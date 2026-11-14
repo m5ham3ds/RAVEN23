@@ -1,0 +1,66 @@
+{
+  "id": "community.yastream",
+  "version": "0.11.5",
+  "catalogs": [
+    {
+      "id": "kisskh.series.Korean",
+      "type": "series",
+      "name": "[yastream] kisskh Korean",
+      "extra": [{"name": "skip", "isRequired": false}]
+    },
+    {
+      "id": "kisskh.series.Search",
+      "type": "series",
+      "name": "[yastream] kisskh Search",
+      "extra": [
+        {"name": "skip", "isRequired": false},
+        {"name": "search", "isRequired": true}
+      ]
+    },
+    {
+      "id": "kisskh.movie.Search",
+      "type": "movie",
+      "name": "[yastream] kisskh Search",
+      "extra": [
+        {"name": "skip", "isRequired": false},
+        {"name": "search", "isRequired": true}
+      ]
+    },
+    {
+      "id": "onetouchtv.series.Korean",
+      "type": "series",
+      "name": "[yastream] onetouchtv Korean",
+      "extra": [{"name": "skip", "isRequired": false}]
+    },
+    {
+      "id": "onetouchtv.series.Search",
+      "type": "series",
+      "name": "[yastream] onetouchtv Search",
+      "extra": [
+        {"name": "skip", "isRequired": false},
+        {"name": "search", "isRequired": true}
+      ]
+    }
+  ],
+  "resources": [
+    "catalog",
+    {
+      "name": "meta",
+      "types": ["movie", "series"],
+      "idPrefixes": ["idrama", "kisskh", "onetouchtv"]
+    },
+    "stream",
+    "subtitles"
+  ],
+  "logo": "https://yastream.tamthai.de/img/yas.png",
+  "idPrefixes": ["tt", "tmdb", "tvdb", "idrama", "kisskh", "onetouchtv"],
+  "types": ["movie", "series"],
+  "name": "yastream",
+  "description": "Yet Another Stream. Stream asian dramas, series and movies directly with multiple providers. Support catalogs with country selection. Powered by TMDB and TVDB for metadata.",
+  "behaviorHints": {
+    "adult": false,
+    "p2p": false,
+    "configurable": true,
+    "configurationRequired": false
+  }
+}

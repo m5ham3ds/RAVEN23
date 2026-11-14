@@ -1,0 +1,2465 @@
+diff --git a/lib/manga/mihon/mihon_default_extension_installer.dart b/lib/manga/mihon/mihon_default_extension_installer.dart
+index 70f870c..48281b7 100644
+--- a/lib/manga/mihon/mihon_default_extension_installer.dart
++++ b/lib/manga/mihon/mihon_default_extension_installer.dart
+@@ -145,8 +145,7 @@ class MihonDefaultExtensionInstaller {
+         .where(
+           (entry) =>
+               entry.canInstall &&
+-              entry.signingKey?.toLowerCase() ==
+-                  trustedKeiyoushiFingerprint,
++              entry.signingKey?.toLowerCase() == trustedKeiyoushiFingerprint,
+         )
+         .toList(growable: false);
+     final selected = <String, MangaExtensionEntry>{};
+diff --git a/lib/manga/mihon/mihon_source_browser_screen.dart b/lib/manga/mihon/mihon_source_browser_screen.dart
+index 32523ca..1a875b2 100644
+--- a/lib/manga/mihon/mihon_source_browser_screen.dart
++++ b/lib/manga/mihon/mihon_source_browser_screen.dart
+@@ -103,15 +103,15 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+         }
+       }
+       extensions.sort(
+-        (left, right) => left.name.toLowerCase().compareTo(
+-          right.name.toLowerCase(),
+-        ),
++        (left, right) =>
++            left.name.toLowerCase().compareTo(right.name.toLowerCase()),
+       );
+       if (!mounted) return;
+       setState(() {
+         _extensions = List<MangaExtensionEntry>.unmodifiable(extensions);
+-        _installedSources =
+-            List<MihonSourceInfo>.unmodifiable(installedSources);
++        _installedSources = List<MihonSourceInfo>.unmodifiable(
++          installedSources,
++        );
+         _visibleEntryCount = _directoryPageSize;
+         _loading = false;
+         if (extensions.isEmpty &&
+@@ -135,7 +135,9 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+       final key = source.packageName.trim().isEmpty
+           ? 'source:${source.id}'
+           : source.packageName;
+-      remainingByPackage.putIfAbsent(key, () => <MihonSourceInfo>[]).add(source);
++      remainingByPackage
++          .putIfAbsent(key, () => <MihonSourceInfo>[])
++          .add(source);
+     }
+ 
+     final entries = <_MihonDirectoryEntry>[];
+@@ -155,8 +157,7 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+           languages: extension.languages.isNotEmpty
+               ? extension.languages
+               : installed.map((source) => source.lang).toList(),
+-          isNsfw: extension.isNsfw ||
+-              installed.any((source) => source.isNsfw),
++          isNsfw: extension.isNsfw || installed.any((source) => source.isNsfw),
+           extension: extension,
+           installedSources: installed,
+         ),
+@@ -190,23 +191,25 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+ 
+   List<_MihonDirectoryEntry> _filteredEntries() {
+     final query = _filterController.text.trim().toLowerCase();
+-    final entries = _directoryEntries.where((entry) {
+-      if (query.isEmpty) return true;
+-      return entry.name.toLowerCase().contains(query) ||
+-          entry.packageName.toLowerCase().contains(query) ||
+-          entry.languages.any(
+-            (language) => language.toLowerCase().contains(query),
+-          ) ||
+-          entry.installedSources.any(
+-            (source) => source.name.toLowerCase().contains(query),
+-          ) ||
+-          (entry.extension?.sources.any(
+-                (source) =>
+-                    source.name.toLowerCase().contains(query) ||
+-                    source.language.toLowerCase().contains(query),
+-              ) ??
+-              false);
+-    }).toList(growable: false);
++    final entries = _directoryEntries
++        .where((entry) {
++          if (query.isEmpty) return true;
++          return entry.name.toLowerCase().contains(query) ||
++              entry.packageName.toLowerCase().contains(query) ||
++              entry.languages.any(
++                (language) => language.toLowerCase().contains(query),
++              ) ||
++              entry.installedSources.any(
++                (source) => source.name.toLowerCase().contains(query),
++              ) ||
++              (entry.extension?.sources.any(
++                    (source) =>
++                        source.name.toLowerCase().contains(query) ||
++                        source.language.toLowerCase().contains(query),
++                  ) ??
++                  false);
++        })
++        .toList(growable: false);
+     // Pin installed sources before available entries, while retaining the
+     // alphabetical order within each group and after every search update.
+     entries.sort((left, right) {
+@@ -283,9 +286,7 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+       context: context,
+       builder: (dialogContext) => AlertDialog(
+         title: Text(tr('mihon_uninstall_title')),
+-        content: Text(
+-          tr('mihon_uninstall_body', args: <String>[displayName]),
+-        ),
++        content: Text(tr('mihon_uninstall_body', args: <String>[displayName])),
+         actions: <Widget>[
+           TextButton(
+             onPressed: () => Navigator.of(dialogContext).pop(false),
+@@ -319,15 +320,12 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+   Future<void> _openWebsite(MangaExtensionEntry extension) async {
+     final homeUrl = extension.sources
+         .map((source) => source.homeUrl.trim())
+-        .firstWhere(
+-          (value) {
+-            final uri = Uri.tryParse(value);
+-            return uri != null &&
+-                (uri.scheme == 'https' || uri.scheme == 'http') &&
+-                uri.host.isNotEmpty;
+-          },
+-          orElse: () => KeiyoushiExtensionRepository.projectUrl,
+-        );
++        .firstWhere((value) {
++          final uri = Uri.tryParse(value);
++          return uri != null &&
++              (uri.scheme == 'https' || uri.scheme == 'http') &&
++              uri.host.isNotEmpty;
++        }, orElse: () => KeiyoushiExtensionRepository.projectUrl);
+     try {
+       final opened = await launchUrl(
+         Uri.parse(homeUrl),
+@@ -403,7 +401,9 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+     try {
+       final sources = await _runtime.listSources(reload: true);
+       if (!mounted) return;
+-      setState(() => _installedSources = List<MihonSourceInfo>.unmodifiable(sources));
++      setState(
++        () => _installedSources = List<MihonSourceInfo>.unmodifiable(sources),
++      );
+     } catch (_) {
+       // Returning from a source catalog should not replace the visible list
+       // with an error if the extension's runtime is temporarily unavailable.
+@@ -479,7 +479,8 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+                     )
+                   else if (extension != null)
+                     FilledButton.icon(
+-                      onPressed: extension.canInstall &&
++                      onPressed:
++                          extension.canInstall &&
+                               _runtime.supportsNativeExtensions
+                           ? () {
+                               Navigator.of(sheetContext).pop();
+@@ -500,9 +501,7 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+ 
+   void _message(String value) {
+     if (!mounted) return;
+-    ScaffoldMessenger.of(context).showSnackBar(
+-      SnackBar(content: Text(value)),
+-    );
++    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+   }
+ 
+   @override
+@@ -510,11 +509,12 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+     final palette = AppPalette.of(context);
+     final allEntries = _directoryEntries;
+     final entries = _filteredEntries();
+-    final installedCount =
+-        allEntries.where((entry) => entry.isInstalled).length;
+-    final visibleEntries = entries.take(_visibleEntryCount).toList(
+-      growable: false,
+-    );
++    final installedCount = allEntries
++        .where((entry) => entry.isInstalled)
++        .length;
++    final visibleEntries = entries
++        .take(_visibleEntryCount)
++        .toList(growable: false);
+ 
+     return Scaffold(
+       backgroundColor: palette.page,
+@@ -654,7 +654,8 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+                         return _MihonDirectoryEntryCard(
+                           entry: entry,
+                           busy: isBusy,
+-                          canInstall: entry.extension?.canInstall == true &&
++                          canInstall:
++                              entry.extension?.canInstall == true &&
+                               _runtime.supportsNativeExtensions,
+                           onOpen: () => _openEntry(entry),
+                           onWebsite: entry.extension == null
+@@ -663,7 +664,8 @@ class _MihonSourceBrowserScreenState extends State<MihonSourceBrowserScreen> {
+                           onInstall: entry.extension == null
+                               ? null
+                               : () => _install(entry.extension!),
+-                          onDetails: entry.isInstalled || entry.extension != null
++                          onDetails:
++                              entry.isInstalled || entry.extension != null
+                               ? () => _showEntryDetails(entry)
+                               : null,
+                         );
+@@ -753,9 +755,7 @@ class _MihonDirectoryEntryCard extends StatelessWidget {
+     return Card(
+       margin: EdgeInsets.zero,
+       color: palette.surface,
+-      shape: RoundedRectangleBorder(
+-        borderRadius: BorderRadius.circular(18),
+-      ),
++      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+       clipBehavior: Clip.antiAlias,
+       child: InkWell(
+         onTap: onOpen,
+diff --git a/lib/manga/ui/manga_reader_crop.dart b/lib/manga/ui/manga_reader_crop.dart
+index 822e91d..7e8509e 100644
+--- a/lib/manga/ui/manga_reader_crop.dart
++++ b/lib/manga/ui/manga_reader_crop.dart
+@@ -57,17 +57,16 @@ ui.Rect? findMangaContentRect(
+   var bottom = height;
+   while (bottom > height - maxY &&
+       bottom > top + 1 &&
+-      flatRow(
+-        bottom - 1,
+-        bottomColor.$1,
+-        bottomColor.$2,
+-        bottomColor.$3,
+-      )) {
++      flatRow(bottom - 1, bottomColor.$1, bottomColor.$2, bottomColor.$3)) {
+     bottom--;
+   }
+ 
+   final leftOffset = offset(0, 0);
+-  final leftColor = (rgba[leftOffset], rgba[leftOffset + 1], rgba[leftOffset + 2]);
++  final leftColor = (
++    rgba[leftOffset],
++    rgba[leftOffset + 1],
++    rgba[leftOffset + 2],
++  );
+   var left = 0;
+   while (left < maxX &&
+       flatColumn(left, leftColor.$1, leftColor.$2, leftColor.$3)) {
+@@ -83,12 +82,7 @@ ui.Rect? findMangaContentRect(
+   var right = width;
+   while (right > width - maxX &&
+       right > left + 1 &&
+-      flatColumn(
+-        right - 1,
+-        rightColor.$1,
+-        rightColor.$2,
+-        rightColor.$3,
+-      )) {
++      flatColumn(right - 1, rightColor.$1, rightColor.$2, rightColor.$3)) {
+     right--;
+   }
+ 
+diff --git a/lib/manga/ui/manga_reader_screen.dart b/lib/manga/ui/manga_reader_screen.dart
+index 6cfdede..5d4ac6b 100644
+--- a/lib/manga/ui/manga_reader_screen.dart
++++ b/lib/manga/ui/manga_reader_screen.dart
+@@ -91,7 +91,8 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+   int? _webtoonDetectionChapter;
+   bool? _lastDoublePageLayout;
+   bool get _doublePageActive =>
+-      _doublePageLandscape && !_vertical &&
++      _doublePageLandscape &&
++      !_vertical &&
+       MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
+   bool _fitHeight = false;
+   String _fitMode = 'width';
+@@ -361,33 +362,30 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+ 
+     if (_vertical) {
+       // Smooth continuous movement for Webtoon/vertical reading.
+-      _autoScrollTimer = Timer.periodic(
+-        const Duration(milliseconds: 16),
+-        (_) {
+-          if (!mounted ||
+-              !_autoScrollActive ||
+-              _autoScrollPaused ||
+-              !_stripController.hasClients) {
+-            return;
+-          }
+-          final position = _stripController.position;
+-          if (position.pixels >= position.maxScrollExtent - 1) {
+-            _setAutoScroll(false);
+-            return;
+-          }
+-          _stripController.jumpTo(
+-            (position.pixels + _autoScrollSpeed)
+-                .clamp(position.minScrollExtent, position.maxScrollExtent)
+-                .toDouble(),
+-          );
+-        },
+-      );
++      _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
++        if (!mounted ||
++            !_autoScrollActive ||
++            _autoScrollPaused ||
++            !_stripController.hasClients) {
++          return;
++        }
++        final position = _stripController.position;
++        if (position.pixels >= position.maxScrollExtent - 1) {
++          _setAutoScroll(false);
++          return;
++        }
++        _stripController.jumpTo(
++          (position.pixels + _autoScrollSpeed)
++              .clamp(position.minScrollExtent, position.maxScrollExtent)
++              .toDouble(),
++        );
++      });
+     } else {
+       // Paged manga advances one page/spread per interval. Higher speed means
+       // a shorter pause between turns, matching the Zangetsu reader behavior.
+       final intervalMilliseconds = (3200 / _autoScrollSpeed)
+-              .clamp(500, 8000)
+-              .round();
++          .clamp(500, 8000)
++          .round();
+       _autoScrollTimer = Timer.periodic(
+         Duration(milliseconds: intervalMilliseconds),
+         (_) async {
+@@ -601,9 +599,11 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+       return false;
+     }
+     if (notification is OverscrollNotification) {
+-      final atStart = notification.metrics.pixels <=
++      final atStart =
++          notification.metrics.pixels <=
+           notification.metrics.minScrollExtent + 1;
+-      final atEnd = notification.metrics.pixels >=
++      final atEnd =
++          notification.metrics.pixels >=
+           notification.metrics.maxScrollExtent - 1;
+       final towardPrevious = atStart && notification.overscroll < 0;
+       final towardNext = atEnd && notification.overscroll > 0;
+@@ -631,7 +631,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+   }
+ 
+   Future<void> _detectWebtoonIfNeeded(int index, Uint8List bytes) async {
+-    if (!_autoWebtoon || index != 0 || _webtoonDetectionChapter == _chapterIndex) {
++    if (!_autoWebtoon ||
++        index != 0 ||
++        _webtoonDetectionChapter == _chapterIndex) {
+       return;
+     }
+     final chapter = _chapterIndex;
+@@ -692,8 +694,7 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+ 
+   Future<void> _openChapterPicker() async {
+     final chapterScrollController = ScrollController(
+-      initialScrollOffset:
+-          (_chapterIndex > 2 ? _chapterIndex - 2 : 0) * 72.0,
++      initialScrollOffset: (_chapterIndex > 2 ? _chapterIndex - 2 : 0) * 72.0,
+     );
+     int? selected;
+     try {
+@@ -769,7 +770,10 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: <Widget>[
+                 Padding(
+-                  padding: const EdgeInsets.only(left: AppSpace.xs, bottom: AppSpace.sm),
++                  padding: const EdgeInsets.only(
++                    left: AppSpace.xs,
++                    bottom: AppSpace.sm,
++                  ),
+                   child: Text(
+                     title,
+                     style: AppType.sectionHeader.copyWith(
+@@ -899,9 +903,12 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                           SwitchListTile(
+                             contentPadding: EdgeInsets.zero,
+                             title: Text(tr('manga_reader_auto_webtoon')),
+-                            subtitle: Text(tr('manga_reader_auto_webtoon_hint')),
++                            subtitle: Text(
++                              tr('manga_reader_auto_webtoon_hint'),
++                            ),
+                             value: _autoWebtoon,
+-                            onChanged: (value) => update(() => _autoWebtoon = value),
++                            onChanged: (value) =>
++                                update(() => _autoWebtoon = value),
+                           ),
+                         ],
+                       ),
+@@ -922,7 +929,7 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                             <(String, String)>[
+                               ('width', tr('manga_reader_fit_width')),
+                               ('height', tr('manga_reader_fit_height')),
+-                                  ('contain', tr('manga_reader_fit_contain')),
++                              ('contain', tr('manga_reader_fit_contain')),
+                               ('original', tr('manga_reader_fit_original')),
+                               ('smart', tr('manga_reader_fit_smart')),
+                             ],
+@@ -979,16 +986,20 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                             onChanged: (value) {
+                               update(() => _doublePageLandscape = value);
+                               WidgetsBinding.instance.addPostFrameCallback((_) {
+-                                if (mounted) _restoreViewport(_pageIndex, _pages.length);
++                                if (mounted)
++                                  _restoreViewport(_pageIndex, _pages.length);
+                               });
+                             },
+                           ),
+                           SwitchListTile(
+                             contentPadding: EdgeInsets.zero,
+                             title: Text(tr('manga_reader_crop_borders')),
+-                            subtitle: Text(tr('manga_reader_crop_borders_hint')),
++                            subtitle: Text(
++                              tr('manga_reader_crop_borders_hint'),
++                            ),
+                             value: _cropBorders,
+-                            onChanged: (value) => update(() => _cropBorders = value),
++                            onChanged: (value) =>
++                                update(() => _cropBorders = value),
+                           ),
+                         ],
+                       ),
+@@ -1020,9 +1031,7 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                                 min: .5,
+                                 max: 5,
+                                 divisions: 18,
+-                                value: _autoScrollSpeed
+-                                    .clamp(.5, 5)
+-                                    .toDouble(),
++                                value: _autoScrollSpeed.clamp(.5, 5).toDouble(),
+                                 onChanged: (value) {
+                                   update(() => _autoScrollSpeed = value);
+                                   if (_autoScrollActive && !_vertical) {
+@@ -1037,18 +1046,24 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                             title: Text(tr('manga_reader_tap_zones')),
+                             subtitle: Text(tr('manga_reader_tap_zones_hint')),
+                             value: _tapZonesEnabled,
+-                            onChanged: (value) => update(() => _tapZonesEnabled = value),
++                            onChanged: (value) =>
++                                update(() => _tapZonesEnabled = value),
+                           ),
+                           SwitchListTile(
+                             contentPadding: EdgeInsets.zero,
+-                            title: Text(tr('manga_reader_pull_to_change_chapter')),
++                            title: Text(
++                              tr('manga_reader_pull_to_change_chapter'),
++                            ),
+                             value: _pullToChangeChapter,
+-                            onChanged: (value) => update(() => _pullToChangeChapter = value),
++                            onChanged: (value) =>
++                                update(() => _pullToChangeChapter = value),
+                           ),
+                           SwitchListTile(
+                             contentPadding: EdgeInsets.zero,
+                             title: Text(tr('manga_reader_volume_key_paging')),
+-                            subtitle: Text(tr('manga_reader_volume_key_paging_hint')),
++                            subtitle: Text(
++                              tr('manga_reader_volume_key_paging_hint'),
++                            ),
+                             value: _volumeKeyPaging,
+                             onChanged: (value) {
+                               update(() => _volumeKeyPaging = value);
+@@ -1058,9 +1073,12 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                           if (_volumeKeyPaging)
+                             SwitchListTile(
+                               contentPadding: EdgeInsets.zero,
+-                              title: Text(tr('manga_reader_invert_volume_keys')),
++                              title: Text(
++                                tr('manga_reader_invert_volume_keys'),
++                              ),
+                               value: _invertVolumeKeys,
+-                              onChanged: (value) => update(() => _invertVolumeKeys = value),
++                              onChanged: (value) =>
++                                  update(() => _invertVolumeKeys = value),
+                             ),
+                         ],
+                       ),
+@@ -1089,15 +1107,25 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                           ),
+                           Align(
+                             alignment: Alignment.centerLeft,
+-                            child: Text(tr('manga_reader_orientation'),
+-                                style: AppType.body.copyWith(color: palette.foreground)),
++                            child: Text(
++                              tr('manga_reader_orientation'),
++                              style: AppType.body.copyWith(
++                                color: palette.foreground,
++                              ),
++                            ),
+                           ),
+                           const SizedBox(height: AppSpace.xs),
+                           choices(
+                             <(String, String)>[
+                               ('system', tr('manga_reader_orientation_system')),
+-                              ('portrait', tr('manga_reader_orientation_portrait')),
+-                              ('landscape', tr('manga_reader_orientation_landscape')),
++                              (
++                                'portrait',
++                                tr('manga_reader_orientation_portrait'),
++                              ),
++                              (
++                                'landscape',
++                                tr('manga_reader_orientation_landscape'),
++                              ),
+                             ],
+                             _readerOrientation,
+                             (value) {
+@@ -1190,31 +1218,35 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+           'saveImageToGallery',
+           <String, Object>{
+             'bytes': bytes,
+-            'name': 'RAVEN23_${widget.anilistId}_${_chapterIndex + 1}_${index + 1}',
++            'name':
++                'RAVEN23_${widget.anilistId}_${_chapterIndex + 1}_${index + 1}',
+             'mimeType': _imageMime(bytes),
+           },
+         );
+         if (!mounted) return;
+-        ScaffoldMessenger.of(context).showSnackBar(
+-          SnackBar(content: Text(tr('manga_reader_page_saved'))),
+-        );
++        ScaffoldMessenger.of(
++          context,
++        ).showSnackBar(SnackBar(content: Text(tr('manga_reader_page_saved'))));
+       } else {
+         final temporary = await getTemporaryDirectory();
+         final extension = _imageExtension(bytes);
+-        final file = File(p.join(
+-          temporary.path,
+-          'raven23_page_${widget.anilistId}_${_chapterIndex + 1}_${index + 1}.$extension',
+-        ));
+-        await file.writeAsBytes(bytes, flush: true);
+-        await Share.shareXFiles(
+-          <XFile>[XFile(file.path, mimeType: _imageMime(bytes))],
+-          text: '${widget.workTitle} · $_chapterTitle',
++        final file = File(
++          p.join(
++            temporary.path,
++            'raven23_page_${widget.anilistId}_${_chapterIndex + 1}_${index + 1}.$extension',
++          ),
+         );
++        await file.writeAsBytes(bytes, flush: true);
++        await Share.shareXFiles(<XFile>[
++          XFile(file.path, mimeType: _imageMime(bytes)),
++        ], text: '${widget.workTitle} · $_chapterTitle');
+       }
+     } on PlatformException catch (error) {
+       if (!mounted) return;
+       ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(error.message ?? tr('manga_reader_page_save_failed'))),
++        SnackBar(
++          content: Text(error.message ?? tr('manga_reader_page_save_failed')),
++        ),
+       );
+     } catch (_) {
+       if (!mounted) return;
+@@ -1238,7 +1270,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+     }
+     final rawHeaders = page['headers'];
+     final headers = rawHeaders is Map
+-        ? rawHeaders.map((key, value) => MapEntry(key.toString(), value.toString()))
++        ? rawHeaders.map(
++            (key, value) => MapEntry(key.toString(), value.toString()),
++          )
+         : const <String, String>{};
+     final bytes = await _runtime.image(
+       widget.source.id,
+@@ -1251,11 +1285,16 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+   }
+ 
+   String _imageMime(Uint8List bytes) {
+-    if (bytes.length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50) return 'image/png';
+-    if (bytes.length >= 12 && String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+-        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') return 'image/webp';
+-    if (bytes.length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8) return 'image/jpeg';
+-    if (bytes.length >= 6 && String.fromCharCodes(bytes.sublist(0, 3)) == 'GIF') return 'image/gif';
++    if (bytes.length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50)
++      return 'image/png';
++    if (bytes.length >= 12 &&
++        String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
++        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP')
++      return 'image/webp';
++    if (bytes.length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8)
++      return 'image/jpeg';
++    if (bytes.length >= 6 && String.fromCharCodes(bytes.sublist(0, 3)) == 'GIF')
++      return 'image/gif';
+     return 'image/jpeg';
+   }
+ 
+@@ -2214,35 +2253,39 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+     );
+   }
+ 
+-  Widget _buildVerticalReader(Color background) => NotificationListener<ScrollNotification>(
+-    onNotification: _onReaderScrollNotification,
+-    child: ListView.builder(
+-      controller: _stripController,
+-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+-      key: ValueKey<String>('vertical-${_chapterIndex}'),
+-      cacheExtent: 1400,
+-      itemCount: _pages.length,
+-      itemBuilder: (context, index) => VisibilityDetector(
+-        key: Key('manga-page-${widget.source.id}-${_chapterIndex}-$index'),
+-        onVisibilityChanged: (info) => _onStripPageVisible(index, info),
+-        child: _MangaReaderPage(
+-          runtime: _runtime,
+-          source: widget.source,
+-          page: _pages[index],
+-          index: index,
+-          fitMode: _fitMode,
+-          colorFilter: _colorFilter,
+-          cropBorders: _cropBorders,
+-          backgroundColor: background,
+-          translation: _translatedPages['${_pages[index]['imageUrl'] ?? ''}'],
+-          showTranslation: _showTranslations,
+-          targetLanguage: _translationTarget,
+-          onBytesReady: _rememberPageBytes,
+-          onLongPress: _openPageActions,
++  Widget _buildVerticalReader(Color background) =>
++      NotificationListener<ScrollNotification>(
++        onNotification: _onReaderScrollNotification,
++        child: ListView.builder(
++          controller: _stripController,
++          physics: const BouncingScrollPhysics(
++            parent: AlwaysScrollableScrollPhysics(),
++          ),
++          key: ValueKey<String>('vertical-${_chapterIndex}'),
++          cacheExtent: 1400,
++          itemCount: _pages.length,
++          itemBuilder: (context, index) => VisibilityDetector(
++            key: Key('manga-page-${widget.source.id}-${_chapterIndex}-$index'),
++            onVisibilityChanged: (info) => _onStripPageVisible(index, info),
++            child: _MangaReaderPage(
++              runtime: _runtime,
++              source: widget.source,
++              page: _pages[index],
++              index: index,
++              fitMode: _fitMode,
++              colorFilter: _colorFilter,
++              cropBorders: _cropBorders,
++              backgroundColor: background,
++              translation:
++                  _translatedPages['${_pages[index]['imageUrl'] ?? ''}'],
++              showTranslation: _showTranslations,
++              targetLanguage: _translationTarget,
++              onBytesReady: _rememberPageBytes,
++              onLongPress: _openPageActions,
++            ),
++          ),
+         ),
+-      ),
+-    ),
+-  );
++      );
+ 
+   Widget _pageWidget(int index, Color background) => Center(
+     child: _MangaReaderPage(
+@@ -2263,7 +2306,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+   );
+ 
+   Widget _buildPagedReader(Color background) => PageView.builder(
+-    key: ValueKey<String>('paged-${_chapterIndex}-${_rightToLeft}-${_doublePageActive}'),
++    key: ValueKey<String>(
++      'paged-${_chapterIndex}-${_rightToLeft}-${_doublePageActive}',
++    ),
+     controller: _pageController,
+     scrollDirection: Axis.horizontal,
+     reverse: _rightToLeft,
+@@ -2388,8 +2433,8 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+   Widget _buildFilteredImage(Uint8List bytes, double width, double height) {
+     final isSmart = widget.fitMode == 'smart';
+     final original = widget.fitMode == 'original';
+-    final landscape = MediaQuery.sizeOf(context).width >
+-        MediaQuery.sizeOf(context).height;
++    final landscape =
++        MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height;
+     final smartFit = landscape ? BoxFit.fitWidth : BoxFit.fitHeight;
+     Widget image = Image.memory(
+       bytes,
+@@ -2398,12 +2443,12 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+       fit: original
+           ? BoxFit.none
+           : widget.fitMode == 'contain'
+-              ? BoxFit.contain
+-              : isSmart
+-                  ? smartFit
+-                  : widget.fitMode == 'height'
+-                      ? BoxFit.fitHeight
+-                      : BoxFit.fitWidth,
++          ? BoxFit.contain
++          : isSmart
++          ? smartFit
++          : widget.fitMode == 'height'
++          ? BoxFit.fitHeight
++          : BoxFit.fitWidth,
+       gaplessPlayback: true,
+       filterQuality: FilterQuality.medium,
+     );
+@@ -2566,43 +2611,46 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+       if (widget.cropBorders) unawaited(_ensureCrop(snapshot.data!));
+       return GestureDetector(
+         onLongPress: () => unawaited(widget.onLongPress(widget.index)),
+-        onDoubleTapDown: (details) => _doubleTapPosition = details.localPosition,
++        onDoubleTapDown: (details) =>
++            _doubleTapPosition = details.localPosition,
+         onDoubleTap: _toggleDoubleTapZoom,
+         child: LayoutBuilder(
+-        builder: (context, constraints) {
+-          final availableWidth = constraints.maxWidth.isFinite
+-              ? constraints.maxWidth
+-              : MediaQuery.sizeOf(context).width;
+-          final availableHeight = constraints.maxHeight.isFinite
+-              ? constraints.maxHeight
+-              : MediaQuery.sizeOf(context).height;
+-          return InteractiveViewer(
+-            transformationController: _transformationController,
+-            minScale: 1,
+-            maxScale: 4,
+-            panEnabled: true,
+-            child: Stack(
+-              fit: StackFit.passthrough,
+-              children: <Widget>[
+-                _cropped(_buildFilteredImage(
+-                  snapshot.data!,
+-                  availableWidth,
+-                  availableHeight,
+-                )),
+-                if (widget.showTranslation && widget.translation != null)
+-                  Positioned.fill(
+-                    child: MangaTranslationOverlay(
+-                      translation: widget.translation!,
+-                      targetLanguage: widget.targetLanguage,
+-                      fitMode: widget.fitMode,
++          builder: (context, constraints) {
++            final availableWidth = constraints.maxWidth.isFinite
++                ? constraints.maxWidth
++                : MediaQuery.sizeOf(context).width;
++            final availableHeight = constraints.maxHeight.isFinite
++                ? constraints.maxHeight
++                : MediaQuery.sizeOf(context).height;
++            return InteractiveViewer(
++              transformationController: _transformationController,
++              minScale: 1,
++              maxScale: 4,
++              panEnabled: true,
++              child: Stack(
++                fit: StackFit.passthrough,
++                children: <Widget>[
++                  _cropped(
++                    _buildFilteredImage(
++                      snapshot.data!,
++                      availableWidth,
++                      availableHeight,
+                     ),
+                   ),
+-              ],
+-            ),
+-          );
+-        },
+-      ),
+-    );
++                  if (widget.showTranslation && widget.translation != null)
++                    Positioned.fill(
++                      child: MangaTranslationOverlay(
++                        translation: widget.translation!,
++                        targetLanguage: widget.targetLanguage,
++                        fitMode: widget.fitMode,
++                      ),
++                    ),
++                ],
++              ),
++            );
++          },
++        ),
++      );
+     },
+   );
+ }
+diff --git a/lib/mobile/app/mobile_nav_bar.dart b/lib/mobile/app/mobile_nav_bar.dart
+index fc7eaf0..275490b 100644
+--- a/lib/mobile/app/mobile_nav_bar.dart
++++ b/lib/mobile/app/mobile_nav_bar.dart
+@@ -90,10 +90,11 @@ class MobileNavBar extends StatelessWidget {
+                     // Keep all five destinations visually grouped. This
+                     // reduces the centre-to-centre gap by 12.5% while keeping
+                     // every item equally sized and the dock centred.
+-                    width: (collapsed
++                    width:
++                        (collapsed
+                             ? (5 * 54.0)
+-                                .clamp(0.0, constraints.maxWidth)
+-                                .toDouble()
++                                  .clamp(0.0, constraints.maxWidth)
++                                  .toDouble()
+                             : constraints.maxWidth) *
+                         0.875,
+                     child: MediaQuery.withClampedTextScaling(
+diff --git a/lib/raven23_main.dart b/lib/raven23_main.dart
+index 67758d0..09beaac 100644
+--- a/lib/raven23_main.dart
++++ b/lib/raven23_main.dart
+@@ -46,18 +46,19 @@ import 'tv/navigation/tv_back_key_guard.dart';
+ import 'tv/widgets/tv_update_gate.dart';
+ 
+ class Raven23App extends StatefulWidget {
+-  const Raven23App(
+-      {required this.settingsProvider,
+-      required this.recentProvider,
+-      required this.bookmarkProvider,
+-      required this.appDependencyProvider,
+-      required this.devicePresentation,
+-      this.configController,
+-      this.backendConfigController,
+-      this.adsController,
+-      this.notifications,
+-      this.firebaseSession,
+-      super.key});
++  const Raven23App({
++    required this.settingsProvider,
++    required this.recentProvider,
++    required this.bookmarkProvider,
++    required this.appDependencyProvider,
++    required this.devicePresentation,
++    this.configController,
++    this.backendConfigController,
++    this.adsController,
++    this.notifications,
++    this.firebaseSession,
++    super.key,
++  });
+ 
+   final SettingsProvider settingsProvider;
+   final RecentProvider recentProvider;
+@@ -136,26 +137,27 @@ class _Raven23AppState extends State<Raven23App>
+     }
+     WellnessProvider.instance.addListener(_scheduleLocalWidgetRefresh);
+     widget.bookmarkProvider.addListener(_scheduleLocalWidgetRefresh);
+-    TmdbConnectivity.instance.proxyUrlSource =
+-        () => widget.appDependencyProvider.tmdbProxy;
++    TmdbConnectivity.instance.proxyUrlSource = () =>
++        widget.appDependencyProvider.tmdbProxy;
+     unawaited(_checkTmdb());
+-    _tmdbNetworkSubscription = _connectivity.onConnectivityChanged.listen(
+-      (results) {
+-        final available =
+-            results.any((result) => result != ConnectivityResult.none);
+-        TmdbConnectivity.instance.updateNetworkAvailability(available);
+-        if (available) unawaited(_checkTmdb());
+-      },
+-      onError: (Object _) {},
+-    );
++    _tmdbNetworkSubscription = _connectivity.onConnectivityChanged.listen((
++      results,
++    ) {
++      final available = results.any(
++        (result) => result != ConnectivityResult.none,
++      );
++      TmdbConnectivity.instance.updateNetworkAvailability(available);
++      if (available) unawaited(_checkTmdb());
++    }, onError: (Object _) {});
+     _initConfig();
+     unawaited(widget.adsController?.boot());
+     fileDelete();
+     InAppMessagingService.initialize(
+-        onConfigHint: widget.configController?.onPushData,
+-        messages: widget.notifications?.messages,
+-        messaging: widget.notifications?.messaging,
+-        onMessage: widget.notifications?.receive);
++      onConfigHint: widget.configController?.onPushData,
++      messages: widget.notifications?.messages,
++      messaging: widget.notifications?.messaging,
++      onMessage: widget.notifications?.receive,
++    );
+     unawaited(widget.notifications?.boot());
+     WidgetsBinding.instance.addPostFrameCallback((_) {
+       DeepLinkDispatcher.onAppReady();
+@@ -177,19 +179,21 @@ class _Raven23AppState extends State<Raven23App>
+   void _scheduleLocalWidgetRefresh() {
+     _widgetRefreshDebounce?.cancel();
+     _widgetRefreshDebounce = Timer(const Duration(seconds: 3), () {
+-      unawaited(HomeWidgetService.instance.refreshLocal(
+-        wellness: WellnessProvider.instance,
+-        bookmarks: widget.bookmarkProvider,
+-      ));
++      unawaited(
++        HomeWidgetService.instance.refreshLocal(
++          wellness: WellnessProvider.instance,
++          bookmarks: widget.bookmarkProvider,
++        ),
++      );
+     });
+   }
+ 
+   Future<void> _refreshHomeWidgets() => HomeWidgetService.instance.refreshAll(
+-        settings: widget.settingsProvider,
+-        dependencies: widget.appDependencyProvider,
+-        wellness: WellnessProvider.instance,
+-        bookmarks: widget.bookmarkProvider,
+-      );
++    settings: widget.settingsProvider,
++    dependencies: widget.appDependencyProvider,
++    wellness: WellnessProvider.instance,
++    bookmarks: widget.bookmarkProvider,
++  );
+ 
+   @override
+   void didChangeAppLifecycleState(AppLifecycleState state) {
+@@ -253,133 +257,160 @@ class _Raven23AppState extends State<Raven23App>
+     //       : DeviceOrientation.portraitUp,
+     // ]);
+     return MultiProvider(
+-        providers: [
+-          ChangeNotifierProvider(create: (_) {
++      providers: [
++        ChangeNotifierProvider(
++          create: (_) {
+             return widget.settingsProvider;
+-          }),
+-          ChangeNotifierProvider(create: (_) {
++          },
++        ),
++        ChangeNotifierProvider(
++          create: (_) {
+             return widget.recentProvider;
+-          }),
+-          ChangeNotifierProvider(create: (_) {
++          },
++        ),
++        ChangeNotifierProvider(
++          create: (_) {
+             return widget.bookmarkProvider;
+-          }),
+-          ChangeNotifierProvider(create: (_) {
++          },
++        ),
++        ChangeNotifierProvider(
++          create: (_) {
+             return widget.appDependencyProvider;
+-          }),
+-          ChangeNotifierProvider(
+-            create: (_) => OfflineDownloadProvider()..initialize(),
+-          ),
+-          ChangeNotifierProvider.value(value: WellnessProvider.instance),
+-        ],
+-        child:
+-            Consumer3<SettingsProvider, RecentProvider, AppDependencyProvider>(
+-                builder: (context, settingsProvider, recentProvider,
+-                    appDependencyProvider, snapshot) {
+-          return AppPresentation(
+-            settings: settingsProvider,
+-            detectedPresentation: widget.devicePresentation,
+-            navigatorKey: InAppMessagingService.navigatorKey,
+-            builder: (context, devicePresentation) => DynamicColorBuilder(
+-              builder: (lightDynamic, darkDynamic) {
+-                final isDarkTheme = settingsProvider.appTheme == 'dark' ||
+-                    settingsProvider.appTheme == 'amoled';
+-                final palette = AppColorsList().appColors(
+-                  isDarkTheme,
+-                  customColor: settingsProvider.customAppColor > 0
+-                      ? settingsProvider.customAppColor
+-                      : null,
+-                );
+-                final selectedAppColor = palette.firstWhere(
+-                  (color) => color.index == settingsProvider.appColorIndex,
+-                  orElse: () => palette.first,
+-                );
+-                final appTheme = Styles.themeData(
+-                  appThemeMode: settingsProvider.appTheme,
+-                  isM3Enabled: settingsProvider.isMaterial3Enabled,
+-                  lightDynamicColor: lightDynamic,
+-                  darkDynamicColor: darkDynamic,
+-                  context: context,
+-                  appColor: selectedAppColor,
+-                  compactCorners:
+-                      devicePresentation != DevicePresentation.television,
+-                  occasionalTheme: appDependencyProvider.activeOccasionalTheme,
+-                  ambientColor: appDependencyProvider.activeAmbientColor,
+-                );
+-                unawaited(
+-                  HomeWidgetService.instance.syncResolvedTheme(appTheme),
+-                );
+-                final app = MaterialApp(
+-                  restorationScopeId: 'raven23',
+-                  navigatorKey: InAppMessagingService.navigatorKey,
+-                  localizationsDelegates: context.localizationDelegates,
+-                  supportedLocales: context.supportedLocales,
+-                  locale: context.locale,
+-                  debugShowCheckedModeBanner: false,
+-                  builder: (context, child) =>
+-                      AnnotatedRegion<SystemUiOverlayStyle>(
+-                    value: SystemUiOverlayStyle(
+-                      systemNavigationBarColor: Colors.transparent,
+-                      systemNavigationBarDividerColor: Colors.transparent,
+-                      systemNavigationBarIconBrightness:
+-                          isDarkTheme ? Brightness.light : Brightness.dark,
+-                      systemNavigationBarContrastEnforced: false,
+-                    ),
+-                    child: Stack(
+-                      fit: StackFit.expand,
+-                      children: [
+-                        if (devicePresentation == DevicePresentation.television)
+-                          TvUpdateGate(child: child ?? const SizedBox.shrink())
+-                        else
+-                          MobileUpdateGate(
+-                              child: child ?? const SizedBox.shrink()),
+-                        PlusCelebration(
+-                          television: devicePresentation ==
+-                              DevicePresentation.television,
+-                        ),
+-                        PlusCouponPrompt(
+-                          television: devicePresentation ==
+-                              DevicePresentation.television,
+-                        ),
+-                        OccasionalEffectOverlay(
+-                          theme: appDependencyProvider.activeOccasionalTheme,
+-                          television: devicePresentation ==
+-                              DevicePresentation.television,
+-                          enabled:
+-                              appDependencyProvider.shouldShowOccasionalEffects,
+-                          visibilityListenable: appDependencyProvider,
+-                          visibilityResolver: () =>
+-                              appDependencyProvider.shouldShowOccasionalEffects,
++          },
++        ),
++        ChangeNotifierProvider(
++          create: (_) => OfflineDownloadProvider()..initialize(),
++        ),
++        ChangeNotifierProvider.value(value: WellnessProvider.instance),
++      ],
++      child: Consumer3<SettingsProvider, RecentProvider, AppDependencyProvider>(
++        builder:
++            (
++              context,
++              settingsProvider,
++              recentProvider,
++              appDependencyProvider,
++              snapshot,
++            ) {
++              return AppPresentation(
++                settings: settingsProvider,
++                detectedPresentation: widget.devicePresentation,
++                navigatorKey: InAppMessagingService.navigatorKey,
++                builder: (context, devicePresentation) => DynamicColorBuilder(
++                  builder: (lightDynamic, darkDynamic) {
++                    final isDarkTheme =
++                        settingsProvider.appTheme == 'dark' ||
++                        settingsProvider.appTheme == 'amoled';
++                    final palette = AppColorsList().appColors(
++                      isDarkTheme,
++                      customColor: settingsProvider.customAppColor > 0
++                          ? settingsProvider.customAppColor
++                          : null,
++                    );
++                    final selectedAppColor = palette.firstWhere(
++                      (color) => color.index == settingsProvider.appColorIndex,
++                      orElse: () => palette.first,
++                    );
++                    final appTheme = Styles.themeData(
++                      appThemeMode: settingsProvider.appTheme,
++                      isM3Enabled: settingsProvider.isMaterial3Enabled,
++                      lightDynamicColor: lightDynamic,
++                      darkDynamicColor: darkDynamic,
++                      context: context,
++                      appColor: selectedAppColor,
++                      compactCorners:
++                          devicePresentation != DevicePresentation.television,
++                      occasionalTheme:
++                          appDependencyProvider.activeOccasionalTheme,
++                      ambientColor: appDependencyProvider.activeAmbientColor,
++                    );
++                    unawaited(
++                      HomeWidgetService.instance.syncResolvedTheme(appTheme),
++                    );
++                    final app = MaterialApp(
++                      restorationScopeId: 'raven23',
++                      navigatorKey: InAppMessagingService.navigatorKey,
++                      localizationsDelegates: context.localizationDelegates,
++                      supportedLocales: context.supportedLocales,
++                      locale: context.locale,
++                      debugShowCheckedModeBanner: false,
++                      builder: (context, child) =>
++                          AnnotatedRegion<SystemUiOverlayStyle>(
++                            value: SystemUiOverlayStyle(
++                              systemNavigationBarColor: Colors.transparent,
++                              systemNavigationBarDividerColor:
++                                  Colors.transparent,
++                              systemNavigationBarIconBrightness: isDarkTheme
++                                  ? Brightness.light
++                                  : Brightness.dark,
++                              systemNavigationBarContrastEnforced: false,
++                            ),
++                            child: Stack(
++                              fit: StackFit.expand,
++                              children: [
++                                if (devicePresentation ==
++                                    DevicePresentation.television)
++                                  TvUpdateGate(
++                                    child: child ?? const SizedBox.shrink(),
++                                  )
++                                else
++                                  MobileUpdateGate(
++                                    child: child ?? const SizedBox.shrink(),
++                                  ),
++                                PlusCelebration(
++                                  television:
++                                      devicePresentation ==
++                                      DevicePresentation.television,
++                                ),
++                                PlusCouponPrompt(
++                                  television:
++                                      devicePresentation ==
++                                      DevicePresentation.television,
++                                ),
++                                OccasionalEffectOverlay(
++                                  theme: appDependencyProvider
++                                      .activeOccasionalTheme,
++                                  television:
++                                      devicePresentation ==
++                                      DevicePresentation.television,
++                                  enabled: appDependencyProvider
++                                      .shouldShowOccasionalEffects,
++                                  visibilityListenable: appDependencyProvider,
++                                  visibilityResolver: () =>
++                                      appDependencyProvider
++                                          .shouldShowOccasionalEffects,
++                                ),
++                              ],
++                            ),
++                          ),
++                      theme: appTheme,
++                      home: AdBlockWarmup(
++                        child: UserState(
++                          key: ValueKey<DevicePresentation>(devicePresentation),
++                          devicePresentation: devicePresentation,
+                         ),
+-                      ],
+-                    ),
+-                  ),
+-                  theme: appTheme,
+-                  home: AdBlockWarmup(
+-                    child: UserState(
+-                      key: ValueKey<DevicePresentation>(devicePresentation),
+-                      devicePresentation: devicePresentation,
+-                    ),
+-                  ),
+-                );
+-                // Wraps the app itself: it has to hear about system Backs
+-                // before the navigator does. Keep the wrapper mounted in both
+-                // modes so the navigator's home builder stays up to date.
+-                return TvBackKeyGuard(
+-                  enabled: devicePresentation == DevicePresentation.television,
+-                  child: app,
+-                );
+-              },
+-            ),
+-          );
+-        }));
++                      ),
++                    );
++                    // Wraps the app itself: it has to hear about system Backs
++                    // before the navigator does. Keep the wrapper mounted in both
++                    // modes so the navigator's home builder stays up to date.
++                    return TvBackKeyGuard(
++                      enabled:
++                          devicePresentation == DevicePresentation.television,
++                      child: app,
++                    );
++                  },
++                ),
++              );
++            },
++      ),
++    );
+   }
+ }
+ 
+ /// The phone and tablet app, under its bottom bar.
+ class Raven23HomePage extends StatelessWidget {
+-  const Raven23HomePage({
+-    super.key,
+-  });
++  const Raven23HomePage({super.key});
+ 
+   @override
+   Widget build(BuildContext context) => const MobileShell();
+diff --git a/lib/screens/common/server_status_screen.dart b/lib/screens/common/server_status_screen.dart
+index 5042c52..78298b4 100644
+--- a/lib/screens/common/server_status_screen.dart
++++ b/lib/screens/common/server_status_screen.dart
+@@ -42,10 +42,12 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     }
+ 
+     try {
+-      final scraperApiUrl =
+-          context.read<AppDependencyProvider>().raven23APIURLV2;
+-      final snapshot =
+-          await ScraperApi(scraperApiUrl).getProviderHealthStatus();
++      final scraperApiUrl = context
++          .read<AppDependencyProvider>()
++          .raven23APIURLV2;
++      final snapshot = await ScraperApi(
++        scraperApiUrl,
++      ).getProviderHealthStatus();
+       if (!mounted) return;
+       setState(() => _snapshot = snapshot);
+     } catch (error) {
+@@ -62,37 +64,37 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     return DefaultTabController(
+       length: 2,
+       child: Scaffold(
+-      backgroundColor: palette.page,
+-      appBar: PageAppBar(
+-        title: tr('check_server'),
+-        contentWidth: 900,
+-        bottom: TabBar(
+-          indicatorColor: palette.foreground,
+-          labelColor: palette.foreground,
+-          unselectedLabelColor: palette.mutedText,
+-          tabs: <Widget>[
+-            Tab(text: tr('provider_health_overview')),
+-            Tab(text: tr('source_manager')),
++        backgroundColor: palette.page,
++        appBar: PageAppBar(
++          title: tr('check_server'),
++          contentWidth: 900,
++          bottom: TabBar(
++            indicatorColor: palette.foreground,
++            labelColor: palette.foreground,
++            unselectedLabelColor: palette.mutedText,
++            tabs: <Widget>[
++              Tab(text: tr('provider_health_overview')),
++              Tab(text: tr('source_manager')),
++            ],
++          ),
++          actions: [
++            IconButton(
++              onPressed: _checking ? null : _checkServer,
++              tooltip: tr('check'),
++              icon: Icon(PhosphorIcons.arrowsClockwise()),
++            ),
++          ],
++        ),
++        body: TabBarView(
++          children: <Widget>[
++            SkeletonSwitcher(
++              loading: _snapshot == null && _checking,
++              skeleton: const _StatusSkeleton(),
++              child: _buildBody(),
++            ),
++            const SourceRepositoriesScreen(embedded: true),
+           ],
+         ),
+-        actions: [
+-          IconButton(
+-            onPressed: _checking ? null : _checkServer,
+-            tooltip: tr('check'),
+-            icon: Icon(PhosphorIcons.arrowsClockwise()),
+-          ),
+-        ],
+-      ),
+-      body: TabBarView(
+-        children: <Widget>[
+-          SkeletonSwitcher(
+-            loading: _snapshot == null && _checking,
+-            skeleton: const _StatusSkeleton(),
+-            child: _buildBody(),
+-          ),
+-          const SourceRepositoriesScreen(embedded: true),
+-        ],
+-      ),
+       ),
+     );
+   }
+@@ -122,58 +124,67 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                   top: AppSpace.xs,
+                   bottom: AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
+                 ),
+-                sliver: SliverList.list(children: [
+-                  if (_error != null)
+-                    Padding(
+-                      padding:
+-                          EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.md),
+-                      child: DetailsMessage(
+-                        message: tr('check_connection'),
+-                        onRetry: _checkServer,
++                sliver: SliverList.list(
++                  children: [
++                    if (_error != null)
++                      Padding(
++                        padding: EdgeInsets.fromLTRB(
++                          gutter,
++                          0,
++                          gutter,
++                          AppSpace.md,
++                        ),
++                        child: DetailsMessage(
++                          message: tr('check_connection'),
++                          onRetry: _checkServer,
++                        ),
+                       ),
++                    Padding(
++                      padding: EdgeInsets.symmetric(horizontal: gutter),
++                      child: _buildOverview(snapshot),
+                     ),
+-                  Padding(
+-                    padding: EdgeInsets.symmetric(horizontal: gutter),
+-                    child: _buildOverview(snapshot),
+-                  ),
+-                  GestureDetector(
+-                    behavior: HitTestBehavior.opaque,
+-                    onDoubleTap: () {
+-                      setState(() {
+-                        if (_revealedProviderIds.length ==
+-                            snapshot.providers.length) {
+-                          _revealedProviderIds.clear();
+-                        } else {
+-                          _revealedProviderIds
+-                              .addAll(snapshot.providers.map((p) => p.id));
+-                        }
+-                      });
+-                    },
+-                    child: KickerHeading(
+-                      tr('provider_health_overview'),
+-                      padding: EdgeInsetsDirectional.fromSTEB(
+-                        gutter,
+-                        AppSpace.xxl,
+-                        gutter,
+-                        AppSpace.xs,
+-                      ),
+-                      trailing: Text(
+-                        '${snapshot.providers.length}',
+-                        style:
+-                            AppType.metadata.copyWith(color: palette.mutedText),
++                    GestureDetector(
++                      behavior: HitTestBehavior.opaque,
++                      onDoubleTap: () {
++                        setState(() {
++                          if (_revealedProviderIds.length ==
++                              snapshot.providers.length) {
++                            _revealedProviderIds.clear();
++                          } else {
++                            _revealedProviderIds.addAll(
++                              snapshot.providers.map((p) => p.id),
++                            );
++                          }
++                        });
++                      },
++                      child: KickerHeading(
++                        tr('provider_health_overview'),
++                        padding: EdgeInsetsDirectional.fromSTEB(
++                          gutter,
++                          AppSpace.xxl,
++                          gutter,
++                          AppSpace.xs,
++                        ),
++                        trailing: Text(
++                          '${snapshot.providers.length}',
++                          style: AppType.metadata.copyWith(
++                            color: palette.mutedText,
++                          ),
++                        ),
+                       ),
+                     ),
+-                  ),
+-                  if (snapshot.providers.isEmpty)
+-                    Padding(
+-                      padding: EdgeInsets.symmetric(horizontal: gutter),
+-                      child:
+-                          DetailsMessage(message: tr('provider_health_empty')),
+-                    )
+-                  else
+-                    for (final provider in snapshot.providers)
+-                      _buildProviderRow(provider),
+-                ]),
++                    if (snapshot.providers.isEmpty)
++                      Padding(
++                        padding: EdgeInsets.symmetric(horizontal: gutter),
++                        child: DetailsMessage(
++                          message: tr('provider_health_empty'),
++                        ),
++                      )
++                    else
++                      for (final provider in snapshot.providers)
++                        _buildProviderRow(provider),
++                  ],
++                ),
+               ),
+             ],
+           ),
+@@ -190,15 +201,15 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     final statusText = healthy
+         ? tr('server_working')
+         : unavailable
+-            ? tr('server_down')
+-            : tr('provider_health_degraded');
++        ? tr('server_down')
++        : tr('provider_health_degraded');
+     final percentage = (snapshot.availability * 100).round();
+     final updatedAt = snapshot.updatedAt?.toLocal();
+     final localizations = MaterialLocalizations.of(context);
+     final updatedText = updatedAt == null
+         ? null
+         : '${localizations.formatMediumDate(updatedAt)} · '
+-            '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt))}';
++              '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(updatedAt))}';
+     final intervalMinutes = snapshot.interval.inMinutes;
+     return Container(
+       padding: const EdgeInsets.all(AppSpace.xl),
+@@ -354,9 +365,7 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+         label: revealed ? provider.originalName : provider.displayName,
+         subtitle: tr(
+           'provider_response_time',
+-          namedArgs: {
+-            'milliseconds': '${provider.requestTime.inMilliseconds}',
+-          },
++          namedArgs: {'milliseconds': '${provider.requestTime.inMilliseconds}'},
+         ),
+         trailing: Text(
+           provider.online ? tr('provider_online') : tr('provider_offline'),
+diff --git a/lib/screens/common/settings.dart b/lib/screens/common/settings.dart
+index 8fb7924..f1a4fe7 100644
+--- a/lib/screens/common/settings.dart
++++ b/lib/screens/common/settings.dart
+@@ -84,10 +84,10 @@ class _SettingsState extends State<Settings> {
+             ),
+           ),
+           child: DecoratedBox(
+-            decoration:
+-                BoxDecoration(color: color, shape: BoxShape.circle),
++            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+             child: Center(
+-              child: iconOverride ??
++              child:
++                  iconOverride ??
+                   (selected
+                       ? Icon(PhosphorIcons.check(), color: onColor)
+                       : null),
+@@ -196,9 +196,7 @@ class _SettingsState extends State<Settings> {
+                     appDependencies.occasionalThemeEnabled &&
+                     occasionalCatalog.allowUserSelection &&
+                     occasionalThemes.isNotEmpty)
+-                  _OccasionalThemeChoiceTile(
+-                    provider: appDependencies,
+-                  ),
++                  _OccasionalThemeChoiceTile(provider: appDependencies),
+                 if (occasionalCatalog.enabled &&
+                     appDependencies.occasionalThemeEnabled &&
+                     occasionalCatalog.effectsEnabled &&
+@@ -216,10 +214,14 @@ class _SettingsState extends State<Settings> {
+                   icon: PhosphorIcons.play(),
+                   label: tr('player_settings'),
+                   onTap: () {
+-                    Navigator.push(context,
+-                        MaterialPageRoute(builder: ((context) {
+-                      return const PlayerSettings();
+-                    })));
++                    Navigator.push(
++                      context,
++                      MaterialPageRoute(
++                        builder: ((context) {
++                          return const PlayerSettings();
++                        }),
++                      ),
++                    );
+                   },
+                 ),
+                 if (!isBelow33)
+@@ -277,10 +279,14 @@ class _SettingsState extends State<Settings> {
+                 ),
+                 ListRow(
+                   onTap: (() {
+-                    Navigator.push(context,
+-                        MaterialPageRoute(builder: ((context) {
+-                      return const AppLanguageChoose();
+-                    })));
++                    Navigator.push(
++                      context,
++                      MaterialPageRoute(
++                        builder: ((context) {
++                          return const AppLanguageChoose();
++                        }),
++                      ),
++                    );
+                   }),
+                   icon: PhosphorIcons.translate(),
+                   label: tr('app_language'),
+@@ -294,8 +300,7 @@ class _SettingsState extends State<Settings> {
+                       ],
+                       Text(
+                         languageName ?? settingsValues.appLanguage,
+-                        style:
+-                            AppType.body.copyWith(color: palette.mutedText),
++                        style: AppType.body.copyWith(color: palette.mutedText),
+                       ),
+                     ],
+                   ),
+@@ -311,37 +316,50 @@ class _SettingsState extends State<Settings> {
+                   label: tr('clear_cache'),
+                   showsNext: false,
+                   trailing: PillButton(
+-                      label: tr('clear'),
+-                      icon: PhosphorIcons.eraser(),
+-                      onPressed: () async {
+-                        await NetworkRuntime.httpCache.clearAll();
+-                        await clearCache().then((value) {
+-                          if (!context.mounted) {
+-                            return;
+-                          }
+-                          GlobalMethods.showCustomScaffoldMessage(
+-                              SnackBar(
+-                                  duration: const Duration(
+-                                      seconds: 1, milliseconds: 500),
+-                                  content: Text(value
+-                                      ? tr('cleared_cache')
+-                                      : tr('cache_doesnt_exist'))),
+-                              context);
+-                        });
+-                        await clearTempCache().then((value) {
+-                          if (!context.mounted) {
+-                            return;
+-                          }
+-                          GlobalMethods.showCustomScaffoldMessage(
+-                              SnackBar(
+-                                  duration: const Duration(
+-                                      seconds: 1, milliseconds: 500),
+-                                  content: Text(value
+-                                      ? tr('cleared_cache')
+-                                      : tr('cache_doesnt_exist'))),
+-                              context);
+-                        });
+-                      }),
++                    label: tr('clear'),
++                    icon: PhosphorIcons.eraser(),
++                    onPressed: () async {
++                      await NetworkRuntime.httpCache.clearAll();
++                      await clearCache().then((value) {
++                        if (!context.mounted) {
++                          return;
++                        }
++                        GlobalMethods.showCustomScaffoldMessage(
++                          SnackBar(
++                            duration: const Duration(
++                              seconds: 1,
++                              milliseconds: 500,
++                            ),
++                            content: Text(
++                              value
++                                  ? tr('cleared_cache')
++                                  : tr('cache_doesnt_exist'),
++                            ),
++                          ),
++                          context,
++                        );
++                      });
++                      await clearTempCache().then((value) {
++                        if (!context.mounted) {
++                          return;
++                        }
++                        GlobalMethods.showCustomScaffoldMessage(
++                          SnackBar(
++                            duration: const Duration(
++                              seconds: 1,
++                              milliseconds: 500,
++                            ),
++                            content: Text(
++                              value
++                                  ? tr('cleared_cache')
++                                  : tr('cache_doesnt_exist'),
++                            ),
++                          ),
++                          context,
++                        );
++                      });
++                    },
++                  ),
+                 ),
+               ],
+             ),
+@@ -354,42 +372,53 @@ class _SettingsState extends State<Settings> {
+                   height: 68,
+                   child: ListView(
+                     padding: const EdgeInsets.symmetric(
+-                        horizontal: 16, vertical: 8),
++                      horizontal: 16,
++                      vertical: 8,
++                    ),
+                     scrollDirection: Axis.horizontal,
+                     children: [
+                       ...appColors
+-                          .appColors(settingsValues.appTheme == 'dark' ||
+-                                  settingsValues.appTheme == 'amoled'
+-                              ? true
+-                              : false)
+-                          .map((AppColor appColor) => _paletteSwatch(
+-                                color: appColor.cs.primary,
+-                                onColor: appColor.cs.onPrimary,
+-                                selected: settingsValues.appColorIndex ==
+-                                    appColor.index,
+-                                onTap: () {
+-                                  final selected =
+-                                      settingsValues.appColorIndex ==
+-                                          appColor.index;
+-                                  setState(() {
+-                                    settingsValues.appColorIndex = selected
+-                                        ? AppColor.defaultIndex
+-                                        : appColor.index;
+-                                  });
+-                                },
+-                              )),
++                          .appColors(
++                            settingsValues.appTheme == 'dark' ||
++                                    settingsValues.appTheme == 'amoled'
++                                ? true
++                                : false,
++                          )
++                          .map(
++                            (AppColor appColor) => _paletteSwatch(
++                              color: appColor.cs.primary,
++                              onColor: appColor.cs.onPrimary,
++                              selected:
++                                  settingsValues.appColorIndex ==
++                                  appColor.index,
++                              onTap: () {
++                                final selected =
++                                    settingsValues.appColorIndex ==
++                                    appColor.index;
++                                setState(() {
++                                  settingsValues.appColorIndex = selected
++                                      ? AppColor.defaultIndex
++                                      : appColor.index;
++                                });
++                              },
++                            ),
++                          ),
+                       if (settingsValues.customAppColor > 0)
+                         _paletteSwatch(
+                           color: Color(settingsValues.customAppColor),
+-                          onColor: ThemeData.estimateBrightnessForColor(
+-                                      Color(settingsValues.customAppColor)) ==
++                          onColor:
++                              ThemeData.estimateBrightnessForColor(
++                                    Color(settingsValues.customAppColor),
++                                  ) ==
+                                   Brightness.dark
+                               ? Colors.white
+                               : Colors.black,
+-                          selected: settingsValues.appColorIndex ==
++                          selected:
++                              settingsValues.appColorIndex ==
+                               AppColor.customIndex,
+                           onTap: () {
+-                            final selected = settingsValues.appColorIndex ==
++                            final selected =
++                                settingsValues.appColorIndex ==
+                                 AppColor.customIndex;
+                             setState(() {
+                               settingsValues.appColorIndex = selected
+@@ -517,8 +546,9 @@ class _OccasionalThemeOption extends StatelessWidget {
+     final palette = AppPalette.of(context);
+     final gutter = AppSpace.gutter(context);
+     final titleColor = selected ? palette.onFocus : palette.foreground;
+-    final detailColor =
+-        selected ? palette.onFocus.withValues(alpha: .72) : palette.mutedText;
++    final detailColor = selected
++        ? palette.onFocus.withValues(alpha: .72)
++        : palette.mutedText;
+     return Padding(
+       padding: EdgeInsets.fromLTRB(gutter, 0, gutter, AppSpace.sm),
+       child: Material(
+diff --git a/lib/screens/common/source_repositories_screen.dart b/lib/screens/common/source_repositories_screen.dart
+index 02413a1..380a6a1 100644
+--- a/lib/screens/common/source_repositories_screen.dart
++++ b/lib/screens/common/source_repositories_screen.dart
+@@ -102,12 +102,14 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+ 
+   List<SourceManifest> _filteredCatalog(List<SourceManifest> catalog) {
+     final query = _catalogSearchController.text.trim().toLowerCase();
+-    final results = catalog.where((source) {
+-      if (query.isEmpty) return true;
+-      return source.name.toLowerCase().contains(query) ||
+-          source.stableKey.toLowerCase().contains(query) ||
+-          source.language.toLowerCase().contains(query);
+-    }).toList(growable: false);
++    final results = catalog
++        .where((source) {
++          if (query.isEmpty) return true;
++          return source.name.toLowerCase().contains(query) ||
++              source.stableKey.toLowerCase().contains(query) ||
++              source.language.toLowerCase().contains(query);
++        })
++        .toList(growable: false);
+     results.sort((left, right) {
+       final leftInstalled = _isInstalled(left);
+       final rightInstalled = _isInstalled(right);
+@@ -126,7 +128,9 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+       return;
+     }
+     if (_pageScrollController.position.extentAfter > 420) return;
+-    final total = _filteredCatalog(_snapshot?.catalog ?? const <SourceManifest>[]).length;
++    final total = _filteredCatalog(
++      _snapshot?.catalog ?? const <SourceManifest>[],
++    ).length;
+     if (_catalogVisibleCount >= total) return;
+     _expandingCatalog = true;
+     WidgetsBinding.instance.addPostFrameCallback((_) {
+@@ -835,10 +839,12 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+     final palette = AppPalette.of(context);
+     final catalog = _snapshot?.catalog ?? const <SourceManifest>[];
+     final filteredCatalog = _filteredCatalog(catalog);
+-    final visibleCatalog = filteredCatalog.take(_catalogVisibleCount).toList(
+-      growable: false,
+-    );
+-    final installedSources = catalog.where(_isInstalled).toList(growable: false);
++    final visibleCatalog = filteredCatalog
++        .take(_catalogVisibleCount)
++        .toList(growable: false);
++    final installedSources = catalog
++        .where(_isInstalled)
++        .toList(growable: false);
+     final unsupportedCount = installedSources
+         .where((source) => !_supportsRuntime(source))
+         .length;
+@@ -867,344 +873,340 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+     }
+ 
+     final managerBody = AppResponsiveContent(
+-        maxWidth: 900,
+-        child: _loading && _snapshot == null
+-            ? const Center(child: CircularProgressIndicator())
+-            : ListView(
+-                padding: EdgeInsets.fromLTRB(
+-                  AppSpace.gutter(context),
+-                  AppSpace.md,
+-                  AppSpace.gutter(context),
+-                  AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
++      maxWidth: 900,
++      child: _loading && _snapshot == null
++          ? const Center(child: CircularProgressIndicator())
++          : ListView(
++              padding: EdgeInsets.fromLTRB(
++                AppSpace.gutter(context),
++                AppSpace.md,
++                AppSpace.gutter(context),
++                AppSpace.xxxl + MediaQuery.paddingOf(context).bottom,
++              ),
++              controller: _pageScrollController,
++              children: <Widget>[
++                if (widget.embedded) _buildEmbeddedToolbar(),
++                _IntroCard(
++                  description: tr('source_manager_description'),
++                  installedCount: installedSources.length,
++                  catalogCount: catalog.length,
++                  unsupportedCount: unsupportedCount,
+                 ),
+-                controller: _pageScrollController,
+-                children: <Widget>[
+-                  if (widget.embedded) _buildEmbeddedToolbar(),
+-                  _IntroCard(
+-                    description: tr('source_manager_description'),
+-                    installedCount: installedSources.length,
+-                    catalogCount: catalog.length,
+-                    unsupportedCount: unsupportedCount,
+-                  ),
+-                  const SizedBox(height: AppSpace.lg),
+-                  _SectionHeading(title: tr('add_source_repository')),
+-                  Padding(
+-                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
+-                    child: Text(
+-                      Localizations.localeOf(context).languageCode == 'ar'
+-                          ? 'مهم: هذا الحقل مخصص لفهارس مستودعات المصادر بصيغة JSON فقط. قوائم القنوات M3U/M3U8 تُضاف من Live TV ثم IPTV / M3U، أما روابط HLS/DASH المباشرة فتُوضع داخل قائمة القنوات.'
+-                          : 'Important: this field accepts JSON source-repository indexes only. Add M3U/M3U8 channel lists from Live TV > IPTV / M3U. Direct HLS/DASH stream URLs belong inside a channel playlist.',
+-                      style: AppType.metadata.copyWith(
+-                        color: palette.mutedText,
+-                      ),
+-                    ),
++                const SizedBox(height: AppSpace.lg),
++                _SectionHeading(title: tr('add_source_repository')),
++                Padding(
++                  padding: const EdgeInsets.only(bottom: AppSpace.sm),
++                  child: Text(
++                    Localizations.localeOf(context).languageCode == 'ar'
++                        ? 'مهم: هذا الحقل مخصص لفهارس مستودعات المصادر بصيغة JSON فقط. قوائم القنوات M3U/M3U8 تُضاف من Live TV ثم IPTV / M3U، أما روابط HLS/DASH المباشرة فتُوضع داخل قائمة القنوات.'
++                        : 'Important: this field accepts JSON source-repository indexes only. Add M3U/M3U8 channel lists from Live TV > IPTV / M3U. Direct HLS/DASH stream URLs belong inside a channel playlist.',
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
+                   ),
+-                  Material(
+-                    color: palette.surface,
+-                    borderRadius: BorderRadius.circular(AppRadii.card),
+-                    child: Padding(
+-                      padding: const EdgeInsets.all(AppSpace.md),
+-                      child: Column(
+-                        children: <Widget>[
+-                          TextField(
+-                            controller: _repositoryController,
+-                            keyboardType: TextInputType.url,
+-                            textInputAction: TextInputAction.go,
+-                            onSubmitted: (_) => _addRepository(),
+-                            decoration: InputDecoration(
+-                              labelText: tr('source_repository_url'),
+-                              hintText: 'https://example.com/index.json',
+-                              border: const OutlineInputBorder(),
+-                              suffixIcon: IconButton(
+-                                tooltip: tr('add_repository'),
+-                                onPressed: _working ? null : _addRepository,
+-                                icon: const Icon(Icons.add_rounded),
+-                              ),
++                ),
++                Material(
++                  color: palette.surface,
++                  borderRadius: BorderRadius.circular(AppRadii.card),
++                  child: Padding(
++                    padding: const EdgeInsets.all(AppSpace.md),
++                    child: Column(
++                      children: <Widget>[
++                        TextField(
++                          controller: _repositoryController,
++                          keyboardType: TextInputType.url,
++                          textInputAction: TextInputAction.go,
++                          onSubmitted: (_) => _addRepository(),
++                          decoration: InputDecoration(
++                            labelText: tr('source_repository_url'),
++                            hintText: 'https://example.com/index.json',
++                            border: const OutlineInputBorder(),
++                            suffixIcon: IconButton(
++                              tooltip: tr('add_repository'),
++                              onPressed: _working ? null : _addRepository,
++                              icon: const Icon(Icons.add_rounded),
+                             ),
+                           ),
+-                          const SizedBox(height: AppSpace.sm),
+-                          Align(
+-                            alignment: AlignmentDirectional.centerStart,
+-                            child: OutlinedButton.icon(
+-                              onPressed: _working
+-                                  ? null
+-                                  : _addBundledRepositories,
+-                              icon: const Icon(Icons.add_link_rounded),
+-                              label: Text(tr('add_all_bundled_repositories')),
+-                            ),
++                        ),
++                        const SizedBox(height: AppSpace.sm),
++                        Align(
++                          alignment: AlignmentDirectional.centerStart,
++                          child: OutlinedButton.icon(
++                            onPressed: _working
++                                ? null
++                                : _addBundledRepositories,
++                            icon: const Icon(Icons.add_link_rounded),
++                            label: Text(tr('add_all_bundled_repositories')),
+                           ),
+-                        ],
+-                      ),
++                        ),
++                      ],
+                     ),
+                   ),
+-                  const SizedBox(height: AppSpace.lg),
+-                  _SectionHeading(
+-                    title: tr('repositories'),
+-                    trailing: Text(
+-                      '${_repositories.length + _mangaRepositories.length}',
+-                    ),
++                ),
++                const SizedBox(height: AppSpace.lg),
++                _SectionHeading(
++                  title: tr('repositories'),
++                  trailing: Text(
++                    '${_repositories.length + _mangaRepositories.length}',
+                   ),
+-                  Padding(
+-                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
+-                    child: Text(
+-                      '${_repositories.length} ${tr('video_repositories')} · ${_mangaRepositories.length} ${tr('manga_repositories')}',
+-                      style: AppType.metadata.copyWith(
+-                        color: palette.mutedText,
+-                      ),
+-                    ),
++                ),
++                Padding(
++                  padding: const EdgeInsets.only(bottom: AppSpace.sm),
++                  child: Text(
++                    '${_repositories.length} ${tr('video_repositories')} · ${_mangaRepositories.length} ${tr('manga_repositories')}',
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
+                   ),
+-                  _SectionHeading(
+-                    title: tr('video_repositories'),
+-                    trailing: Text('${_repositories.length}'),
++                ),
++                _SectionHeading(
++                  title: tr('video_repositories'),
++                  trailing: Text('${_repositories.length}'),
++                ),
++                if (_repositories.isEmpty)
++                  _EmptyPanel(label: tr('no_repositories'))
++                else
++                  _SurfacePanel(
++                    children: <Widget>[
++                      for (var index = 0; index < _repositories.length; index++)
++                        _RepositoryTile(
++                          url: _repositories[index],
++                          error: _snapshot?.errors[_repositories[index]],
++                          revisionCount:
++                              _repositoryHistory[_repositories[index]]
++                                  ?.length ??
++                              0,
++                          latestRevision:
++                              (_repositoryHistory[_repositories[index]]
++                                      ?.isNotEmpty ==
++                                  true)
++                              ? _repositoryHistory[_repositories[index]]!.first
++                              : null,
++                          pinnedCommit: _repositoryPins[_repositories[index]],
++                          isGitHubRaw:
++                              Uri.tryParse(_repositories[index])?.host ==
++                              'raw.githubusercontent.com',
++                          onPreview: () =>
++                              _previewRepository(_repositories[index]),
++                          onRollback: () =>
++                              _rollbackRepository(_repositories[index]),
++                          onPin: () => _pinRepository(_repositories[index]),
++                          onClearPin: () =>
++                              _clearRepositoryPin(_repositories[index]),
++                          onRemove: () =>
++                              _removeRepository(_repositories[index]),
++                          showDivider: index != _repositories.length - 1,
++                        ),
++                    ],
++                  ),
++                const SizedBox(height: AppSpace.lg),
++                _SectionHeading(
++                  title: tr('manga_repositories'),
++                  trailing: Text('${_mangaRepositories.length}'),
++                ),
++                Padding(
++                  padding: const EdgeInsets.only(bottom: AppSpace.sm),
++                  child: Text(
++                    tr('manga_repository_separate_hint'),
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
+                   ),
+-                  if (_repositories.isEmpty)
+-                    _EmptyPanel(label: tr('no_repositories'))
+-                  else
+-                    _SurfacePanel(
++                ),
++                Material(
++                  color: palette.surface,
++                  borderRadius: BorderRadius.circular(AppRadii.card),
++                  child: Padding(
++                    padding: const EdgeInsets.all(AppSpace.md),
++                    child: Column(
++                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                       children: <Widget>[
+-                        for (
+-                          var index = 0;
+-                          index < _repositories.length;
+-                          index++
+-                        )
+-                          _RepositoryTile(
+-                            url: _repositories[index],
+-                            error: _snapshot?.errors[_repositories[index]],
+-                            revisionCount:
+-                                _repositoryHistory[_repositories[index]]
+-                                    ?.length ??
+-                                0,
+-                            latestRevision:
+-                                (_repositoryHistory[_repositories[index]]
+-                                        ?.isNotEmpty ==
+-                                    true)
+-                                ? _repositoryHistory[_repositories[index]]!
+-                                      .first
+-                                : null,
+-                            pinnedCommit: _repositoryPins[_repositories[index]],
+-                            isGitHubRaw:
+-                                Uri.tryParse(_repositories[index])?.host ==
+-                                'raw.githubusercontent.com',
+-                            onPreview: () =>
+-                                _previewRepository(_repositories[index]),
+-                            onRollback: () =>
+-                                _rollbackRepository(_repositories[index]),
+-                            onPin: () => _pinRepository(_repositories[index]),
+-                            onClearPin: () =>
+-                                _clearRepositoryPin(_repositories[index]),
+-                            onRemove: () =>
+-                                _removeRepository(_repositories[index]),
+-                            showDivider: index != _repositories.length - 1,
++                        Row(
++                          children: <Widget>[
++                            Icon(
++                              Icons.menu_book_rounded,
++                              color: palette.foreground,
++                            ),
++                            const SizedBox(width: AppSpace.sm),
++                            Expanded(
++                              child: Text(
++                                tr('manga_repository_add_url'),
++                                style: AppType.cardTitle.copyWith(
++                                  color: palette.foreground,
++                                ),
++                              ),
++                            ),
++                            const Chip(label: Text('Protobuf')),
++                          ],
++                        ),
++                        const SizedBox(height: AppSpace.sm),
++                        TextField(
++                          controller: _mangaRepositoryController,
++                          keyboardType: TextInputType.url,
++                          textInputAction: TextInputAction.go,
++                          onSubmitted: (_) => _addMangaRepository(),
++                          decoration: InputDecoration(
++                            labelText: tr('manga_repository_url'),
++                            hintText: 'https://example.com/index.pb',
++                            border: const OutlineInputBorder(),
++                            suffixIcon: IconButton(
++                              tooltip: tr('add_repository'),
++                              onPressed: _working ? null : _addMangaRepository,
++                              icon: const Icon(Icons.add_rounded),
++                            ),
+                           ),
+-                      ],
+-                    ),
+-                  const SizedBox(height: AppSpace.lg),
+-                  _SectionHeading(
+-                    title: tr('manga_repositories'),
+-                    trailing: Text('${_mangaRepositories.length}'),
+-                  ),
+-                  Padding(
+-                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
+-                    child: Text(
+-                      tr('manga_repository_separate_hint'),
+-                      style: AppType.metadata.copyWith(
+-                        color: palette.mutedText,
+-                      ),
+-                    ),
+-                  ),
+-                  Material(
+-                    color: palette.surface,
+-                    borderRadius: BorderRadius.circular(AppRadii.card),
+-                    child: Padding(
+-                      padding: const EdgeInsets.all(AppSpace.md),
+-                      child: Column(
+-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+-                        children: <Widget>[
+-                          Row(
++                        ),
++                        const SizedBox(height: AppSpace.xs),
++                        Text(
++                          tr('manga_repository_pb_only_hint'),
++                          style: AppType.metadata.copyWith(
++                            color: palette.mutedText,
++                          ),
++                        ),
++                        const SizedBox(height: AppSpace.md),
++                        if (_mangaRepositories.isEmpty)
++                          _EmptyPanel(label: tr('manga_repository_empty'))
++                        else
++                          _SurfacePanel(
+                             children: <Widget>[
+-                              Icon(
+-                                Icons.menu_book_rounded,
+-                                color: palette.foreground,
+-                              ),
+-                              const SizedBox(width: AppSpace.sm),
+-                              Expanded(
+-                                child: Text(
+-                                  tr('manga_repository_add_url'),
+-                                  style: AppType.cardTitle.copyWith(
+-                                    color: palette.foreground,
++                              for (
++                                var index = 0;
++                                index < _mangaRepositories.length;
++                                index++
++                              )
++                                _MangaRepositoryTile(
++                                  url: _mangaRepositories[index],
++                                  showDivider:
++                                      index != _mangaRepositories.length - 1,
++                                  onEdit: () => _editMangaRepository(
++                                    _mangaRepositories[index],
++                                  ),
++                                  onRemove: () => _removeMangaRepository(
++                                    _mangaRepositories[index],
+                                   ),
+                                 ),
+-                              ),
+-                              const Chip(label: Text('Protobuf')),
+                             ],
+                           ),
+-                          const SizedBox(height: AppSpace.sm),
+-                          TextField(
+-                            controller: _mangaRepositoryController,
+-                            keyboardType: TextInputType.url,
+-                            textInputAction: TextInputAction.go,
+-                            onSubmitted: (_) => _addMangaRepository(),
+-                            decoration: InputDecoration(
+-                              labelText: tr('manga_repository_url'),
+-                              hintText: 'https://example.com/index.pb',
+-                              border: const OutlineInputBorder(),
+-                              suffixIcon: IconButton(
+-                                tooltip: tr('add_repository'),
+-                                onPressed: _working
+-                                    ? null
+-                                    : _addMangaRepository,
+-                                icon: const Icon(Icons.add_rounded),
+-                              ),
+-                            ),
+-                          ),
+-                          const SizedBox(height: AppSpace.xs),
+-                          Text(
+-                            tr('manga_repository_pb_only_hint'),
+-                            style: AppType.metadata.copyWith(
+-                              color: palette.mutedText,
+-                            ),
+-                          ),
+-                          const SizedBox(height: AppSpace.md),
+-                          if (_mangaRepositories.isEmpty)
+-                            _EmptyPanel(label: tr('manga_repository_empty'))
+-                          else
+-                            _SurfacePanel(
+-                              children: <Widget>[
+-                                for (
+-                                  var index = 0;
+-                                  index < _mangaRepositories.length;
+-                                  index++
+-                                )
+-                                  _MangaRepositoryTile(
+-                                    url: _mangaRepositories[index],
+-                                    showDivider:
+-                                        index != _mangaRepositories.length - 1,
+-                                    onEdit: () => _editMangaRepository(
+-                                      _mangaRepositories[index],
+-                                    ),
+-                                    onRemove: () => _removeMangaRepository(
+-                                      _mangaRepositories[index],
++                        const SizedBox(height: AppSpace.md),
++                        Align(
++                          alignment: AlignmentDirectional.centerStart,
++                          child: OutlinedButton.icon(
++                            onPressed: _working
++                                ? null
++                                : () => Navigator.of(context).push<void>(
++                                    MaterialPageRoute<void>(
++                                      builder: (_) =>
++                                          const MihonSourceBrowserScreen(),
+                                     ),
+                                   ),
+-                              ],
+-                            ),
+-                          const SizedBox(height: AppSpace.md),
+-                          Align(
+-                            alignment: AlignmentDirectional.centerStart,
+-                            child: OutlinedButton.icon(
+-                              onPressed: _working
+-                                  ? null
+-                                  : () => Navigator.of(context).push<void>(
+-                                      MaterialPageRoute<void>(
+-                                        builder: (_) =>
+-                                            const MihonSourceBrowserScreen(),
+-                                      ),
+-                                    ),
+-                              icon: const Icon(Icons.menu_book_rounded),
+-                              label: Text(tr('mihon_sources')),
+-                            ),
++                            icon: const Icon(Icons.menu_book_rounded),
++                            label: Text(tr('mihon_sources')),
+                           ),
+-                        ],
+-                      ),
++                        ),
++                      ],
+                     ),
+                   ),
+-                  const SizedBox(height: AppSpace.lg),
+-                  _SectionHeading(
+-                    title: tr('source_catalog'),
+-                    trailing: Text('${catalog.length}'),
+-                  ),
+-                  Padding(
+-                    padding: const EdgeInsets.only(bottom: AppSpace.sm),
+-                    child: TextField(
+-                      controller: _catalogSearchController,
+-                      textInputAction: TextInputAction.search,
+-                      decoration: InputDecoration(
+-                        hintText: tr('search_sources'),
+-                        prefixIcon: const Icon(Icons.search_rounded),
+-                        suffixIcon: _catalogSearchController.text.isEmpty
+-                            ? null
+-                            : IconButton(
+-                                tooltip: tr('clear'),
+-                                onPressed: _catalogSearchController.clear,
+-                                icon: const Icon(Icons.close_rounded),
+-                              ),
+-                      ),
++                ),
++                const SizedBox(height: AppSpace.lg),
++                _SectionHeading(
++                  title: tr('source_catalog'),
++                  trailing: Text('${catalog.length}'),
++                ),
++                Padding(
++                  padding: const EdgeInsets.only(bottom: AppSpace.sm),
++                  child: TextField(
++                    controller: _catalogSearchController,
++                    textInputAction: TextInputAction.search,
++                    decoration: InputDecoration(
++                      hintText: tr('search_sources'),
++                      prefixIcon: const Icon(Icons.search_rounded),
++                      suffixIcon: _catalogSearchController.text.isEmpty
++                          ? null
++                          : IconButton(
++                              tooltip: tr('clear'),
++                              onPressed: _catalogSearchController.clear,
++                              icon: const Icon(Icons.close_rounded),
++                            ),
+                     ),
+                   ),
+-                  if (_pageError != null)
+-                    _EmptyPanel(label: _pageError!, isError: true)
+-                  else if (catalog.isEmpty)
+-                    _EmptyPanel(label: tr('no_sources_found'))
+-                  else if (filteredCatalog.isEmpty)
+-                    _EmptyPanel(label: tr('no_sources_found'))
+-                  else
+-                    _SurfacePanel(
+-                      children: <Widget>[
+-                        for (var index = 0; index < visibleCatalog.length; index++)
+-                          _SourceTile(
+-                            source: visibleCatalog[index],
+-                            installed: _isInstalled(visibleCatalog[index]),
+-                            supported: _supportsRuntime(visibleCatalog[index]),
+-                            onChanged: (value) =>
+-                                _setInstalled(visibleCatalog[index], value),
+-                            onProvenance: () =>
+-                                _openSourceProvenance(visibleCatalog[index]),
+-                            onSettings:
+-                                visibleCatalog[index].engine.kind ==
+-                                        SourceEngineKind.javascript &&
+-                                    _isInstalled(visibleCatalog[index])
+-                                ? () => _openQuickJsSettings(visibleCatalog[index])
+-                                : null,
+-                            onConfigure:
+-                                visibleCatalog[index].engine.kind ==
+-                                        SourceEngineKind.stremio &&
+-                                    (visibleCatalog[index]
+-                                                .engine
+-                                                .config['configurable'] ==
+-                                            true ||
+-                                        visibleCatalog[index]
+-                                                .engine
+-                                                .config['configurationRequired'] ==
+-                                            true) &&
+-                                    visibleCatalog[index]
+-                                            .engine
+-                                            .config['configurationUrl']
+-                                        is String
+-                                ? () => _openStremioConfiguration(visibleCatalog[index])
+-                                : null,
+-                            configurationRequired:
+-                                visibleCatalog[index]
+-                                    .engine
+-                                    .config['configurationRequired'] ==
+-                                true,
+-                            configurable:
+-                                visibleCatalog[index].engine.config['configurable'] ==
+-                                true,
+-                            showDivider: index != visibleCatalog.length - 1,
+-                          ),
+-                      ],
+-                    ),
+-                  if (visibleCatalog.length < filteredCatalog.length)
+-                    Padding(
+-                      padding: const EdgeInsets.only(top: AppSpace.xs),
+-                      child: Text(
+-                        '${visibleCatalog.length} / ${filteredCatalog.length}',
+-                        style: AppType.metadata.copyWith(color: palette.mutedText),
+-                        textAlign: TextAlign.center,
+-                      ),
+-                    ),
+-                  if (_snapshot?.errors.isNotEmpty == true) ...<Widget>[
+-                    const SizedBox(height: AppSpace.md),
+-                    Text(
+-                      tr('some_repositories_failed'),
++                ),
++                if (_pageError != null)
++                  _EmptyPanel(label: _pageError!, isError: true)
++                else if (catalog.isEmpty)
++                  _EmptyPanel(label: tr('no_sources_found'))
++                else if (filteredCatalog.isEmpty)
++                  _EmptyPanel(label: tr('no_sources_found'))
++                else
++                  _SurfacePanel(
++                    children: <Widget>[
++                      for (
++                        var index = 0;
++                        index < visibleCatalog.length;
++                        index++
++                      )
++                        _SourceTile(
++                          source: visibleCatalog[index],
++                          installed: _isInstalled(visibleCatalog[index]),
++                          supported: _supportsRuntime(visibleCatalog[index]),
++                          onChanged: (value) =>
++                              _setInstalled(visibleCatalog[index], value),
++                          onProvenance: () =>
++                              _openSourceProvenance(visibleCatalog[index]),
++                          onSettings:
++                              visibleCatalog[index].engine.kind ==
++                                      SourceEngineKind.javascript &&
++                                  _isInstalled(visibleCatalog[index])
++                              ? () =>
++                                    _openQuickJsSettings(visibleCatalog[index])
++                              : null,
++                          onConfigure:
++                              visibleCatalog[index].engine.kind ==
++                                      SourceEngineKind.stremio &&
++                                  (visibleCatalog[index]
++                                              .engine
++                                              .config['configurable'] ==
++                                          true ||
++                                      visibleCatalog[index]
++                                              .engine
++                                              .config['configurationRequired'] ==
++                                          true) &&
++                                  visibleCatalog[index]
++                                          .engine
++                                          .config['configurationUrl']
++                                      is String
++                              ? () => _openStremioConfiguration(
++                                  visibleCatalog[index],
++                                )
++                              : null,
++                          configurationRequired:
++                              visibleCatalog[index]
++                                  .engine
++                                  .config['configurationRequired'] ==
++                              true,
++                          configurable:
++                              visibleCatalog[index]
++                                  .engine
++                                  .config['configurable'] ==
++                              true,
++                          showDivider: index != visibleCatalog.length - 1,
++                        ),
++                    ],
++                  ),
++                if (visibleCatalog.length < filteredCatalog.length)
++                  Padding(
++                    padding: const EdgeInsets.only(top: AppSpace.xs),
++                    child: Text(
++                      '${visibleCatalog.length} / ${filteredCatalog.length}',
+                       style: AppType.metadata.copyWith(
+                         color: palette.mutedText,
+                       ),
++                      textAlign: TextAlign.center,
+                     ),
+-                  ],
++                  ),
++                if (_snapshot?.errors.isNotEmpty == true) ...<Widget>[
++                  const SizedBox(height: AppSpace.md),
++                  Text(
++                    tr('some_repositories_failed'),
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
++                  ),
+                 ],
+-              ),
+-      );
++              ],
++            ),
++    );
+     if (widget.embedded) return managerBody;
+     return Scaffold(
+       backgroundColor: palette.page,
+diff --git a/lib/screens/common/sync_screen.dart b/lib/screens/common/sync_screen.dart
+index 48a0837..80d6499 100644
+--- a/lib/screens/common/sync_screen.dart
++++ b/lib/screens/common/sync_screen.dart
+@@ -123,9 +123,10 @@ class _LibrarySyncTab extends StatelessWidget {
+     final message = switch (runner.status.value) {
+       'syncing' => 'Syncing…',
+       'error' => 'Waiting to retry',
+-      _ => stamp == null
+-          ? 'Ready to sync'
+-          : 'Last synced ${stamp.toString().split('.').first}',
++      _ =>
++        stamp == null
++            ? 'Ready to sync'
++            : 'Last synced ${stamp.toString().split('.').first}',
+     };
+     return ListTile(
+       contentPadding: EdgeInsets.zero,
+diff --git a/test/manga/mihon_default_extension_installer_test.dart b/test/manga/mihon_default_extension_installer_test.dart
+index eae2267..9860e49 100644
+--- a/test/manga/mihon_default_extension_installer_test.dart
++++ b/test/manga/mihon_default_extension_installer_test.dart
+@@ -15,11 +15,14 @@ void main() {
+         ),
+       ];
+ 
+-      final selected =
+-          MihonDefaultExtensionInstaller.selectDefaultExtensions(entries);
++      final selected = MihonDefaultExtensionInstaller.selectDefaultExtensions(
++        entries,
++      );
+ 
+-      expect(selected.keys.toList(),
+-          MihonDefaultExtensionInstaller.requestedNames);
++      expect(
++        selected.keys.toList(),
++        MihonDefaultExtensionInstaller.requestedNames,
++      );
+       expect(selected.length, 10);
+       expect(selected.containsKey('Unrequested source'), isFalse);
+       expect(selected.containsKey('AsgardScans'), isTrue);
+@@ -39,10 +42,9 @@ void main() {
+         versionCode: 10603,
+       );
+ 
+-      final selected =
+-          MihonDefaultExtensionInstaller.selectDefaultExtensions(
+-            <MangaExtensionEntry>[english, arabic],
+-          );
++      final selected = MihonDefaultExtensionInstaller.selectDefaultExtensions(
++        <MangaExtensionEntry>[english, arabic],
++      );
+ 
+       expect(selected['AsgardScans']?.packageName, arabic.packageName);
+     });
+@@ -52,10 +54,7 @@ void main() {
+         MihonDefaultExtensionInstaller.normalizeName('Tachiyomi: Manga Starz'),
+         'mangastarz',
+       );
+-      expect(
+-        MihonDefaultExtensionInstaller.normalizeName('X-COMIC'),
+-        'xcomic',
+-      );
++      expect(MihonDefaultExtensionInstaller.normalizeName('X-COMIC'), 'xcomic');
+       expect(
+         MihonDefaultExtensionInstaller.normalizeName('Manga Star'),
+         isNot(MihonDefaultExtensionInstaller.normalizeName('Manga Starz')),
+@@ -86,7 +85,8 @@ MangaExtensionEntry _extension(
+       ),
+     ],
+     isNsfw: false,
+-    signingKey: signingKey ??
++    signingKey:
++        signingKey ??
+         MihonDefaultExtensionInstaller.trustedKeiyoushiFingerprint,
+   );
+ }
+diff --git a/test/mobile/mobile_nav_bar_test.dart b/test/mobile/mobile_nav_bar_test.dart
+index 5961737..7dd4501 100644
+--- a/test/mobile/mobile_nav_bar_test.dart
++++ b/test/mobile/mobile_nav_bar_test.dart
+@@ -107,10 +107,7 @@ void main() {
+         findsOneWidget,
+       );
+       expect(find.byIcon(PhosphorIcons.radioButton()), findsOneWidget);
+-      expect(
+-        tester.widget<Icon>(menuIcon).icon,
+-        PhosphorIcons.radioButton(),
+-      );
++      expect(tester.widget<Icon>(menuIcon).icon, PhosphorIcons.radioButton());
+     },
+   );
+ }

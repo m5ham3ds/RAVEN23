@@ -1,0 +1,1118 @@
+name: RAVEN23 Local Android APK Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'APK build mode'
+        required: true
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+
+env:
+  # Release is the default for pushes, pull requests, and manual runs.
+  # Select Debug manually only when investigating a Release-only failure.
+  BUILD_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mode || 'release' }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Capture workflow start time
+        id: start_time
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP"
+          date -u +'%Y-%m-%dT%H:%M:%SZ' > "$RUNNER_TEMP/raven23-ci-started-at.txt"
+
+      - name: Check out repository
+        id: checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize build diagnostics
+        id: initialize_diagnostics
+        shell: bash
+        run: |
+          mkdir -p build-artifacts
+          if [ -s "$RUNNER_TEMP/raven23-ci-started-at.txt" ]; then
+            cp "$RUNNER_TEMP/raven23-ci-started-at.txt" build-artifacts/ci-started-at.txt
+          else
+            date -u +'%Y-%m-%dT%H:%M:%SZ' > build-artifacts/ci-started-at.txt
+          fi
+          {
+            echo "Workflow: ${GITHUB_WORKFLOW:-unknown}"
+            echo "Run ID: ${GITHUB_RUN_ID:-unknown}"
+            echo "Run attempt: ${GITHUB_RUN_ATTEMPT:-unknown}"
+            echo "Event: ${GITHUB_EVENT_NAME:-unknown}"
+            echo "Actor: ${GITHUB_ACTOR:-unknown}"
+            echo "Repository: ${GITHUB_REPOSITORY:-unknown}"
+            echo "Ref: ${GITHUB_REF:-unknown}"
+            echo "Commit: ${GITHUB_SHA:-unknown}"
+            echo "Build mode: ${BUILD_MODE:-release}"
+          } > build-artifacts/ci-context.txt
+
+      - name: Set up Java 17
+        id: setup_java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # The repository currently has no Gradle Wrapper because android/.gitignore
+      # was excluding gradlew and gradle-wrapper.jar. Install the pinned Gradle
+      # version here so CI can generate a project wrapper before Flutter builds.
+      - name: Set up Gradle 8.14
+        id: setup_gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14'
+
+      # Keep one CI-only signing identity so Release and Debug APKs can be
+      # installed over each other and successive CI builds remain updatable.
+      # This is NOT a production distribution key.
+      - name: Restore CI development signing key
+        id: restore_signing_key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: raven23-debug-signing-v1-${{ github.repository }}
+
+      - name: Ensure CI development signing key exists
+        id: ensure_signing_key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          if [ ! -s "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Set up Flutter 3.35.7
+        id: setup_flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.35.7'
+          cache: true
+          pub-cache: true
+
+      # Installs Android command-line tools, accepts SDK licenses, and
+      # installs the exact SDK/NDK packages required by this project.
+      - name: Set up Android SDK
+        id: setup_android_sdk
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;28.2.13676358'
+
+      - name: Prepare local environment and resolve dependencies
+        id: resolve_dependencies
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p build-artifacts
+          test -f .env.example
+          cp .env.example .env
+          # Never carry generated plugin metadata from a previous local build.
+          rm -f .flutter-plugins-dependencies .flutter-plugins .packages
+          flutter pub get 2>&1 | tee build-artifacts/dependency-resolution.log
+          command_status=${PIPESTATUS[0]}
+          if [ "$command_status" -eq 0 ]; then
+            if [ ! -s .flutter-plugins-dependencies ]; then
+              echo "ERROR: Flutter plugin dependency manifest was not generated." | tee -a build-artifacts/dependency-resolution.log
+              command_status=1
+            elif grep -q "flutter_native_splash" .flutter-plugins-dependencies || grep -q '^  flutter_native_splash:' pubspec.lock; then
+              echo "ERROR: flutter_native_splash leaked into the application dependency/plugin graph; regenerate splash resources separately, then remove the temporary generator dependency before building." | tee -a build-artifacts/dependency-resolution.log
+              command_status=1
+            else
+              echo "Verified: flutter_native_splash is absent from the application dependency and plugin graph." | tee -a build-artifacts/dependency-resolution.log
+            fi
+          fi
+          printf '\nCommand exit code: %s\n' "$command_status" | tee -a build-artifacts/dependency-resolution.log
+          exit "$command_status"
+
+      - name: Apply and verify scoped Manga/Home/Anime/Mihon/PHASE63 Dart formatting
+        id: dart_format_phase57
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p build-artifacts
+          bash tool/format_phase57_dart.sh --fix 2>&1 | tee build-artifacts/phase57-dart-format.log
+          command_status=${PIPESTATUS[0]}
+          if [ "$command_status" -eq 0 ]; then
+            bash tool/format_phase57_dart.sh --check 2>&1 | tee -a build-artifacts/phase57-dart-format.log
+            command_status=${PIPESTATUS[0]}
+          fi
+          printf '\nScoped Manga/Home/Anime/Mihon/PHASE63 formatter/check exit code: %s\n' "$command_status" | tee -a build-artifacts/phase57-dart-format.log
+          exit "$command_status"
+
+      # Persist the exact formatter output as a downloadable patch. The CI working
+      # tree is formatted for analyze/tests/build; this artifact lets the repository
+      # owner commit the same canonical formatting changes to the source branch.
+      - name: Capture canonical Dart formatting patch
+        id: capture_format_patch
+        if: ${{ always() && steps.checkout.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-artifacts
+          git diff --binary -- '*.dart' > build-artifacts/dart-format.patch
+          git diff --stat -- '*.dart' > build-artifacts/dart-format-summary.txt
+          { git status --short; } > build-artifacts/format-patch.log 2>&1 || true
+          printf 'Patch bytes: %s\n' "$(wc -c < build-artifacts/dart-format.patch)" >> build-artifacts/format-patch.log
+          if [[ ! -s build-artifacts/dart-format.patch ]]; then
+            printf 'No Dart formatter changes were produced.\n' > build-artifacts/dart-format-summary.txt
+          fi
+          cat build-artifacts/dart-format-summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Capture CI environment details
+        id: environment_snapshot
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build-artifacts
+          {
+            echo "UTC capture time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "Runner: ${RUNNER_OS:-unknown} / ${RUNNER_ARCH:-unknown}"
+            echo "Kernel: $(uname -a 2>/dev/null || true)"
+            echo "Repository: ${GITHUB_REPOSITORY:-unknown}"
+            echo "Ref: ${GITHUB_REF:-unknown}"
+            echo "Commit: ${GITHUB_SHA:-unknown}"
+            echo
+            for tool_name in flutter dart java gradle sdkmanager adb python3; do
+              echo "### $tool_name"
+              if command -v "$tool_name" >/dev/null 2>&1; then
+                case "$tool_name" in
+                  java) java -version 2>&1 || true ;;
+                  sdkmanager) sdkmanager --version 2>&1 || true ;;
+                  adb) adb version 2>&1 || true ;;
+                  python3) python3 --version 2>&1 || true ;;
+                  *) "$tool_name" --version 2>&1 || true ;;
+                esac
+              else
+                echo 'Not available on runner at capture time.'
+              fi
+              echo
+            done
+            echo "ANDROID_HOME: ${ANDROID_HOME:-not-set}"
+            echo "ANDROID_SDK_ROOT: ${ANDROID_SDK_ROOT:-not-set}"
+            echo "FLUTTER_ROOT: ${FLUTTER_ROOT:-not-set}"
+          } > build-artifacts/ci-environment.txt
+          cat build-artifacts/ci-environment.txt
+
+      - name: Analyze Flutter project
+        id: analyze
+        # Static analysis is the next gate; do not start after failed formatting.
+        if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p build-artifacts
+          # Keep analyzer errors and warnings fatal; informational lints must not block APK creation.
+          flutter analyze --no-fatal-infos 2>&1 | tee build-artifacts/flutter-analyze.log
+          command_status=${PIPESTATUS[0]}
+          printf '\nCommand exit code: %s\n' "$command_status" | tee -a build-artifacts/flutter-analyze.log
+          exit "$command_status"
+
+      # Routine APK CI runs focused Manga/Mihon work-detail, source-binding,
+      # offline-progress, chapter-reader crop, Home/Anime separation and mobile-navigation regressions. Other
+      # deeper integration tests remain available for owner-led/manual regression.
+      # Run only after dependencies, canonical formatting and full-project analysis.
+      - name: Run focused Manga, Home, Anime, Mihon, navigation and reader Flutter pre-build tests
+        id: flutter_tests
+        if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' }}
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p build-artifacts
+          log_file=build-artifacts/flutter-prebuild-tests.log
+          : > "$log_file"
+          test_files=(
+            test/manga/manga_repository_manager_test.dart
+            test/manga/manga_reader_crop_test.dart
+            test/manga/mihon_source_browser_screen_test.dart
+            test/manga/mihon_default_extension_installer_test.dart
+            test/manga/phase55_manga_catalogue_test.dart
+            test/manga/phase55_mihon_pb_index_test.dart
+            test/manga/phase56_manga_regression_test.dart
+            test/manga/phase57_manga_home_parity_test.dart
+            test/manga_detail_metadata_test.dart
+            test/manga_reading_store_test.dart
+            test/manga_source_matcher_test.dart
+            test/mobile/mobile_nav_bar_test.dart
+            test/anime_media_classification_test.dart
+            test/home_catalog_test.dart
+            test/home_screen_test.dart
+          )
+          printf 'Focused Flutter pre-build test files: %s\n' "${#test_files[@]}" | tee -a "$log_file"
+          for test_file in "${test_files[@]}"; do
+            if [ ! -s "$test_file" ]; then
+              printf 'Required focused test file is missing or empty: %s\n' "$test_file" | tee -a "$log_file"
+              exit 2
+            fi
+            printf '  - %s\n' "$test_file" | tee -a "$log_file"
+          done
+          flutter test --no-pub --reporter expanded --timeout 90s --concurrency=2 \
+            "${test_files[@]}" 2>&1 | tee -a "$log_file"
+          command_status=${PIPESTATUS[0]}
+          if [ "$command_status" -eq 0 ] && ! grep -Eq 'All tests passed|[0-9]+ tests passed' "$log_file"; then
+            printf 'Focused Flutter test completion marker was not observed.\n' | tee -a "$log_file"
+            command_status=3
+          fi
+          printf '\nFocused Flutter pre-build tests exit code: %s\n' "$command_status" | tee -a "$log_file"
+          exit "$command_status"
+
+      - name: Generate Android Gradle Wrapper after Flutter pre-build checks
+        id: gradle_wrapper
+        # Create the wrapper only after every earlier required validation succeeds.
+        if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' && steps.flutter_tests.outcome == 'success' && steps.setup_java.outcome == 'success' && steps.setup_gradle.outcome == 'success' && steps.setup_flutter.outcome == 'success' && steps.setup_android_sdk.outcome == 'success' }}
+        working-directory: android
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p ../build-artifacts
+          {
+          # Flutter's settings.gradle requires flutter.sdk before Gradle can
+          # configure the Android project. Preserve any existing local values.
+          python3 - <<'PYTHON' || exit $?
+          import os
+          from pathlib import Path
+
+          path = Path('local.properties')
+          values = {}
+          if path.exists():
+              for raw in path.read_text().splitlines():
+                  line = raw.strip()
+                  if line and not line.startswith('#') and '=' in line:
+                      key, value = line.split('=', 1)
+                      values[key.strip()] = value.strip()
+          values['flutter.sdk'] = os.environ['FLUTTER_ROOT']
+          values['sdk.dir'] = os.environ.get('ANDROID_HOME', os.environ.get('ANDROID_SDK_ROOT', ''))
+          path.write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
+          PYTHON
+
+          # Generate gradlew, gradlew.bat and gradle-wrapper.jar using pinned Gradle.
+          gradle --no-watch-fs --no-daemon wrapper --gradle-version 8.14 --distribution-type all || exit $?
+          test -s gradlew || exit $?
+          test -s gradle/wrapper/gradle-wrapper.jar || exit $?
+          test -s gradle/wrapper/gradle-wrapper.properties || exit $?
+          chmod +x gradlew || exit $?
+          } 2>&1 | tee ../build-artifacts/gradle-wrapper.log
+          command_status=${PIPESTATUS[0]}
+          printf '\nCommand exit code: %s\n' "$command_status" | tee -a ../build-artifacts/gradle-wrapper.log
+          exit "$command_status"
+
+      # This single Android test protects the Float-to-Double ABI issue reported
+      # by the owner. Gradle still compiles the production Android app sources,
+      # including GeneratedPluginRegistrant, before executing the selected class.
+      # Remaining Android test sources stay available for manual/deeper QA.
+      - name: Run focused Android Mihon ABI unit test
+        id: android_unit_tests
+        if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' && steps.flutter_tests.outcome == 'success' && steps.gradle_wrapper.outcome == 'success' }}
+        working-directory: android
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p ../build-artifacts
+          log_file=../build-artifacts/android-mihon-abi-test.log
+          test_class='com.m5ham3ds.raven23.mihon.MihonExtensionLoaderAbiTest'
+          test_source='app/src/test/kotlin/com/m5ham3ds/raven23/mihon/MihonExtensionLoaderAbiTest.kt'
+          : > "$log_file"
+          if [ ! -s "$test_source" ]; then
+            printf 'Required Mihon ABI test source is missing or empty: %s\n' "$test_source" | tee -a "$log_file"
+            exit 2
+          fi
+          printf 'Selected Android test class: %s\n' "$test_class" | tee -a "$log_file"
+          printf 'Test source: %s\n' "$test_source" | tee -a "$log_file"
+          printf 'Pinned JUnit XML root: build/app/test-results (Gradle subproject buildDir)\n' | tee -a "$log_file"
+          # Remove only previous test reports so a stale XML cannot satisfy this run.
+          rm -rf ../build/app/test-results ../build/app/outputs/test-results ../build/app/reports/tests
+          ./gradlew :app:testProdReleaseUnitTest --tests "$test_class" --console=plain --no-daemon --stacktrace \
+            2>&1 | tee -a "$log_file"
+          command_status=${PIPESTATUS[0]}
+          printf '\nJUnit XML files discovered under repository build/app:\n' | tee -a "$log_file"
+          find ../build/app -type f -name 'TEST-*.xml' -print | sort | tee -a "$log_file" || true
+          if [ "$command_status" -eq 0 ]; then
+            # Do not accept a green Gradle task unless this exact class executed
+            # all three ABI boundary cases from the Gradle report, with console-event fallback.
+            python3 - <<'PYTHON' 2>&1 | tee -a "$log_file"
+          from collections import Counter
+          from pathlib import Path
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          test_class = 'com.m5ham3ds.raven23.mihon.MihonExtensionLoaderAbiTest'
+          expected = {
+              'androidFloatRepresentationOfSixteenIsAcceptedAndCanonicalized',
+              'exactSupportedVersionsRemainAccepted',
+              'unsupportedVersionsAndNonFiniteValuesRemainRejected',
+          }
+          log_path = Path('../build-artifacts/android-mihon-abi-test.log')
+          log_text = log_path.read_text(errors='replace') if log_path.is_file() else ''
+          build_succeeded = re.search(r'^BUILD SUCCESSFUL(?:\s|$)', log_text, re.M) is not None
+          if not build_succeeded:
+              sys.exit('Gradle did not emit a BUILD SUCCESSFUL marker for the focused ABI task.')
+
+          build_dir = Path('../build/app')
+          reports = sorted(build_dir.rglob('TEST-*.xml')) if build_dir.is_dir() else []
+          xml_cases = []
+          for report in reports:
+              document = ET.parse(report).getroot()
+              for node in document.iter():
+                  if node.tag.rsplit('}', 1)[-1] != 'testcase':
+                      continue
+                  if node.attrib.get('classname', '') == test_class:
+                      child_tags = {child.tag.rsplit('}', 1)[-1] for child in list(node)}
+                      xml_cases.append((node.attrib.get('name', ''), child_tags, report))
+
+          passed_pattern = re.compile(
+              r'^MihonExtensionLoaderAbiTest > ([A-Za-z0-9_]+) PASSED\s*$'
+          )
+          failed_pattern = re.compile(
+              r'^MihonExtensionLoaderAbiTest > ([A-Za-z0-9_]+) (FAILED|SKIPPED)\s*$'
+          )
+          console_passes = Counter(
+              match.group(1)
+              for line in log_text.splitlines()
+              if (match := passed_pattern.match(line.strip()))
+          )
+          console_bad = [
+              match.groups()
+              for line in log_text.splitlines()
+              if (match := failed_pattern.match(line.strip()))
+          ]
+
+          if xml_cases:
+              xml_names = [name for name, _, _ in xml_cases]
+              if set(xml_names) != expected or len(xml_names) != len(expected):
+                  sys.exit(
+                      'JUnit XML contains an unexpected/missing selected ABI case set: '
+                      f'{xml_names}; expected exactly {sorted(expected)}.'
+                  )
+              bad_cases = [
+                  (name, sorted(tags & {'failure', 'error', 'skipped'}), str(report))
+                  for name, tags, report in xml_cases
+                  if tags & {'failure', 'error', 'skipped'}
+              ]
+              if bad_cases:
+                  sys.exit(f'JUnit XML selected ABI cases are not all clean: {bad_cases}')
+              print(f'JUnit XML verified {len(xml_cases)}/{len(expected)} selected ABI cases.')
+          else:
+              # Some AGP/Gradle runner combinations emit per-test events to the
+              # Gradle console while not materializing XML under the module build
+              # directory. The console event is emitted by Gradle's TestLogging
+              # only after that test case actually completes; it is not inferred
+              # from source names or from the Gradle task's aggregate exit code.
+              missing_or_duplicate = {
+                  name: console_passes.get(name, 0)
+                  for name in sorted(expected)
+                  if console_passes.get(name, 0) != 1
+              }
+              unexpected = sorted(set(console_passes) - expected)
+              if missing_or_duplicate or unexpected or console_bad:
+                  sys.exit(
+                      'JUnit XML was not produced and Gradle console test events did '
+                      'not prove exactly one clean execution of each ABI case. '
+                      f'Counts={dict(console_passes)}; missing/duplicate={missing_or_duplicate}; '
+                      f'unexpected={unexpected}; failed/skipped={console_bad}.'
+                  )
+              print(
+                  'JUnit XML was not materialized; verified all three exact ABI '
+                  'test-case PASSED events from Gradle --console=plain output '
+                  'after BUILD SUCCESSFUL.'
+              )
+
+          # Console failures/skips must never be hidden by a report from a stale
+          # or alternate test task. The log was truncated before this task began.
+          if console_bad:
+              sys.exit(f'Gradle console reports failed/skipped selected cases: {console_bad}')
+          if console_passes and set(console_passes) != expected:
+              sys.exit(f'Gradle console selected ABI case set is incomplete: {dict(console_passes)}')
+          print('Executed Mihon ABI cases: 3; failures: 0; errors: 0; skipped: 0')
+          PYTHON
+            report_status=${PIPESTATUS[0]}
+            if [ "$report_status" -ne 0 ]; then
+              command_status=$report_status
+            fi
+          fi
+          printf '\nFocused Android Mihon ABI test exit code: %s\n' "$command_status" | tee -a "$log_file"
+          exit "$command_status"
+
+      - name: Build production ${{ env.BUILD_MODE }} APK (local development mode, ARM64 only)
+        id: build_apk
+        # Build only after dependency resolution, formatting, full analysis, the
+        # fifteen focused Flutter test files, and the selected Android ABI test succeed.
+        if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' && steps.flutter_tests.outcome == 'success' && steps.gradle_wrapper.outcome == 'success' && steps.android_unit_tests.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p build-artifacts
+          {
+          case "$BUILD_MODE" in
+            release)
+              BUILD_FLAG=--release
+              APK_OUTPUT=build/app/outputs/flutter-apk/app-prod-release.apk
+              ;;
+            debug)
+              BUILD_FLAG=--debug
+              APK_OUTPUT=build/app/outputs/flutter-apk/app-prod-debug.apk
+              ;;
+            *)
+              echo "Unsupported BUILD_MODE: $BUILD_MODE" >&2
+              exit 2
+              ;;
+          esac
+
+          flutter build apk "$BUILD_FLAG" --flavor prod --target lib/main.dart \
+            --target-platform android-arm64 \
+            -Pdisable-abi-filtering=true \
+            --dart-define=ENABLE_FIREBASE=false \
+            --dart-define=LOCAL_DEV_MODE=true || exit $?
+
+          test -s "$APK_OUTPUT" || exit $?
+          cp "$APK_OUTPUT" RAVEN23-apk.apk || exit $?
+          test -s RAVEN23-apk.apk || exit $?
+          } 2>&1 | tee build-artifacts/android-apk-build.log
+          command_status=${PIPESTATUS[0]}
+          printf '\nCommand exit code: %s\n' "$command_status" | tee -a build-artifacts/android-apk-build.log
+          exit "$command_status"
+
+      - name: Audit APK size and ABI payload
+        id: apk_audit
+        if: ${{ steps.build_apk.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p build-artifacts
+          python3 - <<'PYTHON' 2>&1 | tee build-artifacts/apk-audit.log
+          from collections import defaultdict
+          from pathlib import Path
+          import os
+          import zipfile
+
+          build_mode = os.environ.get('BUILD_MODE', 'release').upper()
+          apk = Path('RAVEN23-apk.apk')
+          if not apk.is_file() or apk.stat().st_size == 0:
+              raise SystemExit('APK artifact is missing or empty')
+
+          with zipfile.ZipFile(apk) as archive:
+              members = [item for item in archive.infolist() if not item.is_dir()]
+              native_entries = []
+              abi_files = defaultdict(list)
+              abi_sizes = defaultdict(lambda: [0, 0])
+              abi_dirs = set()
+
+              for item in members:
+                  parts = Path(item.filename).parts
+                  if len(parts) >= 3 and parts[0] == 'lib':
+                      abi = parts[1]
+                      abi_dirs.add(abi)
+                      native_entries.append(item)
+                      abi_files[abi].append(item)
+                      abi_sizes[abi][0] += item.compress_size
+                      abi_sizes[abi][1] += item.file_size
+
+              abi_dirs = sorted(abi_dirs)
+              groups = defaultdict(lambda: [0, 0])
+              for item in members:
+                  parts = Path(item.filename).parts
+                  if parts[0] == 'lib':
+                      group = f'Native libraries ({parts[1] if len(parts) > 1 else "unknown ABI"})'
+                  elif parts[0] == 'assets':
+                      group = 'Flutter/assets'
+                  elif parts[0] == 'res' or item.filename == 'resources.arsc':
+                      group = 'Android resources'
+                  elif item.filename.endswith('.dex'):
+                      group = 'DEX bytecode'
+                  elif parts[0] == 'META-INF':
+                      group = 'META-INF'
+                  else:
+                      group = 'Other'
+                  groups[group][0] += item.compress_size
+                  groups[group][1] += item.file_size
+
+              total = apk.stat().st_size
+              lines = [
+                  '# APK size and ABI audit',
+                  '',
+                  f'- Artifact: `{apk.name}`',
+                  f'- Build mode: **{build_mode}**',
+                  f'- APK size: **{total / (1024 * 1024):.2f} MiB** ({total:,} bytes)',
+                  f'- Native ABIs found: **{", ".join(abi_dirs) if abi_dirs else "none"}**',
+                  '- Required native ABIs: **arm64-v8a only**',
+                  '- Build target: `android-arm64` (single APK; no split-per-ABI)',
+                  '',
+                  '## Native library payload by ABI',
+                  '',
+                  '| ABI | .so files | Compressed in APK | Uncompressed |',
+                  '|---|---:|---:|---:|',
+              ]
+              for abi in abi_dirs:
+                  compressed, uncompressed = abi_sizes[abi]
+                  lines.append(
+                      f'| `{abi}` | {len(abi_files[abi])} | '
+                      f'{compressed / (1024 * 1024):.2f} MiB | '
+                      f'{uncompressed / (1024 * 1024):.2f} MiB |'
+                  )
+
+              lines += [
+                  '',
+                  '## Payload by category',
+                  '',
+                  '| Category | Compressed in APK | Uncompressed |',
+                  '|---|---:|---:|',
+              ]
+              for group, (compressed, uncompressed) in sorted(
+                  groups.items(), key=lambda entry: entry[1][0], reverse=True
+              ):
+                  lines.append(
+                      f'| {group} | {compressed / (1024 * 1024):.2f} MiB | '
+                      f'{uncompressed / (1024 * 1024):.2f} MiB |'
+                  )
+
+              largest_native = sorted(native_entries, key=lambda item: item.file_size, reverse=True)[:40]
+              lines += [
+                  '',
+                  '## Largest native libraries',
+                  '',
+                  '| ABI | Library | Compressed | Uncompressed |',
+                  '|---|---|---:|---:|',
+              ]
+              for item in largest_native:
+                  parts = Path(item.filename).parts
+                  lines.append(
+                      f'| `{parts[1]}` | `{parts[-1]}` | '
+                      f'{item.compress_size / (1024 * 1024):.2f} MiB | '
+                      f'{item.file_size / (1024 * 1024):.2f} MiB |'
+                  )
+
+              largest = sorted(members, key=lambda item: item.file_size, reverse=True)[:25]
+              lines += [
+                  '',
+                  '## Largest APK entries',
+                  '',
+                  '| Entry | Compressed | Uncompressed |',
+                  '|---|---:|---:|',
+              ]
+              for item in largest:
+                  lines.append(
+                      f'| `{item.filename}` | {item.compress_size / (1024 * 1024):.2f} MiB | '
+                      f'{item.file_size / (1024 * 1024):.2f} MiB |'
+                  )
+
+              report = '\n'.join(lines) + '\n'
+              Path('apk-size-report.md').write_text(report)
+              print(report)
+
+              # Fail only after writing the report, so CI can upload the APK
+              # and forensic ABI breakdown even when the architecture audit fails.
+              if abi_dirs != ['arm64-v8a']:
+                  raise SystemExit(
+                      f'Expected ARM64-only APK; found ABI directories: {abi_dirs}. '
+                      'See apk-size-report.md for per-ABI library details.'
+                  )
+          PYTHON
+          command_status=${PIPESTATUS[0]}
+          if [ "$command_status" -ne 0 ]; then
+            printf '\nAPK audit exit code: %s\n' "$command_status" | tee -a build-artifacts/apk-audit.log
+            exit "$command_status"
+          fi
+
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          if [ -x "$AAPT" ]; then
+            "$AAPT" dump badging RAVEN23-apk.apk > build-artifacts/aapt-badging.txt 2>&1
+            aapt_status=$?
+            cat build-artifacts/aapt-badging.txt | tee -a build-artifacts/apk-audit.log
+            if [ "$aapt_status" -ne 0 ]; then
+              echo "aapt dump badging failed with exit code $aapt_status" | tee -a build-artifacts/apk-audit.log
+              exit "$aapt_status"
+            fi
+            if ! grep -F "name='com.m5ham3ds.raven23'" build-artifacts/aapt-badging.txt >/dev/null; then
+              echo "APK package name did not match com.m5ham3ds.raven23" | tee -a build-artifacts/apk-audit.log
+              exit 1
+            fi
+          else
+            echo 'aapt was not found; package-name badging check was skipped.' | tee -a build-artifacts/apk-audit.log
+          fi
+          cat apk-size-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APK artifact and ABI diagnostics
+        id: upload_apk
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: RAVEN23-apk
+          path: |
+            RAVEN23-apk.apk
+            apk-size-report.md
+            build-artifacts/apk-audit.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload focused pre-build test diagnostics
+        id: upload_test_logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: RAVEN23-focused-prebuild-test-diagnostics
+          path: |
+            build-artifacts/flutter-prebuild-tests.log
+            build-artifacts/android-mihon-abi-test.log
+            build-artifacts/phase57-dart-format.log
+            build/app/test-results/**
+            build/app/outputs/test-results/**
+            build/app/reports/tests/**
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload canonical Dart formatting patch
+        id: upload_format_patch
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: RAVEN23-dart-format-patch
+          path: |
+            build-artifacts/dart-format.patch
+            build-artifacts/dart-format-summary.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Generate comprehensive Markdown build report
+        id: generate_build_report
+        if: always()
+        shell: bash
+        env:
+          CI_JOB_STATUS: ${{ job.status }}
+          STEP_START_TIME: ${{ steps.start_time.outcome || 'not-run' }}
+          STEP_CHECKOUT: ${{ steps.checkout.outcome || 'not-run' }}
+          STEP_INITIALIZE_DIAGNOSTICS: ${{ steps.initialize_diagnostics.outcome || 'not-run' }}
+          STEP_SETUP_JAVA: ${{ steps.setup_java.outcome || 'not-run' }}
+          STEP_SETUP_GRADLE: ${{ steps.setup_gradle.outcome || 'not-run' }}
+          STEP_RESTORE_SIGNING_KEY: ${{ steps.restore_signing_key.outcome || 'not-run' }}
+          STEP_ENSURE_SIGNING_KEY: ${{ steps.ensure_signing_key.outcome || 'not-run' }}
+          STEP_SETUP_FLUTTER: ${{ steps.setup_flutter.outcome || 'not-run' }}
+          STEP_SETUP_ANDROID_SDK: ${{ steps.setup_android_sdk.outcome || 'not-run' }}
+          STEP_RESOLVE_DEPENDENCIES: ${{ steps.resolve_dependencies.outcome || 'not-run' }}
+          STEP_DART_FORMAT_PHASE57: ${{ steps.dart_format_phase57.outcome || 'not-run' }}
+          STEP_CAPTURE_FORMAT_PATCH: ${{ steps.capture_format_patch.outcome || 'not-run' }}
+          STEP_ENVIRONMENT_SNAPSHOT: ${{ steps.environment_snapshot.outcome || 'not-run' }}
+          STEP_ANALYZE: ${{ steps.analyze.outcome || 'not-run' }}
+          STEP_FLUTTER_TESTS: ${{ steps.flutter_tests.outcome || 'not-run' }}
+          STEP_ANDROID_UNIT_TESTS: ${{ steps.android_unit_tests.outcome || 'not-run' }}
+          STEP_GRADLE_WRAPPER: ${{ steps.gradle_wrapper.outcome || 'not-run' }}
+          STEP_BUILD_APK: ${{ steps.build_apk.outcome || 'not-run' }}
+          STEP_APK_AUDIT: ${{ steps.apk_audit.outcome || 'not-run' }}
+          STEP_UPLOAD_APK: ${{ steps.upload_apk.outcome || 'not-run' }}
+          STEP_UPLOAD_TEST_LOGS: ${{ steps.upload_test_logs.outcome || 'not-run' }}
+          STEP_UPLOAD_FORMAT_PATCH: ${{ steps.upload_format_patch.outcome || 'not-run' }}
+        run: |
+          python3 - <<'PYTHON'
+          from collections import Counter
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import os
+          import re
+
+          root = Path.cwd()
+          artifacts = root / 'build-artifacts'
+          artifacts.mkdir(parents=True, exist_ok=True)
+
+          def read_text(path, default='Not captured.'):
+              try:
+                  return Path(path).read_text(errors='replace').strip() or default
+              except OSError:
+                  return default
+
+          def code_block(value, language='text'):
+              return f'```{language}\n{value}\n```'
+
+          def human_size(path):
+              size = Path(path).stat().st_size
+              return f'{size:,} bytes ({size / (1024 * 1024):.2f} MiB)'
+
+          run_url = (
+              f"{os.getenv('GITHUB_SERVER_URL', 'https://github.com')}/"
+              f"{os.getenv('GITHUB_REPOSITORY', '')}/actions/runs/{os.getenv('GITHUB_RUN_ID', '')}"
+          )
+          started_file = artifacts / 'ci-started-at.txt'
+          if not started_file.is_file():
+              started_file = Path(os.getenv('RUNNER_TEMP', '/tmp')) / 'raven23-ci-started-at.txt'
+          started = read_text(started_file, 'Start time unavailable.')
+          finished = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+          job_status = os.getenv('CI_JOB_STATUS', 'unknown').upper()
+          build_mode = os.getenv('BUILD_MODE', 'release').upper()
+          context = read_text(artifacts / 'ci-context.txt')
+
+          steps = [
+              ('Capture workflow start time', 'STEP_START_TIME'),
+              ('Checkout', 'STEP_CHECKOUT'),
+              ('Initialize diagnostics', 'STEP_INITIALIZE_DIAGNOSTICS'),
+              ('Set up Java 17', 'STEP_SETUP_JAVA'),
+              ('Set up Gradle 8.14', 'STEP_SETUP_GRADLE'),
+              ('Restore CI signing key cache', 'STEP_RESTORE_SIGNING_KEY'),
+              ('Ensure CI signing key exists', 'STEP_ENSURE_SIGNING_KEY'),
+              ('Set up Flutter 3.35.7', 'STEP_SETUP_FLUTTER'),
+              ('Set up Android SDK', 'STEP_SETUP_ANDROID_SDK'),
+              ('Resolve Flutter dependencies', 'STEP_RESOLVE_DEPENDENCIES'),
+              ('Scoped Manga/Home/Anime Dart format fix + strict check', 'STEP_DART_FORMAT_PHASE57'),
+              ('Capture formatter patch', 'STEP_CAPTURE_FORMAT_PATCH'),
+              ('Capture environment details', 'STEP_ENVIRONMENT_SNAPSHOT'),
+              ('Flutter analyze', 'STEP_ANALYZE'),
+              ('Focused Manga/Home/Anime/Mihon/mobile-navigation/reader Flutter pre-build tests', 'STEP_FLUTTER_TESTS'),
+              ('Generate Android Gradle Wrapper after required checks', 'STEP_GRADLE_WRAPPER'),
+              ('Focused Mihon ABI Android unit test (1 class)', 'STEP_ANDROID_UNIT_TESTS'),
+              ('Build APK', 'STEP_BUILD_APK'),
+              ('APK size/ABI audit', 'STEP_APK_AUDIT'),
+              ('Upload APK artifact', 'STEP_UPLOAD_APK'),
+              ('Upload focused pre-build test diagnostics', 'STEP_UPLOAD_TEST_LOGS'),
+              ('Upload formatter patch', 'STEP_UPLOAD_FORMAT_PATCH'),
+          ]
+          outcomes = {label: os.getenv(key, 'not-run') for label, key in steps}
+          failed_steps = [label for label, outcome in outcomes.items() if outcome == 'failure']
+          skipped_steps = [label for label, outcome in outcomes.items() if outcome == 'skipped' or outcome.startswith('skipped ')]
+          cancelled_steps = [label for label, outcome in outcomes.items() if outcome == 'cancelled']
+
+          report = [
+              '# RAVEN23 — Comprehensive CI Build Report',
+              '',
+              f'- **Overall job status:** `{job_status}`',
+              f'- **Build mode:** `{build_mode}`',
+              f'- **Started (UTC):** `{started}`',
+              f'- **Finished (UTC):** `{finished}`',
+              f'- **Workflow:** `{os.getenv("GITHUB_WORKFLOW", "unknown")}`',
+              f'- **Actor:** `{os.getenv("GITHUB_ACTOR", "unknown")}`',
+              f'- **Workflow run:** [Open GitHub Actions run]({run_url})',
+              f'- **Run ID / attempt:** `{os.getenv("GITHUB_RUN_ID", "unknown")}` / `{os.getenv("GITHUB_RUN_ATTEMPT", "unknown")}`',
+              f'- **Trigger:** `{os.getenv("GITHUB_EVENT_NAME", "unknown")}`',
+              f'- **Repository:** `{os.getenv("GITHUB_REPOSITORY", "unknown")}`',
+              f'- **Ref:** `{os.getenv("GITHUB_REF", "unknown")}`',
+              f'- **Commit:** `{os.getenv("GITHUB_SHA", "unknown")}`',
+              '',
+              '## 1. Execution summary',
+              '',
+              f'- Steps marked failed: **{len(failed_steps)}**',
+              f'- Steps skipped/not reached: **{len(skipped_steps)}**',
+              f'- Steps cancelled: **{len(cancelled_steps)}**',
+              f'- APK present: **{"Yes — " + human_size("RAVEN23-apk.apk") if Path("RAVEN23-apk.apk").is_file() else "No"}**',
+              '',
+              '### Failed steps',
+              '',
+          ]
+          if failed_steps:
+              report.extend(f'- `{name}`' for name in failed_steps)
+          else:
+              report.append('- None reported by step outcomes.')
+          report += ['', '### Skipped steps (not configured or not reached after a prerequisite failure)', '']
+          if skipped_steps:
+              report.extend(f'- `{name}`' for name in skipped_steps)
+          else:
+              report.append('- None.')
+          report += ['', '### Cancelled steps', '']
+          if cancelled_steps:
+              report.extend(f'- `{name}`' for name in cancelled_steps)
+          else:
+              report.append('- None.')
+
+          report += [
+              '',
+              '## 2. Step-by-step result',
+              '',
+              '| Stage | Result |',
+              '|---|---|',
+          ]
+          for label, outcome in outcomes.items():
+              report.append(f'| {label} | `{outcome}` |')
+
+          duration_text = 'Unavailable'
+          try:
+              start_dt = datetime.fromisoformat(started.replace('Z', '+00:00'))
+              end_dt = datetime.fromisoformat(finished.replace('Z', '+00:00'))
+              seconds = max(0, int((end_dt - start_dt).total_seconds()))
+              hours, remainder = divmod(seconds, 3600)
+              minutes, seconds = divmod(remainder, 60)
+              duration_text = f'{hours:02d}:{minutes:02d}:{seconds:02d}'
+          except (ValueError, TypeError):
+              pass
+          report[5] = f'- **Finished (UTC):** `{finished}`'
+          report.insert(5, f'- **Elapsed time until report generation:** `{duration_text}`')
+
+          report += [
+              '',
+              '## 3. Runner and toolchain',
+              '',
+              code_block(read_text(artifacts / 'ci-environment.txt')),
+              '',
+              '### Build configuration',
+              '',
+              '- Flutter: `3.35.7` (stable channel); Dart is the SDK bundled with this Flutter version.',
+              '- Java: `17` (Temurin).',
+              '- Gradle: `8.14` (compatible with AGP 8.11.1; generated Android Wrapper matches the checked-in distribution URL).',
+              '- Android SDK: `platform-tools`, `platforms;android-36`, `build-tools;36.0.0`, `ndk;28.2.13676358`.',
+              '- Flavor: `prod`; target: `lib/main.dart`.',
+              '- ABI target: `android-arm64` (expected APK ABI: `arm64-v8a` only).',
+              '- Build defines: `ENABLE_FIREBASE=false`, `LOCAL_DEV_MODE=true`.',
+              '- Expected application ID: `com.m5ham3ds.raven23`.',
+              '',
+              '### Run context',
+              '',
+              code_block(context),
+          ]
+
+          log_specs = [
+              ('Dependency resolution', artifacts / 'dependency-resolution.log'),
+              ('Scoped Manga/Home/Anime/Mihon Dart formatting', artifacts / 'phase57-dart-format.log'),
+              ('Formatter patch capture', artifacts / 'format-patch.log'),
+              ('Flutter analyze', artifacts / 'flutter-analyze.log'),
+              ('Focused Manga/Home/Anime/Mihon/mobile-navigation/reader Flutter pre-build tests', artifacts / 'flutter-prebuild-tests.log'),
+              ('Gradle wrapper generation', artifacts / 'gradle-wrapper.log'),
+              ('Focused Mihon ABI Android unit test', artifacts / 'android-mihon-abi-test.log'),
+              ('Android APK build', artifacts / 'android-apk-build.log'),
+              ('APK size and ABI audit', artifacts / 'apk-audit.log'),
+          ]
+          warning_rx = re.compile(r'(?:warning\s*[•:]|^\s*warning:|^\s*w:|\bdeprecated(?:_member_use)?\b|\bWARN(?:ING)?\s*:|\[(?:WARN|WARNING)\])', re.I)
+          notice_rx = re.compile(r'(?:^|\s)notice\b|::notice', re.I)
+          info_rx = re.compile(r'\binfo\s*[•:]')
+          error_rx = re.compile(r'(?:^\s*error\s*[•:]|^\s*error:|\[E\]|Expected:|Actual:|Unhandled Exception|Exception:|Some tests failed|FAILURE: Build failed|What went wrong:|Execution failed for task|Could not (?:resolve|find)|Process completed with exit code [1-9]|Command exit code: [1-9]|APK audit exit code: [1-9])', re.I)
+
+          report += [
+              '',
+              '## 4. Commands and build switches',
+              '',
+              '- Dependency resolution: `flutter pub get`.',
+              '- Formatting: scoped Manga/Home/Anime/Mihon, PHASE63 work-detail/reader/translation and mobile navigation Dart targets via `bash tool/format_phase57_dart.sh --fix` / `--check` (63 files).',
+              '- Static analysis: `flutter analyze --no-fatal-infos`; it starts only after dependency resolution and formatting succeed.',
+              '- Required pre-build tests: fifteen focused Manga/Home/Anime/Mihon/mobile-navigation/reader Flutter test files, including PHASE62 Manga details/reader-source persistence tests, and one Android `MihonExtensionLoaderAbiTest` class (three ABI boundary cases). Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
+              '- Live Laravel smoke/E2E tests are not pre-build gates; their source files are preserved for explicit manual/staging validation after APK creation. The write-enabled E2E test still requires a disposable staging backend and explicit write consent.',
+              '- Wrapper generation: `gradle wrapper --gradle-version 8.14 --distribution-type all`.',
+              '- APK build: `flutter build apk --${BUILD_MODE} --flavor prod --target lib/main.dart --target-platform android-arm64 -Pdisable-abi-filtering=true --dart-define=ENABLE_FIREBASE=false --dart-define=LOCAL_DEV_MODE=true`.',
+              '- APK audit: inspect archive CRC/listing, native ABI directories, package name and payload sizes.',
+              '',
+              '### Routine pre-build test gate',
+              '',
+              code_block('''
+              Routine pre-build Flutter gate runs exactly these fifteen files:
+
+              test/manga/manga_repository_manager_test.dart
+              --covers: first-use seed, add/edit/remove, HTTP(S) .pb validation,
+                        fragment normalization, duplicate prevention and stale updates
+              test/manga/manga_reader_crop_test.dart
+              --covers: flat scan-margin detection, untouched artwork and invalid input safety
+              test/manga/mihon_source_browser_screen_test.dart
+              --covers: unified available/installed extension directory, screenshot-matched row actions, orphaned installed sources and removal support
+              test/manga/mihon_default_extension_installer_test.dart
+              --covers: exact ten-name selection, pinned Keiyoushi signing fingerprint, Arabic package preference and strict name normalization
+              test/manga/phase55_manga_catalogue_test.dart
+              --covers: All/JP/KR/CN filters, title metadata and catalogue shelves
+              test/manga/phase55_mihon_pb_index_test.dart
+              test/manga/phase56_manga_regression_test.dart
+              --covers: gzip Protobuf decoding, extension mapping, raw repo.json parsing, strict signer trust and install eligibility
+              test/manga/phase57_manga_home_parity_test.dart
+              --covers: every Manga/Manhwa/Manhua catalogue shelf survives aggregation
+              test/manga_detail_metadata_test.dart
+              --covers: AniList detail metadata, characters/staff, relations, tags and optional-field fallbacks
+              test/manga_reading_store_test.dart
+              --covers: source pins, chapter progress, reading status and per-work reader preferences
+              test/manga_source_matcher_test.dart
+              --covers: strict whole-title matching, aliases and chapter-number parsing
+              test/mobile/mobile_nav_bar_test.dart
+              --covers: Phosphor destination icons and selected-destination menu-toggle transitions
+              test/anime_media_classification_test.dart
+              --covers: Japanese animation is Anime; non-Japanese Animation and Japanese live action are not
+              test/home_catalog_test.dart
+              --covers: Anime and Series Continue Watching remain isolated
+              test/home_screen_test.dart
+              --covers: Anime feed uses Home rows; Anime stays out of Series; Manga All aggregation, Skeleton and See All behavior
+
+              Android gate: `:app:testProdReleaseUnitTest --tests com.m5ham3ds.raven23.mihon.MihonExtensionLoaderAbiTest`
+              --covers: Float widening (1.6f), exact supported versions (1.4/1.6), and unsupported/non-finite values
+
+              All other test sources remain in the repository for manual/deeper regression; CI does not delete or disable them.
+              '''),
+              '',
+              '## 5. Warnings, errors and diagnostics',
+              '',
+              'Counts below are extracted from the command logs captured by this workflow. Setup/action internals are represented by their step outcome; open the workflow run for the action-owned console output.',
+              '',
+              '| Log | Warning occurrences (unique messages) | Notices | Analyzer info | Error/failure markers |',
+              '|---|---:|---:|---:|---:|',
+          ]
+          captured_any = False
+          warning_lines_all = []
+          notice_lines_all = []
+          error_lines_all = []
+          for label, path in log_specs:
+              if not path.is_file():
+                  continue
+              captured_any = True
+              content = path.read_text(errors='replace')
+              lines = content.splitlines()
+              warning_counts = Counter(
+                  line.strip() for line in lines if warning_rx.search(line)
+              )
+              warning_lines = list(warning_counts.keys())
+              notice_lines = [line.strip() for line in lines if notice_rx.search(line)]
+              info_lines = [line.strip() for line in lines if info_rx.search(line)]
+              error_lines = [line.strip() for line in lines if error_rx.search(line)]
+              report.append(
+                  f'| {label} | {sum(warning_counts.values())} ({len(warning_lines)} unique) | '
+                  f'{len(notice_lines)} | {len(info_lines)} | {len(error_lines)} |'
+              )
+              warning_lines_all.extend(
+                  (label, line, warning_counts[line]) for line in warning_lines
+              )
+              notice_lines_all.extend((label, line) for line in notice_lines)
+              error_lines_all.extend((label, line) for line in error_lines)
+          if not captured_any:
+              report.append('| No command logs captured | 0 | 0 | 0 | 0 |')
+
+          report += ['', '### Warning and deprecation excerpts', '']
+          if warning_lines_all:
+              for label, line, occurrences in warning_lines_all[:60]:
+                  repeat_note = f' _(repeated {occurrences} times)_' if occurrences > 1 else ''
+                  report.append(f'- **{label}:** `{line[:500]}`{repeat_note}')
+              if len(warning_lines_all) > 60:
+                  report.append(f'- _{len(warning_lines_all) - 60} additional unique warning messages are retained in the raw log artifacts._')
+          else:
+              report.append('- No warning/deprecation markers found in captured command logs.')
+
+          report += ['', '### Notices', '']
+          if notice_lines_all:
+              for label, line in notice_lines_all[:20]:
+                  report.append(f'- **{label}:** `{line[:500]}`')
+          else:
+              report.append('- No notice markers found in captured command logs.')
+
+          report += ['', '### Error and failure excerpts', '']
+          if error_lines_all:
+              for label, line in error_lines_all[:60]:
+                  report.append(f'- **{label}:** `{line[:500]}`')
+              if len(error_lines_all) > 60:
+                  report.append(f'- _{len(error_lines_all) - 60} additional error/failure lines are retained in raw logs._')
+          else:
+              report.append('- No error markers found in captured command logs.')
+
+          flutter_test_log = artifacts / 'flutter-prebuild-tests.log'
+          if flutter_test_log.is_file():
+              flutter_test_lines = flutter_test_log.read_text(errors='replace').splitlines()
+              summary_lines = [
+                  line.strip() for line in flutter_test_lines
+                  if re.search(r'(?:Some tests failed|All tests passed|\d+ tests passed|timed out|No tests ran)', line, re.I)
+              ]
+              report += ['', '### Focused Flutter pre-build test summary', '']
+              report.append(next((line for line in flutter_test_lines if 'Focused Flutter pre-build test files:' in line), '- Focused Flutter file count was not captured.'))
+              if summary_lines:
+                  report.extend(f'- `{line[:500]}`' for line in summary_lines[-16:])
+              else:
+                  report.append('- No terminal test summary was captured; inspect the raw focused-test log.')
+              failed_tests = [line.strip() for line in flutter_test_lines if '[E]' in line or 'Some tests failed' in line]
+              if failed_tests:
+                  report += ['', '#### Failed test markers', '']
+                  report.extend(f'- `{line[:500]}`' for line in failed_tests[-30:])
+              tail = flutter_test_lines[-100:]
+              report += ['', '#### Last 100 lines of focused Flutter test log', '', code_block('\n'.join(tail))]
+
+          android_test_log = artifacts / 'android-mihon-abi-test.log'
+          if android_test_log.is_file():
+              android_test_lines = android_test_log.read_text(errors='replace').splitlines()
+              report += ['', '### Android unit-test summary', '']
+              report.append(next((line for line in android_test_lines if 'Selected Android test class:' in line), '- Android test-class selection was not captured.'))
+              gradle_summaries = [line.strip() for line in android_test_lines if re.search(r'(?:BUILD SUCCESSFUL|BUILD FAILED|Executed Mihon ABI tests|Executed Mihon ABI cases|FAILED)', line, re.I)]
+              report.extend(f'- `{line[:500]}`' for line in gradle_summaries[-20:])
+              abi_passes = [
+                  line.strip() for line in android_test_lines
+                  if re.search(r'^MihonExtensionLoaderAbiTest > [A-Za-z0-9_]+ PASSED\s*$', line.strip())
+              ]
+              if abi_passes:
+                  report += ['', '#### Focused ABI case evidence', '']
+                  report.extend(f'- `{line}`' for line in abi_passes)
+              if not gradle_summaries:
+                  report.append('- No terminal Gradle test summary was captured.')
+              module_build = root / 'build' / 'app'
+              junit_paths = sorted(module_build.rglob('TEST-*.xml')) if module_build.is_dir() else []
+              report += ['', '#### Android JUnit report discovery', '']
+              if junit_paths:
+                  report.extend(f'- `{path.relative_to(root)}`' for path in junit_paths)
+              else:
+                  report.append('- No JUnit XML found under `build/app`; inspect the exact Gradle per-test console events above. This is diagnostic information, not by itself a failed test result.')
+
+          apk_report = root / 'apk-size-report.md'
+          if apk_report.is_file():
+              report += ['', '## 6. APK size and ABI report', '', read_text(apk_report)]
+          else:
+              report += ['', '## 6. APK size and ABI report', '', 'APK audit did not produce `apk-size-report.md`; inspect the APK audit step outcome and log.']
+
+          report += [
+              '',
+              '## 7. Generated diagnostic artifacts',
+              '',
+          ]
+          files = sorted(p for p in artifacts.iterdir() if p.is_file())
+          if files:
+              for item in files:
+                  report.append(f'- `{item.relative_to(root)}` — {item.stat().st_size:,} bytes')
+          else:
+              report.append('- No diagnostic files were generated.')
+          report.append('- `build-artifacts/RAVEN23-build-report.md` and root `RAVEN23-build-report.md` — this generated report.')
+          report += [
+              '',
+              '## 8. Interpretation notes',
+              '',
+              '- A step marked `skipped` was not executed; this includes later build stages blocked by a prerequisite failure and must not be interpreted as a pass.',
+              '- The routine APK gate intentionally runs fifteen focused Manga/Home/Anime/Mihon/mobile-navigation/reader Flutter files and the three-case Android Mihon ABI class. The full Flutter and Android test inventories remain untouched in the source tree for manual/deeper regression after the owner installs the APK. Laravel live tests are also retained for explicit staging validation and are not pre-build gates.',
+              '- Setup actions (checkout/tool installers/cache) expose their detailed output in the linked GitHub Actions run; their success/failure outcome is recorded above.',
+              '- This report describes this individual run only. It does not mark a RAVEN23 phase accepted unless all required CI and runtime acceptance gates pass.',
+              '',
+              '---',
+              f'_Generated automatically by `.github/workflows/android-ci.yml` at {finished}._',
+              '',
+          ]
+
+          output = '\n'.join(report)
+          report_path = artifacts / 'RAVEN23-build-report.md'
+          report_path.write_text(output)
+          (root / 'RAVEN23-build-report.md').write_text(output)
+          summary_path = os.getenv('GITHUB_STEP_SUMMARY')
+          if summary_path:
+              with open(summary_path, 'a', encoding='utf-8') as summary:
+                  summary.write(output + '\n')
+          print(f'Generated comprehensive build report: {report_path}')
+          print(f'Overall job status recorded: {job_status}')
+          PYTHON
+
+      - name: Upload comprehensive Markdown build report and raw diagnostics
+        id: upload_build_report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: RAVEN23-build-report-and-diagnostics
+          path: |
+            RAVEN23-build-report.md
+            build-artifacts/**
+            apk-size-report.md
+          if-no-files-found: warn
+          retention-days: 30

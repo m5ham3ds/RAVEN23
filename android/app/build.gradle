@@ -1,0 +1,267 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "org.jetbrains.kotlin.plugin.serialization" version "2.2.20"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+// Firebase is intentionally disabled during the current development phase.
+// Enable it later with -PenableFirebaseGradlePlugins=true and provide a
+// matching android/app/google-services.json for this applicationId.
+def enableFirebaseGradlePlugins = project.hasProperty('enableFirebaseGradlePlugins') &&
+        project.property('enableFirebaseGradlePlugins').toString().toBoolean()
+
+if (enableFirebaseGradlePlugins) {
+    if (!file('google-services.json').isFile()) {
+        throw new GradleException(
+            'Firebase Gradle plugins were enabled, but android/app/google-services.json is missing.'
+        )
+    }
+    apply plugin: 'com.google.gms.google-services'
+    apply plugin: 'com.google.firebase.crashlytics'
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def releaseSigningKeys = ['keyAlias', 'keyPassword', 'storeFile', 'storePassword']
+def hasReleaseSigning = keystorePropertiesFile.isFile() && releaseSigningKeys.every { key ->
+    def value = keystoreProperties.getProperty(key)
+    value != null && !value.trim().isEmpty()
+} && file(keystoreProperties.getProperty('storeFile')).isFile()
+
+android {
+    namespace 'com.m5ham3ds.raven23'
+    compileSdk 36
+    ndkVersion "28.2.13676358"
+    buildToolsVersion "36.0.0"
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += ['-Xcontext-parameters']
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    testOptions {
+        // Android Gradle Plugin normally writes local unit-test XML under
+        // build/outputs/test-results. Pin the result/report roots explicitly so
+        // CI and local Android Studio runs consume the same predictable paths.
+        resultsDir "$buildDir/test-results"
+        reportDir "$buildDir/reports/tests"
+
+        unitTests {
+            includeAndroidResources = true
+            all {
+                testLogging {
+                    events "passed", "skipped", "failed"
+                    exceptionFormat "full"
+                }
+                reports {
+                    junitXml.required = true
+                }
+            }
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.m5ham3ds.raven23"
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 36
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+        ndk {
+            // Flutter 3.35+ pre-populates ABI filters for its supported targets.
+            // Clear that inherited set before selecting this app's single target ABI;
+            // merely adding arm64-v8a would leave armeabi-v7a and x86_64 enabled.
+            abiFilters.clear()
+            abiFilters.add('arm64-v8a')
+        }
+    }
+
+    // Compress native .so files in the APK to reduce the downloadable artifact size.
+    // Android extracts these libraries at install time; this changes packaging, not the
+    // selected ABI or the native engines included in the app.
+    packaging {
+        resources {
+            // OkHttp Brotli, OkHttp DNS-over-HTTPS and JSpecify all publish this
+            // versioned OSGi metadata path. Android does not load OSGi bundle
+            // metadata at runtime; keep one deterministic copy to resolve the
+            // duplicate Java-resource collision without excluding any library
+            // classes or runtime service descriptors.
+            pickFirsts += [
+                'META-INF/versions/9/OSGI-INF/MANIFEST.MF'
+            ]
+        }
+        jniLibs {
+            useLegacyPackaging = true
+            // Hard packaging guard: third-party AARs may contribute prebuilt
+            // native libraries for ABIs that this APK must not ship. The ABI
+            // filters above control the variant; these excludes ensure that
+            // non-ARM64 .so payloads cannot leak into the final APK.
+            excludes += [
+                '**/armeabi-v7a/**',
+                '**/armeabi/**',
+                '**/x86/**',
+                '**/x86_64/**',
+                '**/mips/**',
+                '**/mips64/**',
+                '**/riscv64/**',
+                // Khronos validation layer is a debug diagnostic layer, not
+                // a runtime dependency for Flutter/BetterPlayer video playback.
+                '**/libVkLayer_khronos_validation.so'
+            ]
+        }
+    }
+
+    flavorDimensions "environment"
+    productFlavors {
+        prod {
+            dimension "environment"
+            manifestPlaceholders = [appLabel: "RAVEN23"]
+            // The CI artifact is a single production APK for modern ARM64 phones.
+            // Keep the filter on the selected flavor as well as defaultConfig;
+            // CI disables Flutter's automatic ABI filter so this explicit flavor
+            // configuration is authoritative.
+            ndk {
+                abiFilters.clear()
+                abiFilters.add('arm64-v8a')
+            }
+        }
+        dev {
+            dimension "environment"
+            // Keep the same Android application ID as prod for now. Firebase
+            // registration will be updated to this package when enabled later.
+            manifestPlaceholders = [appLabel: "RAVEN23 Dev"]
+        }
+    }
+
+    signingConfigs {
+       release {
+           keyAlias keystoreProperties['keyAlias']
+           keyPassword keystoreProperties['keyPassword']
+           storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+           storePassword keystoreProperties['storePassword']
+       }
+   }
+   
+   buildTypes {
+       release {
+           // Use the project's private release key when key.properties is
+           // supplied. For local/CI development builds without that key,
+           // fall back to the standard debug signing identity so Release APKs
+           // remain installable and can be compared with Debug builds.
+           // Configure a private keystore before distributing to users.
+           signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
+           // Mihon extension APKs are loaded later through DexClassLoader and link by
+           // exact class/method names against these host-provided source APIs, OkHttp,
+           // serialization, preferences and Material classes. R8 renaming/removal would
+           // break those external DEX references even when this app itself compiles.
+           // Keep the dynamic extension ABI intact; this is the same requirement used
+           // by Zangetsu's extension-enabled Release build.
+           shrinkResources false
+           minifyEnabled false
+       }
+   }
+
+    // `flutter build apk --split-per-abi` adds 1000/2000/4000 to each ABI's
+    // versionCode. Every APK keeps the pubspec build number instead, so the
+    // in-app updater's build comparison holds and devices can move between
+    // the universal and per-ABI APKs without a downgrade error. Registered
+    // after the Flutter plugin's hook, so it runs last.
+    applicationVariants.configureEach { variant ->
+        variant.outputs.each { output ->
+            output.versionCodeOverride = flutterVersionCode.toInteger()
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+// The focused ABI gate must never pass silently when Gradle matches zero tests.
+// Keep the requirement scoped to this single variant task; the remaining Android
+// test inventory stays available for owner-led/manual regression.
+tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+    if (name == 'testProdReleaseUnitTest') {
+        filter {
+            failOnNoMatchingTests = true
+        }
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            exceptionFormat 'full'
+        }
+        reports {
+            junitXml.required = true
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    def media3Version = '1.8.0'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    implementation 'androidx.multidex:multidex:2.0.1'
+    // Mihon manga-extension runtime ported from Zangetsu (Apache-2.0 upstream
+    // compatibility layer; original license headers retained in vendored files).
+    implementation 'com.squareup.okhttp3:okhttp:5.3.2'
+    implementation 'com.squareup.okhttp3:okhttp-brotli:5.3.2'
+    implementation 'com.squareup.okhttp3:okhttp-zstd:5.3.2'
+    implementation 'com.squareup.okhttp3:okhttp-dnsoverhttps:5.3.2'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.preference:preference-ktx:1.2.1'
+    implementation 'io.reactivex:rxjava:1.3.8'
+    implementation 'uy.kohesive.injekt:injekt-core:1.16.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json-okio:1.9.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.9.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    // On-device manga OCR recognizers are downloaded by Google Play services on demand.
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1'
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1'
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1'
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1'
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition-devanagari:16.0.1'
+    // ML Kit downloads source/target language packs only after reader consent.
+    implementation 'com.google.mlkit:translate:17.0.3'
+    implementation 'org.jsoup:jsoup:1.18.3'
+    implementation "androidx.media3:media3-database:$media3Version"
+    implementation "androidx.media3:media3-datasource:$media3Version"
+    implementation "androidx.media3:media3-exoplayer:$media3Version"
+    implementation "androidx.media3:media3-exoplayer-dash:$media3Version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3Version"
+    implementation "androidx.media3:media3-ui:$media3Version"
+    implementation "androidx.media3:media3-transformer:$media3Version"
+}

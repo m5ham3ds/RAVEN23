@@ -1,0 +1,67 @@
+UTC capture time: 2026-11-08T16:47:18Z
+Runner: Linux / X64
+Kernel: Linux runnervmwuk1x 7.0.0-1019-azure #20-Ubuntu SMP PREEMPT Mon Oct 19 22:41:16 UTC 2026 x86_64 GNU/Linux
+Repository: m5ham3ds/RAVEN23
+Ref: refs/heads/main
+Commit: 8fab95f764c9b541d2e74e5845bab30488e738a6
+
+### flutter
+Flutter 3.35.7 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision adc9010625 (1 year, 1 month ago) • 2025-10-21 14:16:03 -0400
+Engine • hash 6b24e1b529bc46df7ff397667502719a2a8b6b72 (revision 035316565a) (12 months ago) • 2025-10-21 14:28:01.000Z
+Tools • Dart 3.9.2 • DevTools 2.48.0
+
+### dart
+Dart SDK version: 3.9.2 (stable) (Wed Aug 27 03:49:40 2025 -0700) on "linux_x64"
+
+### java
+openjdk version "17.0.21" 2026-10-20
+OpenJDK Runtime Environment Temurin-17.0.21+9 (build 17.0.21+9)
+OpenJDK 64-Bit Server VM Temurin-17.0.21+9 (build 17.0.21+9, mixed mode, sharing)
+
+### gradle
+
+Welcome to Gradle 8.7!
+
+Here are the highlights of this release:
+ - Compiling and testing with Java 22
+ - Cacheable Groovy script compilation
+ - New methods in lazy collection properties
+
+For more details see https://docs.gradle.org/8.7/release-notes.html
+
+
+------------------------------------------------------------
+Gradle 8.7
+------------------------------------------------------------
+
+Build time:   2024-03-22 15:52:46 UTC
+Revision:     650af14d7653aa949fce5e886e685efc9cf97c10
+
+Kotlin:       1.9.22
+Groovy:       3.0.17
+Ant:          Apache Ant(TM) version 1.10.13 compiled on January 4 2023
+JVM:          17.0.21 (Eclipse Adoptium 17.0.21+9)
+OS:           Linux 7.0.0-1019-azure amd64
+
+
+### sdkmanager
+WARNING: The SDK Manager CLI tool (sdkmanager) is deprecated. Use Android CLI instead.
+The 'android' binary can also be found in the cmdline-tools directory, and 'android sdk' is the replacement for 'sdkmanager'.
+To learn more about the Android CLI and how to use it, see the documentation (https://d.android.com/tools/agents/android-cli)
+
+22.0
+
+
+### adb
+Android Debug Bridge version 1.0.41
+Version 37.0.1-15733141
+Installed as /usr/local/lib/android/sdk/platform-tools/adb
+Running on Linux 7.0.0-1019-azure (x86_64)
+
+### python3
+Python 3.14.4
+
+ANDROID_HOME: /usr/local/lib/android/sdk
+ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+FLUTTER_ROOT: /opt/hostedtoolcache/flutter/stable-3.35.7-x64/flutter

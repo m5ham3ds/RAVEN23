@@ -1,0 +1,8 @@
+version: 1
+protocol: http
+name: RAVEN23 DLHD browser loader
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

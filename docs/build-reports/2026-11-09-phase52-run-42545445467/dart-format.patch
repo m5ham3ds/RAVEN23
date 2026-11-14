@@ -1,0 +1,2105 @@
+diff --git a/lib/screens/common/source_repositories_screen.dart b/lib/screens/common/source_repositories_screen.dart
+index 006fd12..eddbc96 100644
+--- a/lib/screens/common/source_repositories_screen.dart
++++ b/lib/screens/common/source_repositories_screen.dart
+@@ -916,7 +916,8 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+   ) {
+     final priority = (_priorityKeys[category] ?? const <String>[]).toSet();
+     return catalog.where((source) {
+-      if (!_isInstalled(source) || priority.contains(source.stableKey)) return false;
++      if (!_isInstalled(source) || priority.contains(source.stableKey))
++        return false;
+       return SourcePriorityPolicy.isDirectPriorityCandidate(
+         source,
+         category,
+@@ -949,9 +950,11 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+       await _service.removePrioritySource(_priorityCategory, source);
+       await _refresh(showBusy: false, forceRefresh: false);
+       if (mounted) {
+-        _message(_isArabic(context)
+-            ? 'تمت إزالة المصدر من الأولوية فقط؛ وسيبقى مثبتًا ومتاحًا ضمن البحث الاحتياطي.'
+-            : 'Removed from priority only; the installed source remains available as a backup.');
++        _message(
++          _isArabic(context)
++              ? 'تمت إزالة المصدر من الأولوية فقط؛ وسيبقى مثبتًا ومتاحًا ضمن البحث الاحتياطي.'
++              : 'Removed from priority only; the installed source remains available as a backup.',
++        );
+       }
+     } catch (error) {
+       if (mounted) _message('${tr('repository_error')}: $error');
+@@ -964,20 +967,23 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+     if (_working || _snapshot == null) return;
+     final category = _priorityCategory;
+     final existing = (_priorityKeys[category] ?? const <String>[]).toSet();
+-    final candidates = _snapshot!.catalog.where((source) {
+-      return !existing.contains(source.stableKey) &&
+-          SourcePriorityPolicy.isDirectPriorityCandidate(
+-            source,
+-            category,
+-            supportsRuntime: _supportsRuntime,
+-          ) &&
+-          _canActivatePrioritySource(source);
+-    }).toList()..sort((left, right) {
+-      final byStatus = SourcePriorityPolicy.backupStatusRank(left).compareTo(
+-        SourcePriorityPolicy.backupStatusRank(right),
+-      );
+-      return byStatus != 0 ? byStatus : left.name.toLowerCase().compareTo(right.name.toLowerCase());
+-    });
++    final candidates =
++        _snapshot!.catalog.where((source) {
++          return !existing.contains(source.stableKey) &&
++              SourcePriorityPolicy.isDirectPriorityCandidate(
++                source,
++                category,
++                supportsRuntime: _supportsRuntime,
++              ) &&
++              _canActivatePrioritySource(source);
++        }).toList()..sort((left, right) {
++          final byStatus = SourcePriorityPolicy.backupStatusRank(
++            left,
++          ).compareTo(SourcePriorityPolicy.backupStatusRank(right));
++          return byStatus != 0
++              ? byStatus
++              : left.name.toLowerCase().compareTo(right.name.toLowerCase());
++        });
+     final selected = await showDialog<SourceManifest>(
+       context: context,
+       builder: (dialogContext) => AlertDialog(
+@@ -986,7 +992,13 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+           width: 560,
+           height: 420,
+           child: candidates.isEmpty
+-              ? Center(child: Text(_isArabic(context) ? 'لا توجد مصادر مؤهلة إضافية لهذه الفئة.' : 'No additional eligible sources for this category.'))
++              ? Center(
++                  child: Text(
++                    _isArabic(context)
++                        ? 'لا توجد مصادر مؤهلة إضافية لهذه الفئة.'
++                        : 'No additional eligible sources for this category.',
++                  ),
++                )
+               : ListView.separated(
+                   itemCount: candidates.length,
+                   separatorBuilder: (_, __) => const Divider(height: 1),
+@@ -994,7 +1006,9 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+                     final source = candidates[index];
+                     return ListTile(
+                       title: Text(source.name),
+-                      subtitle: Text('${source.language} · ${SourcePriorityPolicy.statusLabel(source)}'),
++                      subtitle: Text(
++                        '${source.language} · ${SourcePriorityPolicy.statusLabel(source)}',
++                      ),
+                       trailing: const Icon(Icons.add_circle_outline_rounded),
+                       onTap: () => Navigator.pop(dialogContext, source),
+                     );
+@@ -1002,7 +1016,10 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+                 ),
+         ),
+         actions: <Widget>[
+-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(tr('cancel'))),
++          TextButton(
++            onPressed: () => Navigator.pop(dialogContext),
++            child: Text(tr('cancel')),
++          ),
+         ],
+       ),
+     );
+@@ -1011,7 +1028,12 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+     try {
+       final added = await _service.addPrioritySource(category, selected);
+       if (!added) {
+-        if (mounted) _message(_isArabic(context) ? 'وصلت الفئة أو المستودع إلى حد 15 مصدرًا، أو لم يعد المصدر مؤهلًا.' : 'The category or repository has reached its 15-source limit, or this source is no longer eligible.');
++        if (mounted)
++          _message(
++            _isArabic(context)
++                ? 'وصلت الفئة أو المستودع إلى حد 15 مصدرًا، أو لم يعد المصدر مؤهلًا.'
++                : 'The category or repository has reached its 15-source limit, or this source is no longer eligible.',
++          );
+         return;
+       }
+       await _refresh(showBusy: false, forceRefresh: false);
+@@ -1033,7 +1055,9 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+       children: <Widget>[
+         _SectionHeading(
+           title: 'REPOSITORIES',
+-          trailing: Text('$priorityCount/${SourcePriorityManager.maxPrioritySources}'),
++          trailing: Text(
++            '$priorityCount/${SourcePriorityManager.maxPrioritySources}',
++          ),
+         ),
+         Container(
+           padding: const EdgeInsets.all(AppSpace.md),
+@@ -1055,20 +1079,39 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+               Wrap(
+                 spacing: AppSpace.sm,
+                 runSpacing: AppSpace.sm,
+-                children: SourcePriorityCategory.values.map((category) {
+-                  return ChoiceChip(
+-                    label: Text(_categoryTitle(category, arabic: arabic)),
+-                    selected: _priorityCategory == category,
+-                    onSelected: _working ? null : (_) => setState(() => _priorityCategory = category),
+-                  );
+-                }).toList(growable: false),
++                children: SourcePriorityCategory.values
++                    .map((category) {
++                      return ChoiceChip(
++                        label: Text(_categoryTitle(category, arabic: arabic)),
++                        selected: _priorityCategory == category,
++                        onSelected: _working
++                            ? null
++                            : (_) =>
++                                  setState(() => _priorityCategory = category),
++                      );
++                    })
++                    .toList(growable: false),
+               ),
+               const SizedBox(height: AppSpace.sm),
+               Row(
+                 children: <Widget>[
+-                  Expanded(child: Text(arabic ? 'الأولوية: $priorityCount · الاحتياطي: $backups' : 'Priority: $priorityCount · Backups: $backups', style: AppType.metadata.copyWith(color: palette.mutedText))),
++                  Expanded(
++                    child: Text(
++                      arabic
++                          ? 'الأولوية: $priorityCount · الاحتياطي: $backups'
++                          : 'Priority: $priorityCount · Backups: $backups',
++                      style: AppType.metadata.copyWith(
++                        color: palette.mutedText,
++                      ),
++                    ),
++                  ),
+                   OutlinedButton.icon(
+-                    onPressed: _working || priorityCount >= SourcePriorityManager.maxPrioritySources ? null : _addPriority,
++                    onPressed:
++                        _working ||
++                            priorityCount >=
++                                SourcePriorityManager.maxPrioritySources
++                        ? null
++                        : _addPriority,
+                     icon: const Icon(Icons.add_rounded),
+                     label: Text(arabic ? 'إضافة' : 'Add'),
+                   ),
+@@ -1077,17 +1120,32 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+               if (selected.isEmpty)
+                 Padding(
+                   padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
+-                  child: Text(arabic ? 'لا توجد مصادر في قائمة الأولوية. ستُجرّب المصادر المباشرة المؤهلة كخيارات احتياطية.' : 'No priority sources are selected. Eligible direct sources will be tried as backups.', style: AppType.metadata.copyWith(color: palette.mutedText)),
++                  child: Text(
++                    arabic
++                        ? 'لا توجد مصادر في قائمة الأولوية. ستُجرّب المصادر المباشرة المؤهلة كخيارات احتياطية.'
++                        : 'No priority sources are selected. Eligible direct sources will be tried as backups.',
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
++                  ),
+                 )
+               else
+-                for (var index = 0; index < selected.length; index++) ...<Widget>[
++                for (
++                  var index = 0;
++                  index < selected.length;
++                  index++
++                ) ...<Widget>[
+                   if (index > 0) Divider(height: 1, color: palette.hairline),
+                   _PrioritySourceTile(
+                     source: selected[index],
+                     index: index,
+-                    onMoveUp: _working || index == 0 ? null : () => _changePriorityOrder(index, index - 1),
+-                    onMoveDown: _working || index == selected.length - 1 ? null : () => _changePriorityOrder(index, index + 2),
+-                    onRemove: _working ? null : () => _removePriority(selected[index]),
++                    onMoveUp: _working || index == 0
++                        ? null
++                        : () => _changePriorityOrder(index, index - 1),
++                    onMoveDown: _working || index == selected.length - 1
++                        ? null
++                        : () => _changePriorityOrder(index, index + 2),
++                    onRemove: _working
++                        ? null
++                        : () => _removePriority(selected[index]),
+                   ),
+                 ],
+             ],
+@@ -1147,7 +1205,9 @@ class _PrioritySourceTile extends StatelessWidget {
+     final palette = AppPalette.of(context);
+     final status = SourcePriorityPolicy.statusLabel(source);
+     final repo = Uri.tryParse(source.repositoryUrl ?? '');
+-    final repositoryName = repo == null ? 'Local' : '${repo.host}${repo.path.split('/').take(3).join('/')}';
++    final repositoryName = repo == null
++        ? 'Local'
++        : '${repo.host}${repo.path.split('/').take(3).join('/')}';
+     final arabic = _isArabic(context);
+     return Padding(
+       padding: const EdgeInsets.symmetric(vertical: 6),
+@@ -1157,23 +1217,61 @@ class _PrioritySourceTile extends StatelessWidget {
+             width: 28,
+             height: 28,
+             alignment: Alignment.center,
+-            decoration: BoxDecoration(color: palette.page, borderRadius: BorderRadius.circular(8)),
+-            child: Text('${index + 1}', style: AppType.metadata.copyWith(fontWeight: FontWeight.w700)),
++            decoration: BoxDecoration(
++              color: palette.page,
++              borderRadius: BorderRadius.circular(8),
++            ),
++            child: Text(
++              '${index + 1}',
++              style: AppType.metadata.copyWith(fontWeight: FontWeight.w700),
++            ),
+           ),
+           const SizedBox(width: AppSpace.sm),
+           Expanded(
+             child: Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: <Widget>[
+-                Text(source.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.body.copyWith(fontWeight: FontWeight.w600)),
+-                Text('$repositoryName · ${source.language}', maxLines: 1, overflow: TextOverflow.ellipsis, style: AppType.metadata.copyWith(color: palette.mutedText)),
+-                Text(status, style: AppType.metadata.copyWith(color: status == 'Beta' || status == 'Slow' || status == 'Unrated' ? palette.mutedText : palette.secondaryText)),
++                Text(
++                  source.name,
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: AppType.body.copyWith(fontWeight: FontWeight.w600),
++                ),
++                Text(
++                  '$repositoryName · ${source.language}',
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                  style: AppType.metadata.copyWith(color: palette.mutedText),
++                ),
++                Text(
++                  status,
++                  style: AppType.metadata.copyWith(
++                    color:
++                        status == 'Beta' ||
++                            status == 'Slow' ||
++                            status == 'Unrated'
++                        ? palette.mutedText
++                        : palette.secondaryText,
++                  ),
++                ),
+               ],
+             ),
+           ),
+-          IconButton(tooltip: arabic ? 'تحريك لأعلى' : 'Move up', onPressed: onMoveUp, icon: const Icon(Icons.keyboard_arrow_up_rounded)),
+-          IconButton(tooltip: arabic ? 'تحريك لأسفل' : 'Move down', onPressed: onMoveDown, icon: const Icon(Icons.keyboard_arrow_down_rounded)),
+-          IconButton(tooltip: arabic ? 'إزالة من الأولوية' : 'Remove from priority', onPressed: onRemove, icon: const Icon(Icons.remove_circle_outline_rounded)),
++          IconButton(
++            tooltip: arabic ? 'تحريك لأعلى' : 'Move up',
++            onPressed: onMoveUp,
++            icon: const Icon(Icons.keyboard_arrow_up_rounded),
++          ),
++          IconButton(
++            tooltip: arabic ? 'تحريك لأسفل' : 'Move down',
++            onPressed: onMoveDown,
++            icon: const Icon(Icons.keyboard_arrow_down_rounded),
++          ),
++          IconButton(
++            tooltip: arabic ? 'إزالة من الأولوية' : 'Remove from priority',
++            onPressed: onRemove,
++            icon: const Icon(Icons.remove_circle_outline_rounded),
++          ),
+         ],
+       ),
+     );
+diff --git a/lib/video_providers/unified/source_priority_manager.dart b/lib/video_providers/unified/source_priority_manager.dart
+index 2773052..74ae5c2 100644
+--- a/lib/video_providers/unified/source_priority_manager.dart
++++ b/lib/video_providers/unified/source_priority_manager.dart
+@@ -11,7 +11,8 @@ class SourcePriorityManager {
+     : _preferences = preferences;
+ 
+   static const int maxPrioritySources = 15;
+-  static const String _configuredKey = 'raven23.source_priorities.initialized.v1';
++  static const String _configuredKey =
++      'raven23.source_priorities.initialized.v1';
+   static const String _prefix = 'raven23.source_priorities.v1.';
+ 
+   final SharedPreferences? _preferences;
+@@ -30,9 +31,7 @@ class SourcePriorityManager {
+   Future<void> markInitialized() async =>
+       (await _prefs).setBool(_configuredKey, true);
+ 
+-  Future<List<String>> getPriorityKeys(
+-    SourcePriorityCategory category,
+-  ) async {
++  Future<List<String>> getPriorityKeys(SourcePriorityCategory category) async {
+     final raw = (await _prefs).getStringList(_key(category)) ?? const [];
+     return _normalize(raw);
+   }
+diff --git a/lib/video_providers/unified/source_priority_policy.dart b/lib/video_providers/unified/source_priority_policy.dart
+index 85f33ce..1c98ece 100644
+--- a/lib/video_providers/unified/source_priority_policy.dart
++++ b/lib/video_providers/unified/source_priority_policy.dart
+@@ -12,52 +12,56 @@ class SourcePriorityPolicy {
+ 
+   static const int maxAutoActivatedPerRepository = 15;
+ 
+-  static const Map<SourcePriorityCategory, List<({String repository, String id})>>
+-  _priorityOrder = <SourcePriorityCategory, List<({String repository, String id})>>{
+-    SourcePriorityCategory.movies: <({String repository, String id})>[
+-      (repository: 'openstream', id: 'yoru'),
+-      (repository: 'openstream', id: 'cypher'),
+-      (repository: 'openstream', id: 'breach'),
+-      (repository: 'openstream', id: 'neon'),
+-      (repository: 'openstream', id: 'vyse'),
+-      (repository: 'openstream', id: 'omen'),
+-      (repository: 'openstream', id: 'raze'),
+-      (repository: 'spyou-zangetsu', id: 'fourkhdhub'),
+-      (repository: 'spyou-zangetsu', id: 'uhdmovies'),
+-      (repository: 'serenity', id: 'serenity-streamplay'),
+-      (repository: 'serenity', id: 'serenity-cinestream'),
+-      (repository: 'spyhell-experiment', id: 'filmzie'),
+-      (repository: 'spyhell-experiment', id: 'internetarchive'),
+-    ],
+-    SourcePriorityCategory.series: <({String repository, String id})>[
+-      (repository: 'openstream', id: 'yoru'),
+-      (repository: 'openstream', id: 'cypher'),
+-      (repository: 'openstream', id: 'breach'),
+-      (repository: 'openstream', id: 'neon'),
+-      (repository: 'openstream', id: 'vyse'),
+-      (repository: 'openstream', id: 'omen'),
+-      (repository: 'openstream', id: 'raze'),
+-      // Serenity's current scripts implement explicit getDetail/getEpisodes
+-      // and episode stream paths even though their index/getInfo metadata
+-      // still says movie. A narrowly scoped reviewed override enables them.
+-      (repository: 'serenity', id: 'serenity-streamplay'),
+-      (repository: 'serenity', id: 'serenity-cinestream'),
+-    ],
+-    SourcePriorityCategory.anime: <({String repository, String id})>[
+-      // Sources with a concrete anime manifest and current engine support.
+-      (repository: 'spyou-zangetsu', id: 'anikoto'),
+-      (repository: 'spyou-zangetsu', id: 'hianime'),
+-      (repository: 'spyou-zangetsu', id: 'animecube'), // Chinese / Donghua.
+-      (repository: 'serenity', id: 'serenity-anikoto'),
+-      (repository: 'serenity', id: 'serenity-animekai'),
+-      (repository: 'serenity', id: 'serenity-aniwave'),
+-      (repository: 'spyhell-experiment', id: 'animesuge'),
+-      (repository: 'spyhell-experiment', id: 'animex'),
+-      (repository: 'spyhell-experiment', id: 'anikage'),
+-      (repository: 'spyhell-experiment', id: 'wcoflix'),
+-      (repository: 'spyhell-experiment', id: 'donghuanation'),
+-    ],
+-  };
++  static const Map<
++    SourcePriorityCategory,
++    List<({String repository, String id})>
++  >
++  _priorityOrder =
++      <SourcePriorityCategory, List<({String repository, String id})>>{
++        SourcePriorityCategory.movies: <({String repository, String id})>[
++          (repository: 'openstream', id: 'yoru'),
++          (repository: 'openstream', id: 'cypher'),
++          (repository: 'openstream', id: 'breach'),
++          (repository: 'openstream', id: 'neon'),
++          (repository: 'openstream', id: 'vyse'),
++          (repository: 'openstream', id: 'omen'),
++          (repository: 'openstream', id: 'raze'),
++          (repository: 'spyou-zangetsu', id: 'fourkhdhub'),
++          (repository: 'spyou-zangetsu', id: 'uhdmovies'),
++          (repository: 'serenity', id: 'serenity-streamplay'),
++          (repository: 'serenity', id: 'serenity-cinestream'),
++          (repository: 'spyhell-experiment', id: 'filmzie'),
++          (repository: 'spyhell-experiment', id: 'internetarchive'),
++        ],
++        SourcePriorityCategory.series: <({String repository, String id})>[
++          (repository: 'openstream', id: 'yoru'),
++          (repository: 'openstream', id: 'cypher'),
++          (repository: 'openstream', id: 'breach'),
++          (repository: 'openstream', id: 'neon'),
++          (repository: 'openstream', id: 'vyse'),
++          (repository: 'openstream', id: 'omen'),
++          (repository: 'openstream', id: 'raze'),
++          // Serenity's current scripts implement explicit getDetail/getEpisodes
++          // and episode stream paths even though their index/getInfo metadata
++          // still says movie. A narrowly scoped reviewed override enables them.
++          (repository: 'serenity', id: 'serenity-streamplay'),
++          (repository: 'serenity', id: 'serenity-cinestream'),
++        ],
++        SourcePriorityCategory.anime: <({String repository, String id})>[
++          // Sources with a concrete anime manifest and current engine support.
++          (repository: 'spyou-zangetsu', id: 'anikoto'),
++          (repository: 'spyou-zangetsu', id: 'hianime'),
++          (repository: 'spyou-zangetsu', id: 'animecube'), // Chinese / Donghua.
++          (repository: 'serenity', id: 'serenity-anikoto'),
++          (repository: 'serenity', id: 'serenity-animekai'),
++          (repository: 'serenity', id: 'serenity-aniwave'),
++          (repository: 'spyhell-experiment', id: 'animesuge'),
++          (repository: 'spyhell-experiment', id: 'animex'),
++          (repository: 'spyhell-experiment', id: 'anikage'),
++          (repository: 'spyhell-experiment', id: 'wcoflix'),
++          (repository: 'spyhell-experiment', id: 'donghuanation'),
++        ],
++      };
+ 
+   /// These additional sources are enabled as backups, but do not occupy the
+   /// first-pass priority tier. The allow-list avoids auto-enabling every
+@@ -181,7 +185,6 @@ class SourcePriorityPolicy {
+     return List<SourceManifest>.unmodifiable(selected.values);
+   }
+ 
+-
+   /// Applies the repository-wide activation cap to first-run and manual adds.
+   /// The same stable source may appear in several media lanes but is counted once.
+   static bool canActivateWithinRepositoryCap({
+@@ -232,7 +235,10 @@ class SourcePriorityPolicy {
+     }
+     // Known index/script language disagreements are handled conservatively:
+     // the provider script is more authoritative than its manifest label.
+-    if (_knownLanguageMismatches[repository]?.contains(source.id.toLowerCase()) == true) {
++    if (_knownLanguageMismatches[repository]?.contains(
++          source.id.toLowerCase(),
++        ) ==
++        true) {
+       return false;
+     }
+     final raw = (source.engine.language ?? source.language)
+@@ -241,9 +247,22 @@ class SourcePriorityPolicy {
+         .replaceAll('_', '-');
+     const english = <String>{'en', 'eng', 'english', 'multi'};
+     const animeOnly = <String>{
+-      'ja', 'jpn', 'japanese', 'ja-jp',
+-      'zh', 'zho', 'chi', 'chinese', 'mandarin', 'cmn',
+-      'zh-cn', 'zh-tw', 'zh-hk', 'zh-sg', 'zh-hans', 'zh-hant',
++      'ja',
++      'jpn',
++      'japanese',
++      'ja-jp',
++      'zh',
++      'zho',
++      'chi',
++      'chinese',
++      'mandarin',
++      'cmn',
++      'zh-cn',
++      'zh-tw',
++      'zh-hk',
++      'zh-sg',
++      'zh-hans',
++      'zh-hant',
+     };
+     final isEnglish = english.contains(raw) || raw.startsWith('en-');
+     return isEnglish ||
+@@ -268,8 +287,12 @@ class SourcePriorityPolicy {
+     required bool Function(SourceManifest) supportsRuntime,
+   }) {
+     final repository = _repositoryBucket(source.repositoryUrl);
+-    if (_knownAdultSourceIds[repository]?.contains(source.id.toLowerCase()) == true ||
+-        _unsupportedRuntimeSourceIds[repository]?.contains(source.id.toLowerCase()) == true) {
++    if (_knownAdultSourceIds[repository]?.contains(source.id.toLowerCase()) ==
++            true ||
++        _unsupportedRuntimeSourceIds[repository]?.contains(
++              source.id.toLowerCase(),
++            ) ==
++            true) {
+       return false;
+     }
+     if (!source.enabled ||
+@@ -300,8 +323,8 @@ class SourcePriorityPolicy {
+     return source.supportsMedia(probe);
+   }
+ 
+-  static const Map<String, Set<String>> _knownLanguageMismatches =
+-      <String, Set<String>>{
++  static const Map<String, Set<String>>
++  _knownLanguageMismatches = <String, Set<String>>{
+     // The index currently says English, but getInfo() in the live script says
+     // Hindi. Exclude it from every language lane until upstream fixes metadata.
+     'spyou-zangetsu': <String>{'hdhub4u'},
+@@ -310,14 +333,14 @@ class SourcePriorityPolicy {
+     'spyhell-experiment': <String>{'anilibria'},
+   };
+ 
+-  static const Map<String, Set<String>> _knownAdultSourceIds =
+-      <String, Set<String>>{
++  static const Map<String, Set<String>>
++  _knownAdultSourceIds = <String, Set<String>>{
+     // Hanime is adult-oriented even though the repository omits `nsfw: true`.
+     'spyhell-experiment': <String>{'hanime'},
+   };
+ 
+-  static const Map<String, Set<String>> _unsupportedRuntimeSourceIds =
+-      <String, Set<String>>{
++  static const Map<String, Set<String>>
++  _unsupportedRuntimeSourceIds = <String, Set<String>>{
+     // These providers expose magnet/torrent results; QuickJS mapping currently
+     // accepts HTTP(S) media URLs only and RAVEN23 has no torrent playback engine.
+     'spyhell-experiment': <String>{
+@@ -334,18 +357,22 @@ class SourcePriorityPolicy {
+   static bool _looksAdult(SourceManifest source) {
+     final identity = '${source.id} ${source.name} ${source.description}'
+         .toLowerCase();
+-    return RegExp(r'(^|[^a-z])(hentai|xxx|porn|adult|ecchi|oppai)([^a-z]|$)')
+-        .hasMatch(identity);
++    return RegExp(
++      r'(^|[^a-z])(hentai|xxx|porn|adult|ecchi|oppai)([^a-z]|$)',
++    ).hasMatch(identity);
+   }
+ 
+   static String _repositoryBucket(String? repositoryUrl) {
+     final uri = Uri.tryParse(repositoryUrl ?? '');
+-    final value = '${uri?.host.toLowerCase() ?? ''}${uri?.path.toLowerCase() ?? ''}';
++    final value =
++        '${uri?.host.toLowerCase() ?? ''}${uri?.path.toLowerCase() ?? ''}';
+     if (value.contains('/ivorisnoob/openstream/')) return 'openstream';
+     if (value.contains('/spyou/zangetsu-providers/')) return 'spyou-zangetsu';
+     if (value.contains('/serenity-mist/zangetsu-sources/')) return 'serenity';
+-    if (value.contains('/spyhell/zangetsu-experiment-repo/')) return 'spyhell-experiment';
+-    if (value.contains('/spyou/zangetsu-spyou-provider/')) return 'spyou-additional';
++    if (value.contains('/spyhell/zangetsu-experiment-repo/'))
++      return 'spyhell-experiment';
++    if (value.contains('/spyou/zangetsu-spyou-provider/'))
++      return 'spyou-additional';
+     if (value.contains('/spyhell/spyou-latin-zan/')) return 'spyhell-latin';
+     return 'other:${uri?.host ?? 'local'}${uri?.path ?? ''}';
+   }
+diff --git a/lib/video_providers/unified/source_repository_parser.dart b/lib/video_providers/unified/source_repository_parser.dart
+index 119080a..33a1b2c 100644
+--- a/lib/video_providers/unified/source_repository_parser.dart
++++ b/lib/video_providers/unified/source_repository_parser.dart
+@@ -125,8 +125,10 @@ class SourceRepositoryParser {
+           : SourceEngineKind.unsupported;
+       final config = Map<String, dynamic>.from(engineMap)
+         ..['languageDeclared'] =
+-            _text(engineMap['language']) != null || _text(entry['language']) != null
+-        ..['statusDeclared'] = entry.containsKey('status') &&
++            _text(engineMap['language']) != null ||
++            _text(entry['language']) != null
++        ..['statusDeclared'] =
++            entry.containsKey('status') &&
+             _integer(entry['status'], fallback: -1) >= 0 &&
+             _integer(entry['status'], fallback: -1) <= 3
+         ..remove('type')
+@@ -272,7 +274,8 @@ class SourceRepositoryParser {
+               'version': _text(entry['version']) ?? '1.0.0',
+               'sourceFile': file,
+               'runtimeContract': 'zangetsu-js-v1',
+-              'statusDeclared': entry.containsKey('status') &&
++              'statusDeclared':
++                  entry.containsKey('status') &&
+                   _integer(entry['status'], fallback: -1) >= 0 &&
+                   _integer(entry['status'], fallback: -1) <= 3,
+               'languageDeclared': _text(entry['lang']) != null,
+diff --git a/lib/video_providers/unified/unified_source_service.dart b/lib/video_providers/unified/unified_source_service.dart
+index 0de42f1..34f4adc 100644
+--- a/lib/video_providers/unified/unified_source_service.dart
++++ b/lib/video_providers/unified/unified_source_service.dart
+@@ -178,10 +178,10 @@ class UnifiedSourceService {
+     SourceManifest source,
+   ) async {
+     if (!SourcePriorityPolicy.isDirectPriorityCandidate(
+-      source,
+-      category,
+-      supportsRuntime: _engines.supports,
+-    ) ||
++          source,
++          category,
++          supportsRuntime: _engines.supports,
++        ) ||
+         !await _priorityManager.canAddPriorityKey(category)) {
+       return false;
+     }
+@@ -249,15 +249,18 @@ class UnifiedSourceService {
+ 
+     final currentInstalled = await _repositories.installedSourceKeys();
+     for (final category in SourcePriorityCategory.values) {
+-      final preferred = SourcePriorityPolicy.recommended(
+-        category,
+-        snapshot.catalog,
+-        supportsRuntime: _engines.supports,
+-      ).where((source) {
+-        return currentInstalled.contains(source.stableKey) ||
+-            (source.installedByDefault &&
+-                !disabledDefaults.contains(source.stableKey));
+-      }).map((source) => source.stableKey);
++      final preferred =
++          SourcePriorityPolicy.recommended(
++                category,
++                snapshot.catalog,
++                supportsRuntime: _engines.supports,
++              )
++              .where((source) {
++                return currentInstalled.contains(source.stableKey) ||
++                    (source.installedByDefault &&
++                        !disabledDefaults.contains(source.stableKey));
++              })
++              .map((source) => source.stableKey);
+       await _priorityManager.setPriorityKeys(category, preferred);
+     }
+     await _priorityManager.markInitialized();
+@@ -307,14 +310,17 @@ class UnifiedSourceService {
+       );
+     }
+ 
+-    if (onlySource == null && onlySources == null &&
++    if (onlySource == null &&
++        onlySources == null &&
+         !await _priorityManager.isInitialized) {
+       await configureRecommendedSources(snapshot);
+       snapshot = await _repositories.sync(forceRefresh: false);
+     }
+ 
+     final orderedOnlySources = onlySources?.toList(growable: false);
+-    final selectedKeys = orderedOnlySources?.map((source) => source.stableKey).toSet();
++    final selectedKeys = orderedOnlySources
++        ?.map((source) => source.stableKey)
++        .toSet();
+     final candidates = snapshot.sources.where((source) {
+       if (onlySource != null && source.stableKey != onlySource.stableKey) {
+         return false;
+@@ -324,10 +330,10 @@ class UnifiedSourceService {
+       }
+       final category = _priorityCategoryFor(media);
+       if (!SourcePriorityPolicy.isEligible(
+-        source,
+-        category,
+-        supportsRuntime: _engines.supports,
+-      ) ||
++            source,
++            category,
++            supportsRuntime: _engines.supports,
++          ) ||
+           !source.supportsMedia(media)) {
+         return false;
+       }
+@@ -339,10 +345,9 @@ class UnifiedSourceService {
+           orderedOnlySources[index].stableKey: index,
+       };
+       candidates.sort(
+-        (left, right) =>
+-            (order[left.stableKey] ?? 1 << 30).compareTo(
+-              order[right.stableKey] ?? 1 << 30,
+-            ),
++        (left, right) => (order[left.stableKey] ?? 1 << 30).compareTo(
++          order[right.stableKey] ?? 1 << 30,
++        ),
+       );
+     } else {
+       candidates.sort(_compareRankedSources);
+@@ -401,11 +406,13 @@ class UnifiedSourceService {
+               ? byDeclaredStatus
+               : _compareRankedSources(left, right);
+         });
+-        final embedded = candidates.where((source) {
+-          return source.isFallback ||
+-              source.engine.kind == SourceEngineKind.webEmbed ||
+-              source.engine.kind == SourceEngineKind.vidkingWebView;
+-        }).toList(growable: false);
++        final embedded = candidates
++            .where((source) {
++              return source.isFallback ||
++                  source.engine.kind == SourceEngineKind.webEmbed ||
++                  source.engine.kind == SourceEngineKind.vidkingWebView;
++            })
++            .toList(growable: false);
+         return _searchPriorityTiers(
+           media: media,
+           snapshot: snapshot,
+diff --git a/test/video_providers/phase44_quickjs_catalog_test.dart b/test/video_providers/phase44_quickjs_catalog_test.dart
+index d353e37..78aeb4a 100644
+--- a/test/video_providers/phase44_quickjs_catalog_test.dart
++++ b/test/video_providers/phase44_quickjs_catalog_test.dart
+@@ -113,17 +113,18 @@ void main() {
+   test(
+     'reviewed Serenity mixed scripts receive a narrow Series capability override',
+     () {
+-      for (final id in <String>[
+-        'serenity-cinestream',
+-        'serenity-streamplay',
+-      ]) {
++      for (final id in <String>['serenity-cinestream', 'serenity-streamplay']) {
+         final profile = QuickJsSourceCatalogProfile.classify(
+           repositoryUrl:
+               'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json',
+           sourceId: id,
+         );
+         expect(profile.seriesCapabilityVerified, isTrue, reason: id);
+-        expect(profile.seriesCapabilityReview, contains('getEpisodes'), reason: id);
++        expect(
++          profile.seriesCapabilityReview,
++          contains('getEpisodes'),
++          reason: id,
++        );
+         expect(profile.catalogRole, 'vod-candidate');
+       }
+     },
+diff --git a/test/video_providers/source_priority_policy_test.dart b/test/video_providers/source_priority_policy_test.dart
+index 087a1cd..1ef8ff5 100644
+--- a/test/video_providers/source_priority_policy_test.dart
++++ b/test/video_providers/source_priority_policy_test.dart
+@@ -13,213 +13,281 @@ void main() {
+     test('keeps movie, series and anime orders independently', () async {
+       final preferences = await SharedPreferences.getInstance();
+       final manager = SourcePriorityManager(preferences: preferences);
+-      await manager.setPriorityKeys(
+-        SourcePriorityCategory.movies,
+-        <String>['repo::movie-a', 'repo::movie-b'],
+-      );
+-      await manager.setPriorityKeys(
+-        SourcePriorityCategory.series,
+-        <String>['repo::series-a'],
+-      );
+-      await manager.setPriorityKeys(
+-        SourcePriorityCategory.anime,
+-        <String>['repo::anime-a'],
+-      );
+-
+-      expect(await manager.getPriorityKeys(SourcePriorityCategory.movies),
+-          <String>['repo::movie-a', 'repo::movie-b']);
+-      expect(await manager.getPriorityKeys(SourcePriorityCategory.series),
+-          <String>['repo::series-a']);
+-      expect(await manager.getPriorityKeys(SourcePriorityCategory.anime),
+-          <String>['repo::anime-a']);
+-    });
+-
+-    test('deduplicates, enforces the 15-source cap and reorders stably', () async {
+-      final preferences = await SharedPreferences.getInstance();
+-      final manager = SourcePriorityManager(preferences: preferences);
+-      final keys = List<String>.generate(15, (index) => 'repo::source-$index');
+       await manager.setPriorityKeys(SourcePriorityCategory.movies, <String>[
+-        ...keys,
+-        keys.first,
+-        ' ',
++        'repo::movie-a',
++        'repo::movie-b',
++      ]);
++      await manager.setPriorityKeys(SourcePriorityCategory.series, <String>[
++        'repo::series-a',
++      ]);
++      await manager.setPriorityKeys(SourcePriorityCategory.anime, <String>[
++        'repo::anime-a',
+       ]);
+ 
+-      expect(await manager.getPriorityKeys(SourcePriorityCategory.movies),
+-          hasLength(15));
+       expect(
+-        await manager.addPriorityKey(
+-          SourcePriorityCategory.movies,
+-          'repo::overflow',
+-        ),
+-        isFalse,
++        await manager.getPriorityKeys(SourcePriorityCategory.movies),
++        <String>['repo::movie-a', 'repo::movie-b'],
+       );
+-      await manager.reorderPriorityKey(
+-        SourcePriorityCategory.movies,
+-        oldIndex: 0,
+-        newIndex: 2,
++      expect(
++        await manager.getPriorityKeys(SourcePriorityCategory.series),
++        <String>['repo::series-a'],
+       );
+-      final reordered = await manager.getPriorityKeys(
+-        SourcePriorityCategory.movies,
++      expect(
++        await manager.getPriorityKeys(SourcePriorityCategory.anime),
++        <String>['repo::anime-a'],
+       );
+-      expect(reordered[0], 'repo::source-1');
+-      expect(reordered[1], 'repo::source-0');
+-      expect(reordered, hasLength(15));
+     });
+ 
+-    test('removing a repository clears its stale keys from every lane', () async {
+-      final preferences = await SharedPreferences.getInstance();
+-      final manager = SourcePriorityManager(preferences: preferences);
+-      for (final category in SourcePriorityCategory.values) {
+-        await manager.setPriorityKeys(category, <String>[
+-          'https://repo.example/index.json::source-a',
+-          'https://other.example/index.json::source-b',
++    test(
++      'deduplicates, enforces the 15-source cap and reorders stably',
++      () async {
++        final preferences = await SharedPreferences.getInstance();
++        final manager = SourcePriorityManager(preferences: preferences);
++        final keys = List<String>.generate(
++          15,
++          (index) => 'repo::source-$index',
++        );
++        await manager.setPriorityKeys(SourcePriorityCategory.movies, <String>[
++          ...keys,
++          keys.first,
++          ' ',
+         ]);
+-      }
+-
+-      await manager.removeRepositorySources('https://repo.example/index.json');
+ 
+-      for (final category in SourcePriorityCategory.values) {
+         expect(
+-          await manager.getPriorityKeys(category),
+-          <String>['https://other.example/index.json::source-b'],
++          await manager.getPriorityKeys(SourcePriorityCategory.movies),
++          hasLength(15),
+         );
+-      }
+-    });
++        expect(
++          await manager.addPriorityKey(
++            SourcePriorityCategory.movies,
++            'repo::overflow',
++          ),
++          isFalse,
++        );
++        await manager.reorderPriorityKey(
++          SourcePriorityCategory.movies,
++          oldIndex: 0,
++          newIndex: 2,
++        );
++        final reordered = await manager.getPriorityKeys(
++          SourcePriorityCategory.movies,
++        );
++        expect(reordered[0], 'repo::source-1');
++        expect(reordered[1], 'repo::source-0');
++        expect(reordered, hasLength(15));
++      },
++    );
+ 
+-    test('removing from priority does not alter installation preferences',
+-        () async {
+-      final preferences = await SharedPreferences.getInstance();
+-      final manager = SourcePriorityManager(preferences: preferences);
+-      await manager.setPriorityKeys(
+-        SourcePriorityCategory.movies,
+-        <String>['repo::installed-source'],
+-      );
+-      await manager.removePriorityKey(
+-        SourcePriorityCategory.movies,
+-        'repo::installed-source',
+-      );
++    test(
++      'removing a repository clears its stale keys from every lane',
++      () async {
++        final preferences = await SharedPreferences.getInstance();
++        final manager = SourcePriorityManager(preferences: preferences);
++        for (final category in SourcePriorityCategory.values) {
++          await manager.setPriorityKeys(category, <String>[
++            'https://repo.example/index.json::source-a',
++            'https://other.example/index.json::source-b',
++          ]);
++        }
+ 
+-      expect(await manager.getPriorityKeys(SourcePriorityCategory.movies),
+-          isEmpty);
+-      expect(preferences.getStringList('unified_installed_source_keys_v1'),
+-          isNull);
+-    });
++        await manager.removeRepositorySources(
++          'https://repo.example/index.json',
++        );
++
++        for (final category in SourcePriorityCategory.values) {
++          expect(await manager.getPriorityKeys(category), <String>[
++            'https://other.example/index.json::source-b',
++          ]);
++        }
++      },
++    );
++
++    test(
++      'removing from priority does not alter installation preferences',
++      () async {
++        final preferences = await SharedPreferences.getInstance();
++        final manager = SourcePriorityManager(preferences: preferences);
++        await manager.setPriorityKeys(SourcePriorityCategory.movies, <String>[
++          'repo::installed-source',
++        ]);
++        await manager.removePriorityKey(
++          SourcePriorityCategory.movies,
++          'repo::installed-source',
++        );
++
++        expect(
++          await manager.getPriorityKeys(SourcePriorityCategory.movies),
++          isEmpty,
++        );
++        expect(
++          preferences.getStringList('unified_installed_source_keys_v1'),
++          isNull,
++        );
++      },
++    );
+   });
+ 
+   group('SourcePriorityPolicy', () {
+-    test('restricts movie and series providers to English or declared Multi',
+-        () {
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          _source('english', 'English'),
+-          SourcePriorityCategory.movies,
+-        ),
+-        isTrue,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          _source('regional', 'en-US'),
+-          SourcePriorityCategory.series,
+-        ),
+-        isTrue,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          _source('hindi', 'hi'),
+-          SourcePriorityCategory.movies,
+-        ),
+-        isFalse,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          _source('portuguese', 'pt'),
+-          SourcePriorityCategory.series,
+-        ),
+-        isFalse,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          _source('unspecified-all', 'All'),
+-          SourcePriorityCategory.movies,
+-        ),
+-        isFalse,
+-      );
+-    });
++    test(
++      'restricts movie and series providers to English or declared Multi',
++      () {
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            _source('english', 'English'),
++            SourcePriorityCategory.movies,
++          ),
++          isTrue,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            _source('regional', 'en-US'),
++            SourcePriorityCategory.series,
++          ),
++          isTrue,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            _source('hindi', 'hi'),
++            SourcePriorityCategory.movies,
++          ),
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            _source('portuguese', 'pt'),
++            SourcePriorityCategory.series,
++          ),
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            _source('unspecified-all', 'All'),
++            SourcePriorityCategory.movies,
++          ),
++          isFalse,
++        );
++      },
++    );
+ 
+-    test('Japanese and Chinese language providers are allowed only for anime',
+-        () {
+-      final japanese = _source('japanese', 'ja-JP', tags: const ['anime']);
+-      final chinese = _source('chinese', 'zh-Hans', tags: const ['anime']);
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          japanese,
+-          SourcePriorityCategory.anime,
+-        ),
+-        isTrue,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          chinese,
+-          SourcePriorityCategory.anime,
+-        ),
+-        isTrue,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          japanese,
+-          SourcePriorityCategory.movies,
+-        ),
+-        isFalse,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isLanguageAllowed(
+-          chinese,
+-          SourcePriorityCategory.series,
+-        ),
+-        isFalse,
+-      );
+-    });
++    test(
++      'Japanese and Chinese language providers are allowed only for anime',
++      () {
++        final japanese = _source('japanese', 'ja-JP', tags: const ['anime']);
++        final chinese = _source('chinese', 'zh-Hans', tags: const ['anime']);
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            japanese,
++            SourcePriorityCategory.anime,
++          ),
++          isTrue,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            chinese,
++            SourcePriorityCategory.anime,
++          ),
++          isTrue,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            japanese,
++            SourcePriorityCategory.movies,
++          ),
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            chinese,
++            SourcePriorityCategory.series,
++          ),
++          isFalse,
++        );
++      },
++    );
+ 
+-    test('remote sources require a declared language and known script mismatches are excluded', () {
+-      final undeclared = _source(
+-        'missing-language',
+-        'Multi',
+-        repository: 'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
+-        config: const <String, dynamic>{'languageDeclared': false},
+-      );
+-      final hdhub4u = _source(
+-        'hdhub4u',
+-        'English',
+-        repository: 'https://raw.githubusercontent.com/Spyou/zangetsu-providers/main/index.json',
+-      );
+-      final anilibria = _source(
+-        'anilibria',
+-        'English',
+-        repository: 'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
+-        tags: const <String>['anime'],
+-      );
++    test(
++      'remote sources require a declared language and known script mismatches are excluded',
++      () {
++        final undeclared = _source(
++          'missing-language',
++          'Multi',
++          repository:
++              'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
++          config: const <String, dynamic>{'languageDeclared': false},
++        );
++        final hdhub4u = _source(
++          'hdhub4u',
++          'English',
++          repository:
++              'https://raw.githubusercontent.com/Spyou/zangetsu-providers/main/index.json',
++        );
++        final anilibria = _source(
++          'anilibria',
++          'English',
++          repository:
++              'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
++          tags: const <String>['anime'],
++        );
+ 
+-      expect(SourcePriorityPolicy.isLanguageAllowed(undeclared, SourcePriorityCategory.movies), isFalse);
+-      expect(SourcePriorityPolicy.isLanguageAllowed(hdhub4u, SourcePriorityCategory.movies), isFalse);
+-      expect(SourcePriorityPolicy.isLanguageAllowed(anilibria, SourcePriorityCategory.anime), isFalse);
+-    });
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            undeclared,
++            SourcePriorityCategory.movies,
++          ),
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            hdhub4u,
++            SourcePriorityCategory.movies,
++          ),
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.isLanguageAllowed(
++            anilibria,
++            SourcePriorityCategory.anime,
++          ),
++          isFalse,
++        );
++      },
++    );
+ 
+-    test('adult and torrent-only sources are excluded from VOD source activation', () {
+-      final hanime = _source(
+-        'hanime',
+-        'English',
+-        repository: 'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
+-        tags: const <String>['anime'],
+-      );
+-      final subsplease = _source(
+-        'subsplease',
+-        'English',
+-        repository: 'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
+-        tags: const <String>['anime'],
+-      );
+-      expect(SourcePriorityPolicy.isEligible(hanime, SourcePriorityCategory.anime, supportsRuntime: _supportsRuntime), isFalse);
+-      expect(SourcePriorityPolicy.isEligible(subsplease, SourcePriorityCategory.anime, supportsRuntime: _supportsRuntime), isFalse);
+-    });
++    test(
++      'adult and torrent-only sources are excluded from VOD source activation',
++      () {
++        final hanime = _source(
++          'hanime',
++          'English',
++          repository:
++              'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
++          tags: const <String>['anime'],
++        );
++        final subsplease = _source(
++          'subsplease',
++          'English',
++          repository:
++              'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json',
++          tags: const <String>['anime'],
++        );
++        expect(
++          SourcePriorityPolicy.isEligible(
++            hanime,
++            SourcePriorityCategory.anime,
++            supportsRuntime: _supportsRuntime,
++          ),
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.isEligible(
++            subsplease,
++            SourcePriorityCategory.anime,
++            supportsRuntime: _supportsRuntime,
++          ),
++          isFalse,
++        );
++      },
++    );
+ 
+     test('unrated repository metadata is not presented as Listed OK', () {
+       final source = _source(
+@@ -230,282 +298,358 @@ void main() {
+       expect(SourcePriorityPolicy.statusLabel(source), 'Unrated');
+     });
+ 
+-    test('multi-category providers are eligible in both movie and series lanes',
+-        () {
+-      final multi = _source(
+-        'yoru',
+-        'Multi',
+-        repository: 'https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json',
+-        tags: const ['movies', 'series'],
+-      );
+-      expect(
+-        SourcePriorityPolicy.isEligible(
+-          multi,
+-          SourcePriorityCategory.movies,
+-          supportsRuntime: (_) => true,
+-        ),
+-        isTrue,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isEligible(
+-          multi,
+-          SourcePriorityCategory.series,
+-          supportsRuntime: (_) => true,
+-        ),
+-        isTrue,
+-      );
+-    });
+-
+-    test('embedded and fallback pages cannot be promoted to direct priority', () {
+-      final embedded = SourceManifest(
+-        id: 'embedded-only',
+-        name: 'Embedded only',
+-        repositoryUrl: 'https://repo.example/index.json',
+-        engine: const SourceEngineDescriptor(
+-          rawType: 'web-embed',
+-          kind: SourceEngineKind.webEmbed,
+-          config: <String, dynamic>{'languageDeclared': true},
+-        ),
+-      );
+-      final fallback = SourceManifest(
+-        id: 'fallback',
+-        name: 'Fallback',
+-        repositoryUrl: 'https://repo.example/index.json',
+-        isFallback: true,
+-        engine: const SourceEngineDescriptor(
+-          rawType: 'native',
+-          kind: SourceEngineKind.native,
+-          config: <String, dynamic>{'languageDeclared': true},
+-        ),
+-      );
+-      expect(
+-        SourcePriorityPolicy.isDirectPriorityCandidate(
+-          embedded,
+-          SourcePriorityCategory.movies,
+-          supportsRuntime: _supportsRuntime,
+-        ),
+-        isFalse,
+-      );
+-      expect(
+-        SourcePriorityPolicy.isDirectPriorityCandidate(
+-          fallback,
+-          SourcePriorityCategory.movies,
+-          supportsRuntime: _supportsRuntime,
+-        ),
+-        isFalse,
+-      );
+-    });
+-
+-    test('live-only, adult, unsupported-language and disabled sources are excluded',
+-        () {
+-      final live = _source(
+-        'worldlivetv',
+-        'English',
+-        tags: const ['movies'],
+-        config: const {'requiresLiveTvAdapter': true},
+-      );
+-      final adult = _source(
+-        'adult-anime',
+-        'English',
+-        tags: const ['anime'],
+-        nsfw: true,
+-      );
+-      final spanish = _source('spanish', 'es', tags: const ['movies']);
+-      final disabled = _source(
+-        'disabled',
+-        'English',
+-        tags: const ['movies'],
+-        enabled: false,
+-      );
+-      for (final source in <SourceManifest>[live, adult, spanish, disabled]) {
++    test(
++      'multi-category providers are eligible in both movie and series lanes',
++      () {
++        final multi = _source(
++          'yoru',
++          'Multi',
++          repository:
++              'https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json',
++          tags: const ['movies', 'series'],
++        );
++        expect(
++          SourcePriorityPolicy.isEligible(
++            multi,
++            SourcePriorityCategory.movies,
++            supportsRuntime: (_) => true,
++          ),
++          isTrue,
++        );
+         expect(
+           SourcePriorityPolicy.isEligible(
+-            source,
+-            source.tags.contains('anime')
+-                ? SourcePriorityCategory.anime
+-                : SourcePriorityCategory.movies,
++            multi,
++            SourcePriorityCategory.series,
+             supportsRuntime: (_) => true,
+           ),
++          isTrue,
++        );
++      },
++    );
++
++    test(
++      'embedded and fallback pages cannot be promoted to direct priority',
++      () {
++        final embedded = SourceManifest(
++          id: 'embedded-only',
++          name: 'Embedded only',
++          repositoryUrl: 'https://repo.example/index.json',
++          engine: const SourceEngineDescriptor(
++            rawType: 'web-embed',
++            kind: SourceEngineKind.webEmbed,
++            config: <String, dynamic>{'languageDeclared': true},
++          ),
++        );
++        final fallback = SourceManifest(
++          id: 'fallback',
++          name: 'Fallback',
++          repositoryUrl: 'https://repo.example/index.json',
++          isFallback: true,
++          engine: const SourceEngineDescriptor(
++            rawType: 'native',
++            kind: SourceEngineKind.native,
++            config: <String, dynamic>{'languageDeclared': true},
++          ),
++        );
++        expect(
++          SourcePriorityPolicy.isDirectPriorityCandidate(
++            embedded,
++            SourcePriorityCategory.movies,
++            supportsRuntime: _supportsRuntime,
++          ),
+           isFalse,
+-          reason: source.id,
+         );
+-      }
+-    });
++        expect(
++          SourcePriorityPolicy.isDirectPriorityCandidate(
++            fallback,
++            SourcePriorityCategory.movies,
++            supportsRuntime: _supportsRuntime,
++          ),
++          isFalse,
++        );
++      },
++    );
+ 
+-    test('curated lists contain up to fifteen real sources and retain multi-type providers', () {
+-      final catalog = _auditedCatalog();
+-      const supportsRuntime = _supportsRuntime;
+-      final movies = SourcePriorityPolicy.recommended(
+-        SourcePriorityCategory.movies,
+-        catalog,
+-        supportsRuntime: supportsRuntime,
+-      );
+-      final series = SourcePriorityPolicy.recommended(
+-        SourcePriorityCategory.series,
+-        catalog,
+-        supportsRuntime: supportsRuntime,
+-      );
+-      final anime = SourcePriorityPolicy.recommended(
+-        SourcePriorityCategory.anime,
+-        catalog,
+-        supportsRuntime: supportsRuntime,
+-      );
++    test(
++      'live-only, adult, unsupported-language and disabled sources are excluded',
++      () {
++        final live = _source(
++          'worldlivetv',
++          'English',
++          tags: const ['movies'],
++          config: const {'requiresLiveTvAdapter': true},
++        );
++        final adult = _source(
++          'adult-anime',
++          'English',
++          tags: const ['anime'],
++          nsfw: true,
++        );
++        final spanish = _source('spanish', 'es', tags: const ['movies']);
++        final disabled = _source(
++          'disabled',
++          'English',
++          tags: const ['movies'],
++          enabled: false,
++        );
++        for (final source in <SourceManifest>[live, adult, spanish, disabled]) {
++          expect(
++            SourcePriorityPolicy.isEligible(
++              source,
++              source.tags.contains('anime')
++                  ? SourcePriorityCategory.anime
++                  : SourcePriorityCategory.movies,
++              supportsRuntime: (_) => true,
++            ),
++            isFalse,
++            reason: source.id,
++          );
++        }
++      },
++    );
+ 
+-      expect(movies, hasLength(13));
+-      expect(series, hasLength(9));
+-      expect(anime, hasLength(11));
+-      expect(movies.any((source) => source.id == 'hdhub'), isFalse);
+-      expect(movies.any((source) => source.id == 'internetarchive'), isTrue);
+-      expect(movies.any((source) => source.id == 'netprime'), isFalse);
+-      expect(anime.any((source) => source.id == 'anikage'), isTrue);
+-      expect(anime.any((source) => source.id == 'subsplease'), isFalse);
+-      expect(series.any((source) => source.id == 'hdhub'), isFalse);
+-      expect(movies.any((source) => source.id == 'yastream'), isFalse);
+-      expect(series.any((source) => source.id == 'yastream'), isFalse);
+-      expect(
+-        series.where((source) => source.repositoryUrl ==
+-            'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json'),
+-        hasLength(2),
+-        reason: 'The two reviewed Serenity scripts support exact Series episodes.',
+-      );
+-      expect(
+-        anime.any((source) => source.id == 'reanime'),
+-        isFalse,
+-        reason: 'OpenStream Beta anime adapters remain in the backup tier.',
+-      );
+-    });
++    test(
++      'curated lists contain up to fifteen real sources and retain multi-type providers',
++      () {
++        final catalog = _auditedCatalog();
++        const supportsRuntime = _supportsRuntime;
++        final movies = SourcePriorityPolicy.recommended(
++          SourcePriorityCategory.movies,
++          catalog,
++          supportsRuntime: supportsRuntime,
++        );
++        final series = SourcePriorityPolicy.recommended(
++          SourcePriorityCategory.series,
++          catalog,
++          supportsRuntime: supportsRuntime,
++        );
++        final anime = SourcePriorityPolicy.recommended(
++          SourcePriorityCategory.anime,
++          catalog,
++          supportsRuntime: supportsRuntime,
++        );
+ 
+-    test('manual repository activation cap counts unique sources across lanes', () {
+-      const repository = 'https://repo.example/index.json';
+-      final active = List<SourceManifest>.generate(
+-        15,
+-        (index) => _source('active-$index', 'English', repository: repository),
+-      );
+-      final next = _source('next', 'English', repository: repository);
+-      final alreadyActive = active.first;
++        expect(movies, hasLength(13));
++        expect(series, hasLength(9));
++        expect(anime, hasLength(11));
++        expect(movies.any((source) => source.id == 'hdhub'), isFalse);
++        expect(movies.any((source) => source.id == 'internetarchive'), isTrue);
++        expect(movies.any((source) => source.id == 'netprime'), isFalse);
++        expect(anime.any((source) => source.id == 'anikage'), isTrue);
++        expect(anime.any((source) => source.id == 'subsplease'), isFalse);
++        expect(series.any((source) => source.id == 'hdhub'), isFalse);
++        expect(movies.any((source) => source.id == 'yastream'), isFalse);
++        expect(series.any((source) => source.id == 'yastream'), isFalse);
++        expect(
++          series.where(
++            (source) =>
++                source.repositoryUrl ==
++                'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json',
++          ),
++          hasLength(2),
++          reason:
++              'The two reviewed Serenity scripts support exact Series episodes.',
++        );
++        expect(
++          anime.any((source) => source.id == 'reanime'),
++          isFalse,
++          reason: 'OpenStream Beta anime adapters remain in the backup tier.',
++        );
++      },
++    );
+ 
+-      expect(
+-        SourcePriorityPolicy.canActivateWithinRepositoryCap(
+-          activeSources: active,
+-          candidate: next,
+-        ),
+-        isFalse,
+-      );
+-      expect(
+-        SourcePriorityPolicy.canActivateWithinRepositoryCap(
+-          activeSources: active,
+-          candidate: alreadyActive,
+-        ),
+-        isTrue,
+-      );
+-      expect(
+-        SourcePriorityPolicy.canActivateWithinRepositoryCap(
+-          activeSources: active,
+-          candidate: _source(
+-            'other-repository',
+-            'English',
+-            repository: 'https://other.example/index.json',
++    test(
++      'manual repository activation cap counts unique sources across lanes',
++      () {
++        const repository = 'https://repo.example/index.json';
++        final active = List<SourceManifest>.generate(
++          15,
++          (index) =>
++              _source('active-$index', 'English', repository: repository),
++        );
++        final next = _source('next', 'English', repository: repository);
++        final alreadyActive = active.first;
++
++        expect(
++          SourcePriorityPolicy.canActivateWithinRepositoryCap(
++            activeSources: active,
++            candidate: next,
+           ),
+-        ),
+-        isTrue,
+-      );
+-    });
++          isFalse,
++        );
++        expect(
++          SourcePriorityPolicy.canActivateWithinRepositoryCap(
++            activeSources: active,
++            candidate: alreadyActive,
++          ),
++          isTrue,
++        );
++        expect(
++          SourcePriorityPolicy.canActivateWithinRepositoryCap(
++            activeSources: active,
++            candidate: _source(
++              'other-repository',
++              'English',
++              repository: 'https://other.example/index.json',
++            ),
++          ),
++          isTrue,
++        );
++      },
++    );
+ 
+-    test('automatic activation is capped at fifteen unique sources per repository', () {
+-      final selected = SourcePriorityPolicy.autoActivationSet(
+-        _auditedCatalog(),
+-        supportsRuntime: _supportsRuntime,
+-      );
+-      final byRepository = <String, Set<String>>{};
+-      for (final source in selected) {
+-        byRepository.putIfAbsent(source.repositoryUrl!, () => <String>{})
+-            .add(source.stableKey);
+-      }
+-      expect(byRepository.values.every((keys) => keys.length <= 15), isTrue);
+-      expect(byRepository.length, greaterThanOrEqualTo(5));
+-      final openStream = byRepository.entries.firstWhere(
+-        (entry) => entry.key.contains('/Ivorisnoob/OpenStream/'),
+-      ).value;
+-      expect(openStream, hasLength(14));
+-      expect(
+-        openStream,
+-        containsAll(<String>[
+-          for (final id in <String>[
+-            'hdhub', 'yastream', 'anikoto', 'reanime', 'animepahe', 'fouranimo', 'animegg',
+-          ])
+-            'https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json::$id',
+-        ]),
+-      );
+-      final spyou = byRepository.entries.firstWhere(
+-        (entry) => entry.key.contains('/Spyou/zangetsu-providers/'),
+-      ).value;
+-      expect(spyou, hasLength(5));
+-      final serenity = byRepository.entries.firstWhere(
+-        (entry) => entry.key.contains('/Serenity-MIST/zangetsu-sources/'),
+-      ).value;
+-      expect(serenity, hasLength(5));
+-      final spyhell = byRepository.entries.firstWhere(
+-        (entry) => entry.key.contains('/Spyhell/zangetsu-experiment-repo/'),
+-      ).value;
+-      expect(spyhell, hasLength(15));
+-      expect(
+-        selected.any((source) => source.id == 'netprime'),
+-        isTrue,
+-        reason: 'NetPrime stays available as a best-effort backup, not priority.',
+-      );
+-    });
++    test(
++      'automatic activation is capped at fifteen unique sources per repository',
++      () {
++        final selected = SourcePriorityPolicy.autoActivationSet(
++          _auditedCatalog(),
++          supportsRuntime: _supportsRuntime,
++        );
++        final byRepository = <String, Set<String>>{};
++        for (final source in selected) {
++          byRepository
++              .putIfAbsent(source.repositoryUrl!, () => <String>{})
++              .add(source.stableKey);
++        }
++        expect(byRepository.values.every((keys) => keys.length <= 15), isTrue);
++        expect(byRepository.length, greaterThanOrEqualTo(5));
++        final openStream = byRepository.entries
++            .firstWhere(
++              (entry) => entry.key.contains('/Ivorisnoob/OpenStream/'),
++            )
++            .value;
++        expect(openStream, hasLength(14));
++        expect(
++          openStream,
++          containsAll(<String>[
++            for (final id in <String>[
++              'hdhub',
++              'yastream',
++              'anikoto',
++              'reanime',
++              'animepahe',
++              'fouranimo',
++              'animegg',
++            ])
++              'https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json::$id',
++          ]),
++        );
++        final spyou = byRepository.entries
++            .firstWhere(
++              (entry) => entry.key.contains('/Spyou/zangetsu-providers/'),
++            )
++            .value;
++        expect(spyou, hasLength(5));
++        final serenity = byRepository.entries
++            .firstWhere(
++              (entry) => entry.key.contains('/Serenity-MIST/zangetsu-sources/'),
++            )
++            .value;
++        expect(serenity, hasLength(5));
++        final spyhell = byRepository.entries
++            .firstWhere(
++              (entry) =>
++                  entry.key.contains('/Spyhell/zangetsu-experiment-repo/'),
++            )
++            .value;
++        expect(spyhell, hasLength(15));
++        expect(
++          selected.any((source) => source.id == 'netprime'),
++          isTrue,
++          reason:
++              'NetPrime stays available as a best-effort backup, not priority.',
++        );
++      },
++    );
+   });
+ }
+ 
+ bool _supportsRuntime(SourceManifest source) => true;
+ 
+ List<SourceManifest> _auditedCatalog() {
+-  const openStream = 'https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json';
+-  const spyou = 'https://raw.githubusercontent.com/Spyou/zangetsu-providers/main/index.json';
+-  const serenity = 'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json';
+-  const spyhell = 'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json';
+-  const additional = 'https://raw.githubusercontent.com/Spyou/Zangetsu-spyou-provider/main/index.json';
++  const openStream =
++      'https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json';
++  const spyou =
++      'https://raw.githubusercontent.com/Spyou/zangetsu-providers/main/index.json';
++  const serenity =
++      'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json';
++  const spyhell =
++      'https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json';
++  const additional =
++      'https://raw.githubusercontent.com/Spyou/Zangetsu-spyou-provider/main/index.json';
+   final sources = <SourceManifest>[];
+-  void add(String repository, Iterable<String> movies, Iterable<String> anime,
+-      {Iterable<String> series = const <String>[], bool betaAnime = false}) {
++  void add(
++    String repository,
++    Iterable<String> movies,
++    Iterable<String> anime, {
++    Iterable<String> series = const <String>[],
++    bool betaAnime = false,
++  }) {
+     final multi = <String>{...movies, ...series};
+     for (final id in multi) {
+-      sources.add(_source(
+-        id,
+-        'Multi',
+-        repository: repository,
+-        tags: const <String>['movies', 'series'],
+-        status: repository == openStream && <String>{'hdhub', 'yastream'}.contains(id) ? 3 : 1,
+-        config: const <String, dynamic>{'statusDeclared': true},
+-      ));
++      sources.add(
++        _source(
++          id,
++          'Multi',
++          repository: repository,
++          tags: const <String>['movies', 'series'],
++          status:
++              repository == openStream &&
++                  <String>{'hdhub', 'yastream'}.contains(id)
++              ? 3
++              : 1,
++          config: const <String, dynamic>{'statusDeclared': true},
++        ),
++      );
+     }
+     for (final id in anime) {
+-      sources.add(_source(
+-        id,
+-        'Multi',
+-        repository: repository,
+-        tags: const <String>['anime'],
+-        status: repository == openStream ? 3 : 1,
+-        config: <String, dynamic>{'providerType': 'anime', 'statusDeclared': true},
+-      ));
++      sources.add(
++        _source(
++          id,
++          'Multi',
++          repository: repository,
++          tags: const <String>['anime'],
++          status: repository == openStream ? 3 : 1,
++          config: <String, dynamic>{
++            'providerType': 'anime',
++            'statusDeclared': true,
++          },
++        ),
++      );
+     }
+   }
+ 
+   add(
+     openStream,
+     const <String>[
+-      'yoru', 'cypher', 'breach', 'neon', 'vyse', 'omen', 'raze',
+-      'hdhub', 'yastream',
+-    ],
+-    const <String>[
+-      'anikoto', 'reanime', 'animepahe', 'fouranimo', 'animegg',
++      'yoru',
++      'cypher',
++      'breach',
++      'neon',
++      'vyse',
++      'omen',
++      'raze',
++      'hdhub',
++      'yastream',
+     ],
++    const <String>['anikoto', 'reanime', 'animepahe', 'fouranimo', 'animegg'],
+     series: const <String>[
+-      'yoru', 'cypher', 'breach', 'neon', 'vyse', 'omen', 'raze',
+-      'hdhub', 'yastream',
++      'yoru',
++      'cypher',
++      'breach',
++      'neon',
++      'vyse',
++      'omen',
++      'raze',
++      'hdhub',
++      'yastream',
+     ],
+   );
+-  add(spyou, const <String>['fourkhdhub', 'uhdmovies'], const <String>['anikoto', 'hianime', 'animecube']);
++  add(
++    spyou,
++    const <String>['fourkhdhub', 'uhdmovies'],
++    const <String>['anikoto', 'hianime', 'animecube'],
++  );
+   add(
+     serenity,
+     const <String>['serenity-streamplay', 'serenity-cinestream'],
+@@ -514,8 +658,12 @@ List<SourceManifest> _auditedCatalog() {
+   );
+   // Mark the explicitly reviewed Serenity scripts as dual Movie/Series.
+   for (final source in sources.where(
+-    (source) => source.repositoryUrl == serenity &&
+-        <String>{'serenity-streamplay', 'serenity-cinestream'}.contains(source.id),
++    (source) =>
++        source.repositoryUrl == serenity &&
++        <String>{
++          'serenity-streamplay',
++          'serenity-cinestream',
++        }.contains(source.id),
+   )) {
+     final index = sources.indexOf(source);
+     sources[index] = SourceManifest(
+@@ -539,11 +687,28 @@ List<SourceManifest> _auditedCatalog() {
+       ),
+     );
+   }
+-  add(spyhell, const <String>[
+-    'filmzie', 'peertube', 'internetarchive', 'wikimedia', 'prelinger', 'silentfilms', 'loc', 'artetv',
+-  ], const <String>[
+-    'animesuge', 'animex', 'anikage', 'wcoflix', 'donghuanation', 'animetsu', 'gogoanime',
+-  ]);
++  add(
++    spyhell,
++    const <String>[
++      'filmzie',
++      'peertube',
++      'internetarchive',
++      'wikimedia',
++      'prelinger',
++      'silentfilms',
++      'loc',
++      'artetv',
++    ],
++    const <String>[
++      'animesuge',
++      'animex',
++      'anikage',
++      'wcoflix',
++      'donghuanation',
++      'animetsu',
++      'gogoanime',
++    ],
++  );
+   add(additional, const <String>['netprime'], const <String>[]);
+   return sources;
+ }
+diff --git a/test/video_providers/source_repository_client_test.dart b/test/video_providers/source_repository_client_test.dart
+index 6733d7d..8b24633 100644
+--- a/test/video_providers/source_repository_client_test.dart
++++ b/test/video_providers/source_repository_client_test.dart
+@@ -33,31 +33,28 @@ void main() {
+     );
+   });
+ 
+-  test(
+-    'rejects extensionless endpoints that return an M3U document',
+-    () async {
+-      final dio = Dio();
+-      dio.httpClientAdapter = _TextAdapter(
+-        '\uFEFF#EXTM3U\n#EXTINF:-1,Test Channel\nhttps://media.example/live.m3u8',
+-      );
+-      final client = SourceRepositoryClient(
+-        dio: dio,
+-        hostPolicy: const SourceHostPolicy(resolveDns: false),
+-      );
++  test('rejects extensionless endpoints that return an M3U document', () async {
++    final dio = Dio();
++    dio.httpClientAdapter = _TextAdapter(
++      '\uFEFF#EXTM3U\n#EXTINF:-1,Test Channel\nhttps://media.example/live.m3u8',
++    );
++    final client = SourceRepositoryClient(
++      dio: dio,
++      hostPolicy: const SourceHostPolicy(resolveDns: false),
++    );
+ 
+-      await expectLater(
+-        client.fetchRepository('https://repo.example/live/channels'),
+-        throwsA(
+-          isA<FormatException>().having(
+-            (error) => error.message,
+-            'message',
+-            contains('M3U/HLS media playlist'),
+-          ),
++    await expectLater(
++      client.fetchRepository('https://repo.example/live/channels'),
++      throwsA(
++        isA<FormatException>().having(
++          (error) => error.message,
++          'message',
++          contains('M3U/HLS media playlist'),
+         ),
+-      );
+-      dio.close(force: true);
+-    },
+-  );
++      ),
++    );
++    dio.close(force: true);
++  });
+ 
+   test(
+     'enriches Stremio entries from OpenStream-style indexes with manifest IDs',
+diff --git a/test/video_providers/source_repository_parser_test.dart b/test/video_providers/source_repository_parser_test.dart
+index 36952af..b1b05d0 100644
+--- a/test/video_providers/source_repository_parser_test.dart
++++ b/test/video_providers/source_repository_parser_test.dart
+@@ -65,11 +65,13 @@ void main() {
+           {"id":"other-movie","name":"Other Movie","type":"movie","lang":"en","file":"other.js"}
+         ]}
+         ''';
+-        final sources = parser.parseRepository(
+-          raw,
+-          sourceUrl:
+-              'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json',
+-        ).extensions;
++        final sources = parser
++            .parseRepository(
++              raw,
++              sourceUrl:
++                  'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json',
++            )
++            .extensions;
+         const seriesProbe = MediaIdentity(
+           type: UnifiedMediaType.series,
+           title: 'Test Series',
+diff --git a/test/video_providers/unified/quickjs_source_engine_test.dart b/test/video_providers/unified/quickjs_source_engine_test.dart
+index a2cf39f..e44f33c 100644
+--- a/test/video_providers/unified/quickjs_source_engine_test.dart
++++ b/test/video_providers/unified/quickjs_source_engine_test.dart
+@@ -166,7 +166,8 @@ void main() {
+           engine: SourceEngineDescriptor(
+             rawType: 'javascript',
+             kind: SourceEngineKind.javascript,
+-            endpoint: 'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/serenity-cinestream.js',
++            endpoint:
++                'https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/serenity-cinestream.js',
+             config: <String, dynamic>{
+               'providerType': 'movie',
+               'seriesCapabilityReview': 'reviewed getEpisodes contract',
+@@ -186,17 +187,21 @@ void main() {
+           },
+         );
+ 
+-        final result = await QuickJsSourceEngine(
+-          runtime: runtime,
+-        ).resolve(source: reviewedSource, media: const MediaIdentity(
+-          type: UnifiedMediaType.series,
+-          title: 'Sample Series',
+-          seasonNumber: 1,
+-          episodeNumber: 1,
+-        ));
++        final result = await QuickJsSourceEngine(runtime: runtime).resolve(
++          source: reviewedSource,
++          media: const MediaIdentity(
++            type: UnifiedMediaType.series,
++            title: 'Sample Series',
++            seasonNumber: 1,
++            episodeNumber: 1,
++          ),
++        );
+ 
+         expect(result.success, isTrue);
+-        expect(runtime.videoSourceTarget, 'https://source.example/serenity/s1e1');
++        expect(
++          runtime.videoSourceTarget,
++          'https://source.example/serenity/s1e1',
++        );
+       },
+     );
+ 
+@@ -214,14 +219,15 @@ void main() {
+             ],
+           },
+         );
+-        final result = await QuickJsSourceEngine(
+-          runtime: runtime,
+-        ).resolve(source: source, media: const MediaIdentity(
+-          type: UnifiedMediaType.series,
+-          title: 'Sample Series',
+-          seasonNumber: 1,
+-          episodeNumber: 1,
+-        ));
++        final result = await QuickJsSourceEngine(runtime: runtime).resolve(
++          source: source,
++          media: const MediaIdentity(
++            type: UnifiedMediaType.series,
++            title: 'Sample Series',
++            seasonNumber: 1,
++            episodeNumber: 1,
++          ),
++        );
+ 
+         expect(result.success, isFalse);
+         expect(result.errorMessage, contains('cannot resolve series'));
+diff --git a/test/video_providers/unified_source_service_execution_test.dart b/test/video_providers/unified_source_service_execution_test.dart
+index 6855056..2bb790d 100644
+--- a/test/video_providers/unified_source_service_execution_test.dart
++++ b/test/video_providers/unified_source_service_execution_test.dart
+@@ -25,13 +25,19 @@ void main() {
+       SharedPreferences.setMockInitialValues(<String, Object>{});
+       final preferences = await SharedPreferences.getInstance();
+       final priorities = SourcePriorityManager(preferences: preferences);
+-      final priorityOne = _source('priority-one', kind: SourceEngineKind.native);
+-      final priorityTwo = _source('priority-two', kind: SourceEngineKind.native);
+-      final backup = _source('backup', kind: SourceEngineKind.native);
+-      await priorities.setPriorityKeys(
+-        SourcePriorityCategory.movies,
+-        <String>[priorityOne.stableKey, priorityTwo.stableKey],
++      final priorityOne = _source(
++        'priority-one',
++        kind: SourceEngineKind.native,
+       );
++      final priorityTwo = _source(
++        'priority-two',
++        kind: SourceEngineKind.native,
++      );
++      final backup = _source('backup', kind: SourceEngineKind.native);
++      await priorities.setPriorityKeys(SourcePriorityCategory.movies, <String>[
++        priorityOne.stableKey,
++        priorityTwo.stableKey,
++      ]);
+       await priorities.markInitialized();
+ 
+       final started = <String>[];
+@@ -63,39 +69,44 @@ void main() {
+     },
+   );
+ 
++  test(
++    'backup direct sources prefer declared Listed OK over Beta and Unrated',
++    () async {
++      SharedPreferences.setMockInitialValues(<String, Object>{});
++      final preferences = await SharedPreferences.getInstance();
++      final priorities = SourcePriorityManager(preferences: preferences);
++      await priorities.setPriorityKeys(
++        SourcePriorityCategory.movies,
++        const <String>[],
++      );
++      await priorities.markInitialized();
+ 
+-  test('backup direct sources prefer declared Listed OK over Beta and Unrated', () async {
+-    SharedPreferences.setMockInitialValues(<String, Object>{});
+-    final preferences = await SharedPreferences.getInstance();
+-    final priorities = SourcePriorityManager(preferences: preferences);
+-    await priorities.setPriorityKeys(SourcePriorityCategory.movies, const <String>[]);
+-    await priorities.markInitialized();
+-
+-    final started = <String>[];
+-    final engine = _FakeEngine((source, _, __, ___) async {
+-      started.add(source.id);
+-      return _empty();
+-    });
+-    final service = _service(
+-      engine,
+-      priorityManager: priorities,
+-      policy: const SourceExecutionPolicy(
+-        maxConcurrentSources: 1,
+-        fallbackHeadStart: Duration.zero,
+-      ),
+-    );
++      final started = <String>[];
++      final engine = _FakeEngine((source, _, __, ___) async {
++        started.add(source.id);
++        return _empty();
++      });
++      final service = _service(
++        engine,
++        priorityManager: priorities,
++        policy: const SourceExecutionPolicy(
++          maxConcurrentSources: 1,
++          fallbackHeadStart: Duration.zero,
++        ),
++      );
+ 
+-    await service.search(
+-      media: media,
+-      repositorySnapshot: _snapshot(<SourceManifest>[
+-        _source('beta', priority: 0, status: 3),
+-        _source('unrated', priority: 1, statusDeclared: false),
+-        _source('listed-ok', priority: 99, status: 1),
+-      ]),
+-    );
++      await service.search(
++        media: media,
++        repositorySnapshot: _snapshot(<SourceManifest>[
++          _source('beta', priority: 0, status: 3),
++          _source('unrated', priority: 1, statusDeclared: false),
++          _source('listed-ok', priority: 99, status: 1),
++        ]),
++      );
+ 
+-    expect(started, <String>['listed-ok', 'beta', 'unrated']);
+-  });
++      expect(started, <String>['listed-ok', 'beta', 'unrated']);
++    },
++  );
+ 
+   test(
+     'empty configured priority lane searches every direct provider as backup',
+@@ -122,9 +133,7 @@ void main() {
+       );
+       final engine = _FakeEngine((source, _, __, ___) async {
+         started.add(source.id);
+-        return source.id == 'second-backup'
+-            ? _playable(source.id)
+-            : _empty();
++        return source.id == 'second-backup' ? _playable(source.id) : _empty();
+       }, engineKind: SourceEngineKind.native);
+       final service = _service(engine, priorityManager: priorities);
+ 

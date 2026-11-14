@@ -1,0 +1,9 @@
+ .../translation/manga_translation_platform.dart    |   1 -
+ lib/manga/ui/manga_reading_store.dart              |   6 +-
+ lib/manga/ui/manga_source_matcher.dart             |  14 +-
+ lib/manga/ui/manga_work_screen.dart                | 372 ++++++++++++---------
+ lib/mobile/app/mobile_nav_bar.dart                 |  13 +-
+ test/manga_reading_store_test.dart                 |  89 ++---
+ test/manga_source_matcher_test.dart                |  44 +--
+ test/mobile/mobile_nav_bar_test.dart               |  52 +--
+ 8 files changed, 333 insertions(+), 258 deletions(-)

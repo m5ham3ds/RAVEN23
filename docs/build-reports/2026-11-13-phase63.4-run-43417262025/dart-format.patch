@@ -1,0 +1,1130 @@
+diff --git a/lib/manga/translation/manga_translation_platform.dart b/lib/manga/translation/manga_translation_platform.dart
+index 9811b61..1d0332a 100644
+--- a/lib/manga/translation/manga_translation_platform.dart
++++ b/lib/manga/translation/manga_translation_platform.dart
+@@ -1,4 +1,3 @@
+-
+ import 'package:flutter/services.dart';
+ 
+ import 'manga_translation_models.dart';
+diff --git a/lib/manga/ui/manga_reading_store.dart b/lib/manga/ui/manga_reading_store.dart
+index 6180382..006a3ea 100644
+--- a/lib/manga/ui/manga_reading_store.dart
++++ b/lib/manga/ui/manga_reading_store.dart
+@@ -81,7 +81,6 @@ class MangaChapterProgress {
+       );
+ }
+ 
+-
+ /// UI and notification preferences scoped to a single AniList work.
+ /// Keeping these separate from reader settings prevents a reader preset from
+ /// accidentally resetting the detail page layout when the work is reopened.
+@@ -167,7 +166,8 @@ class MangaReadingStore {
+   static const String _readerSettingsKey = 'raven.manga.reader_settings.v1';
+   static const String _savedWorksKey = 'raven.manga.saved_works.v1';
+   static const String _readingStatusesKey = 'raven.manga.reading_statuses.v1';
+-  static const String _lastGoodMangaSourceKey = 'raven.manga.last_good_source.v1';
++  static const String _lastGoodMangaSourceKey =
++      'raven.manga.last_good_source.v1';
+   static const String _workPreferencesKey = 'raven.manga.work_preferences.v1';
+   static const String _pinnedMihonSourcesKey = 'raven.manga.pinned_sources.v1';
+   Future<void> _writeTail = Future<void>.value();
+@@ -221,7 +221,6 @@ class MangaReadingStore {
+     await _writeMap(_bindingsKey, values);
+   });
+ 
+-
+   /// Last successfully used manga source. New unbound works try it first,
+   /// then continue through every other installed source if no exact title
+   /// alias match is found. Existing per-work bindings remain authoritative.
+@@ -246,7 +245,6 @@ class MangaReadingStore {
+     await prefs.remove(_lastGoodMangaSourceKey);
+   });
+ 
+-
+   String _progressId(int anilistId, int sourceId, String chapterUrl) =>
+       '$anilistId::$sourceId::$chapterUrl';
+ 
+diff --git a/lib/manga/ui/manga_source_matcher.dart b/lib/manga/ui/manga_source_matcher.dart
+index b2f6f88..4c3c26c 100644
+--- a/lib/manga/ui/manga_source_matcher.dart
++++ b/lib/manga/ui/manga_source_matcher.dart
+@@ -85,14 +85,12 @@ List<String> buildMangaTitleQueries({
+   return result;
+ }
+ 
+-String _westernizeMangaDigits(String value) => value.replaceAllMapped(
+-  RegExp(r'[٠-٩۰-۹]'),
+-  (match) {
+-    final code = match.group(0)!.codeUnitAt(0);
+-    final digit = code >= 0x06F0 ? code - 0x06F0 : code - 0x0660;
+-    return '$digit';
+-  },
+-);
++String _westernizeMangaDigits(String value) =>
++    value.replaceAllMapped(RegExp(r'[٠-٩۰-۹]'), (match) {
++      final code = match.group(0)!.codeUnitAt(0);
++      final digit = code >= 0x06F0 ? code - 0x06F0 : code - 0x0660;
++      return '$digit';
++    });
+ 
+ /// Parse a stable chapter number from Mihon's number field or visible title.
+ /// Some extensions return the number as a string and others only include it
+diff --git a/lib/manga/ui/manga_work_screen.dart b/lib/manga/ui/manga_work_screen.dart
+index 25df25e..eb76289 100644
+--- a/lib/manga/ui/manga_work_screen.dart
++++ b/lib/manga/ui/manga_work_screen.dart
+@@ -257,14 +257,15 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       ),
+     );
+     if (!mounted) return;
+-    ScaffoldMessenger.of(context).showSnackBar(
+-      SnackBar(content: Text(tr('manga_notifications_enabled'))),
+-    );
++    ScaffoldMessenger.of(
++      context,
++    ).showSnackBar(SnackBar(content: Text(tr('manga_notifications_enabled'))));
+   }
+ 
+   @override
+   void didChangeAppLifecycleState(AppLifecycleState state) {
+-    if (state != AppLifecycleState.resumed || !_notifyNewChapters ||
++    if (state != AppLifecycleState.resumed ||
++        !_notifyNewChapters ||
+         !_workPreferencesLoaded) {
+       return;
+     }
+@@ -686,15 +687,12 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           await _bindSourceMatch(exact, sourceRequest: request);
+           return;
+         }
+-
+       }
+ 
+       suggestions.sort((a, b) => b.score.compareTo(a.score));
+       if (!mounted || request != _sourceRequest) return;
+       setState(() {
+-        _matches = List<_MangaSourceMatch>.unmodifiable(
+-          suggestions.take(8),
+-        );
++        _matches = List<_MangaSourceMatch>.unmodifiable(suggestions.take(8));
+         _autoResolving = false;
+         _autoResolveSourceName = null;
+         if (suggestions.isEmpty) {
+@@ -808,10 +806,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     if (selected != null) await _bindSourceMatch(selected);
+   }
+ 
+-  Widget _buildMihonSourceIcon(
+-    MihonSourceInfo source, {
+-    required double size,
+-  }) {
++  Widget _buildMihonSourceIcon(MihonSourceInfo source, {required double size}) {
+     final encoded = source.iconBase64?.trim();
+     if (encoded != null && encoded.isNotEmpty) {
+       try {
+@@ -856,9 +851,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     }
+     if (!mounted) return;
+     if (_sources.isEmpty) {
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(tr('manga_no_installed_sources'))),
+-      );
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(tr('manga_no_installed_sources'))));
+       return;
+     }
+ 
+@@ -922,7 +917,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     unselectedLabelColor: palette.mutedText,
+                     indicatorColor: Theme.of(sheetContext).colorScheme.primary,
+                     dividerColor: palette.hairline,
+-                    tabs: <Widget>[Tab(text: tr('all')), Tab(text: tr('manga'))],
++                    tabs: <Widget>[
++                      Tab(text: tr('all')),
++                      Tab(text: tr('manga')),
++                    ],
+                   ),
+                   Expanded(
+                     child: ListView(
+@@ -935,15 +933,16 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           dense: true,
+                           visualDensity: const VisualDensity(vertical: -2),
+                           minVerticalPadding: 6,
+-                          contentPadding: const EdgeInsets.symmetric(horizontal: 22),
++                          contentPadding: const EdgeInsets.symmetric(
++                            horizontal: 22,
++                          ),
+                           leading: Container(
+                             width: 48,
+                             height: 48,
+                             decoration: BoxDecoration(
+-                              color: Theme.of(sheetContext)
+-                                  .colorScheme
+-                                  .primary
+-                                  .withValues(alpha: .13),
++                              color: Theme.of(
++                                sheetContext,
++                              ).colorScheme.primary.withValues(alpha: .13),
+                               borderRadius: BorderRadius.circular(14),
+                             ),
+                             child: Icon(
+@@ -960,7 +959,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           ),
+                           subtitle: Text(
+                             tr('manga_auto_resolve_hint'),
+-                            style: AppType.metadata.copyWith(color: palette.mutedText),
++                            style: AppType.metadata.copyWith(
++                              color: palette.mutedText,
++                            ),
+                           ),
+                           onTap: () => Navigator.pop(sheetContext, 'auto'),
+                         ),
+@@ -969,7 +970,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           padding: const EdgeInsets.fromLTRB(22, 14, 22, 6),
+                           child: Text(
+                             tr('manga_source_group_manga').toUpperCase(),
+-                            style: AppType.kicker.copyWith(color: palette.mutedText),
++                            style: AppType.kicker.copyWith(
++                              color: palette.mutedText,
++                            ),
+                           ),
+                         ),
+                         for (final source in orderedSources)
+@@ -978,22 +981,24 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                               final current = source.id == _boundSource?.id;
+                               final isPinned = pinned.contains(source.id);
+                               return Padding(
+-                                padding: const EdgeInsets.symmetric(horizontal: 8),
++                                padding: const EdgeInsets.symmetric(
++                                  horizontal: 8,
++                                ),
+                                 child: DecoratedBox(
+                                   decoration: BoxDecoration(
+                                     color: current
+                                         ? Theme.of(sheetContext)
+-                                            .colorScheme
+-                                            .primary
+-                                            .withValues(alpha: .13)
++                                              .colorScheme
++                                              .primary
++                                              .withValues(alpha: .13)
+                                         : Colors.transparent,
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: current
+                                         ? Border(
+                                             left: BorderSide(
+-                                              color: Theme.of(sheetContext)
+-                                                  .colorScheme
+-                                                  .primary,
++                                              color: Theme.of(
++                                                sheetContext,
++                                              ).colorScheme.primary,
+                                               width: 3,
+                                             ),
+                                           )
+@@ -1001,9 +1006,14 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                   ),
+                                   child: ListTile(
+                                     dense: true,
+-                                    visualDensity: const VisualDensity(vertical: -2),
++                                    visualDensity: const VisualDensity(
++                                      vertical: -2,
++                                    ),
+                                     minVerticalPadding: 6,
+-                                    leading: _buildMihonSourceIcon(source, size: 42),
++                                    leading: _buildMihonSourceIcon(
++                                      source,
++                                      size: 42,
++                                    ),
+                                     title: Text(
+                                       'Mihon · ${source.name}',
+                                       maxLines: 1,
+@@ -1034,9 +1044,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                         if (current)
+                                           Icon(
+                                             Icons.check_circle_rounded,
+-                                            color: Theme.of(sheetContext)
+-                                                .colorScheme
+-                                                .primary,
++                                            color: Theme.of(
++                                              sheetContext,
++                                            ).colorScheme.primary,
+                                           ),
+                                         FutureBuilder<bool>(
+                                           future: _settingsAvailable(source),
+@@ -1048,34 +1058,55 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                                   color: palette.mutedText,
+                                                 ),
+                                                 onSelected: (action) =>
+-                                                    unawaited(_handleSourceAction(source, action)),
++                                                    unawaited(
++                                                      _handleSourceAction(
++                                                        source,
++                                                        action,
++                                                      ),
++                                                    ),
+                                                 itemBuilder: (context) =>
+                                                     <PopupMenuEntry<String>>[
+-                                                  if (source.baseUrl.isNotEmpty)
+-                                                    PopupMenuItem<String>(
+-                                                      value: 'solve',
+-                                                      child: Text(tr('manga_source_solve_cloudflare')),
+-                                                    ),
+-                                                  if (source.baseUrl.isNotEmpty)
+-                                                    PopupMenuItem<String>(
+-                                                      value: 'signin',
+-                                                      child: Text(tr('manga_source_sign_in')),
+-                                                    ),
+-                                                  if (snapshot.data == true)
+-                                                    PopupMenuItem<String>(
+-                                                      value: 'settings',
+-                                                      child: Text(tr('manga_source_settings')),
+-                                                    ),
+-                                                ],
++                                                      if (source
++                                                          .baseUrl
++                                                          .isNotEmpty)
++                                                        PopupMenuItem<String>(
++                                                          value: 'solve',
++                                                          child: Text(
++                                                            tr(
++                                                              'manga_source_solve_cloudflare',
++                                                            ),
++                                                          ),
++                                                        ),
++                                                      if (source
++                                                          .baseUrl
++                                                          .isNotEmpty)
++                                                        PopupMenuItem<String>(
++                                                          value: 'signin',
++                                                          child: Text(
++                                                            tr(
++                                                              'manga_source_sign_in',
++                                                            ),
++                                                          ),
++                                                        ),
++                                                      if (snapshot.data == true)
++                                                        PopupMenuItem<String>(
++                                                          value: 'settings',
++                                                          child: Text(
++                                                            tr(
++                                                              'manga_source_settings',
++                                                            ),
++                                                          ),
++                                                        ),
++                                                    ],
+                                               ),
+                                         ),
+                                       ],
+                                     ),
+-                                    onTap: () => Navigator.pop(sheetContext, source),
++                                    onTap: () =>
++                                        Navigator.pop(sheetContext, source),
+                                     onLongPress: () async {
+-                                      final nowPinned = await _store.togglePinnedMihonSource(
+-                                        source.id,
+-                                      );
++                                      final nowPinned = await _store
++                                          .togglePinnedMihonSource(source.id);
+                                       if (!sheetContext.mounted) return;
+                                       setSheetState(() {
+                                         if (nowPinned) {
+@@ -1098,13 +1129,19 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           child: Row(
+                             mainAxisAlignment: MainAxisAlignment.center,
+                             children: <Widget>[
+-                              Icon(Icons.push_pin_outlined, size: 16, color: palette.mutedText),
++                              Icon(
++                                Icons.push_pin_outlined,
++                                size: 16,
++                                color: palette.mutedText,
++                              ),
+                               const SizedBox(width: 7),
+                               Flexible(
+                                 child: Text(
+                                   tr('manga_source_pin_hint'),
+                                   textAlign: TextAlign.center,
+-                                  style: AppType.metadata.copyWith(color: palette.mutedText),
++                                  style: AppType.metadata.copyWith(
++                                    color: palette.mutedText,
++                                  ),
+                                 ),
+                               ),
+                             ],
+@@ -1222,7 +1259,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   onTap: _openSourcePicker,
+                   borderRadius: BorderRadius.circular(AppRadii.card),
+                   child: Padding(
+-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
++                    padding: const EdgeInsets.symmetric(
++                      horizontal: 12,
++                      vertical: 14,
++                    ),
+                     child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: <Widget>[
+@@ -1230,15 +1270,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           label,
+                           maxLines: 1,
+                           overflow: TextOverflow.ellipsis,
+-                          style: AppType.cardTitle.copyWith(color: Colors.white),
++                          style: AppType.cardTitle.copyWith(
++                            color: Colors.white,
++                          ),
+                         ),
+-                        if (subtitle != null && subtitle.isNotEmpty) ...<Widget>[
++                        if (subtitle != null &&
++                            subtitle.isNotEmpty) ...<Widget>[
+                           const SizedBox(height: 3),
+                           Text(
+                             subtitle,
+                             maxLines: 1,
+                             overflow: TextOverflow.ellipsis,
+-                            style: AppType.metadata.copyWith(color: Colors.white70),
++                            style: AppType.metadata.copyWith(
++                              color: Colors.white70,
++                            ),
+                           ),
+                         ],
+                       ],
+@@ -1260,8 +1305,12 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   future: _settingsAvailable(source),
+                   builder: (context, snapshot) => PopupMenuButton<String>(
+                     tooltip: tr('more'),
+-                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+-                    onSelected: (action) => unawaited(_handleSourceAction(source, action)),
++                    icon: const Icon(
++                      Icons.more_vert_rounded,
++                      color: Colors.white,
++                    ),
++                    onSelected: (action) =>
++                        unawaited(_handleSourceAction(source, action)),
+                     itemBuilder: (context) => <PopupMenuEntry<String>>[
+                       if (source.baseUrl.isNotEmpty)
+                         PopupMenuItem<String>(
+@@ -1324,7 +1373,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     _MangaSourceMatch match, {
+     int? sourceRequest,
+   }) async {
+-    if (!mounted || (sourceRequest != null && sourceRequest != _sourceRequest)) {
++    if (!mounted ||
++        (sourceRequest != null && sourceRequest != _sourceRequest)) {
+       return;
+     }
+     final url = '${match.item['url'] ?? ''}'.trim();
+@@ -1341,9 +1391,11 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           : '${match.item['thumbnail_url']}',
+     );
+     await _store.saveBinding(binding);
+-    if (!mounted || (sourceRequest != null && sourceRequest != _sourceRequest)) return;
++    if (!mounted || (sourceRequest != null && sourceRequest != _sourceRequest))
++      return;
+     await _store.rememberLastGoodMangaSourceId(match.source.id);
+-    if (!mounted || (sourceRequest != null && sourceRequest != _sourceRequest)) return;
++    if (!mounted || (sourceRequest != null && sourceRequest != _sourceRequest))
++      return;
+     setState(() {
+       _binding = binding;
+       _boundSource = match.source;
+@@ -1508,9 +1560,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final source = _boundSource;
+     if (binding == null || source == null) return;
+     final visible = _displayChapters;
+-    final target = visible.indexWhere(
+-      (item) => item['url'] == chapter['url'],
+-    );
++    final target = visible.indexWhere((item) => item['url'] == chapter['url']);
+     if (target < 0) return;
+ 
+     for (var index = 0; index <= target; index++) {
+@@ -1550,9 +1600,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   width: 44,
+                   height: 4,
+                   decoration: BoxDecoration(
+-                    color: AppPalette.of(sheetContext).mutedText.withValues(
+-                      alpha: .45,
+-                    ),
++                    color: AppPalette.of(
++                      sheetContext,
++                    ).mutedText.withValues(alpha: .45),
+                     borderRadius: BorderRadius.circular(10),
+                   ),
+                 ),
+@@ -1631,14 +1681,13 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final visible = _displayChapters;
+     final pending = visible
+         .where(
+-          (chapter) =>
+-              !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
++          (chapter) => !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
+         )
+         .toList(growable: false);
+     if (pending.isEmpty) {
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(tr('manga_no_pending_downloads'))),
+-      );
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(tr('manga_no_pending_downloads'))));
+       return;
+     }
+ 
+@@ -1679,9 +1728,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   ),
+                   Text(
+                     '${pending.length} ${tr('manga_not_downloaded')}',
+-                    style: AppType.metadata.copyWith(
+-                      color: palette.mutedText,
+-                    ),
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
+                   ),
+                 ],
+               ),
+@@ -1819,10 +1866,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                 Align(
+                   alignment: AlignmentDirectional.centerEnd,
+                   child: FilledButton.icon(
+-                    onPressed: () => Navigator.pop(
+-                      sheetContext,
+-                      (startIndex, endIndex),
+-                    ),
++                    onPressed: () =>
++                        Navigator.pop(sheetContext, (startIndex, endIndex)),
+                     icon: const Icon(Icons.download_rounded),
+                     label: Text(tr('download')),
+                   ),
+@@ -1840,9 +1885,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final to = selectedRange.$1 > selectedRange.$2
+         ? selectedRange.$1
+         : selectedRange.$2;
+-    await _downloadSelectedChapters(
+-      visible.sublist(from, to + 1),
+-    );
++    await _downloadSelectedChapters(visible.sublist(from, to + 1));
+   }
+ 
+   Future<void> _downloadSelectedChapters(
+@@ -1852,14 +1895,13 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     if (source == null || selection.isEmpty) return;
+     final pending = selection
+         .where(
+-          (chapter) =>
+-              !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
++          (chapter) => !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
+         )
+         .toList(growable: false);
+     if (pending.isEmpty) {
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(tr('manga_no_pending_downloads'))),
+-      );
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(tr('manga_no_pending_downloads'))));
+       return;
+     }
+ 
+@@ -2298,10 +2340,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+               _title.staff.take(3).map((person) => person.name).join(' · '),
+             ),
+           if (_title.genres.isNotEmpty)
+-            _heroMetadataLine(
+-              tr('genres'),
+-              _title.genres.take(4).join(' · '),
+-            ),
++            _heroMetadataLine(tr('genres'), _title.genres.take(4).join(' · ')),
+           const SizedBox(height: 12),
+           Row(
+             mainAxisAlignment: MainAxisAlignment.spaceAround,
+@@ -2456,8 +2495,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+ 
+     final pendingCount = chapters
+         .where(
+-          (chapter) =>
+-              !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
++          (chapter) => !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
+         )
+         .length;
+     return RefreshIndicator(
+@@ -2508,7 +2546,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     icon: const Icon(Icons.download_rounded),
+                   ),
+                   IconButton(
+-                    tooltip: _gridView ? tr('manga_list_view') : tr('manga_grid_view'),
++                    tooltip: _gridView
++                        ? tr('manga_list_view')
++                        : tr('manga_grid_view'),
+                     onPressed: () {
+                       setState(() => _gridView = !_gridView);
+                       unawaited(_persistWorkPreferences());
+@@ -2606,8 +2646,11 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           childAspectRatio: 1.08,
+                         ),
+                     delegate: SliverChildBuilderDelegate(
+-                      (context, index) =>
+-                          _buildChapterGridTile(context, chapters[index], index),
++                      (context, index) => _buildChapterGridTile(
++                        context,
++                        chapters[index],
++                        index,
++                      ),
+                       childCount: chapters.length,
+                     ),
+                   )
+@@ -2696,11 +2739,11 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     ].join(' · '),
+                     maxLines: 1,
+                     overflow: TextOverflow.ellipsis,
+-                    style: AppType.metadata.copyWith(
+-                      color: palette.mutedText,
+-                    ),
++                    style: AppType.metadata.copyWith(color: palette.mutedText),
+                   ),
+-                  if (mark != null && !isRead && mark.totalPages > 0) ...<Widget>[
++                  if (mark != null &&
++                      !isRead &&
++                      mark.totalPages > 0) ...<Widget>[
+                     const SizedBox(height: 6),
+                     ClipRRect(
+                       borderRadius: BorderRadius.circular(4),
+@@ -2747,8 +2790,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final mark = _progress[url];
+     final isRead = mark?.isRead == true;
+     final isDownloaded = _downloadedChapters.contains(url);
+-    final number = _chapterNumber(chapter['chapter_number']) ??
+-        '${displayIndex + 1}';
++    final number =
++        _chapterNumber(chapter['chapter_number']) ?? '${displayIndex + 1}';
+     final name = '${chapter['name'] ?? tr('chapter')}';
+ 
+     return Tooltip(
+@@ -2776,9 +2819,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     maxLines: 1,
+                     overflow: TextOverflow.ellipsis,
+                     style: AppType.cardTitle.copyWith(
+-                      color: isRead
+-                          ? palette.mutedText
+-                          : palette.foreground,
++                      color: isRead ? palette.mutedText : palette.foreground,
+                       fontSize: 18,
+                       fontWeight: FontWeight.w700,
+                     ),
+@@ -2838,9 +2879,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+   }
+ 
+   Future<void> _openChapterFromList(Map<String, dynamic> chapter) async {
+-    final index = _chapters.indexWhere(
+-      (item) => item['url'] == chapter['url'],
+-    );
++    final index = _chapters.indexWhere((item) => item['url'] == chapter['url']);
+     if (index >= 0) await _openReader(index);
+   }
+ 
+@@ -2880,16 +2919,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     }
+     if (difference.inDays < 365) {
+       final months = (difference.inDays / 30).floor().clamp(1, 11);
+-      return tr(
+-        'n_months_ago',
+-        namedArgs: <String, String>{'n': '$months'},
+-      );
++      return tr('n_months_ago', namedArgs: <String, String>{'n': '$months'});
+     }
+     final years = (difference.inDays / 365).floor();
+-    return tr(
+-      'n_years_ago',
+-      namedArgs: <String, String>{'n': '$years'},
+-    );
++    return tr('n_years_ago', namedArgs: <String, String>{'n': '$years'});
+   }
+ 
+   Future<void> _openSourceManager() async {
+@@ -3990,7 +4023,8 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+           : <_MangaSourceMatch>[
+               ..._results,
+               ...matches.where(
+-                (item) => !_results.any((old) => old.item['url'] == item.item['url']),
++                (item) =>
++                    !_results.any((old) => old.item['url'] == item.item['url']),
+               ),
+             ];
+       setState(() {
+@@ -4075,7 +4109,11 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+             ),
+           ),
+           const SizedBox(width: 4),
+-          Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: palette.mutedText),
++          Icon(
++            Icons.keyboard_arrow_down_rounded,
++            size: 18,
++            color: palette.mutedText,
++          ),
+         ],
+       ),
+     ),
+@@ -4103,7 +4141,9 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                         tr('manga_source_search_prompt'),
+                         maxLines: 1,
+                         overflow: TextOverflow.ellipsis,
+-                        style: AppType.sectionHeader.copyWith(color: palette.foreground),
++                        style: AppType.sectionHeader.copyWith(
++                          color: palette.foreground,
++                        ),
+                       ),
+                     ),
+                   ),
+@@ -4115,7 +4155,9 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+               ),
+               const SizedBox(height: 12),
+               Padding(
+-                padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
++                padding: EdgeInsets.symmetric(
++                  horizontal: AppSpace.gutter(context),
++                ),
+                 child: DecoratedBox(
+                   decoration: BoxDecoration(
+                     color: palette.surface,
+@@ -4142,12 +4184,16 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                           controller: _controller,
+                           textInputAction: TextInputAction.search,
+                           onSubmitted: (_) => _load(reset: true),
+-                          style: AppType.body.copyWith(color: palette.foreground),
++                          style: AppType.body.copyWith(
++                            color: palette.foreground,
++                          ),
+                           decoration: InputDecoration(
+                             hintText: tr('manga_search_source'),
+                             border: InputBorder.none,
+                             isDense: true,
+-                            contentPadding: const EdgeInsets.symmetric(vertical: 13),
++                            contentPadding: const EdgeInsets.symmetric(
++                              vertical: 13,
++                            ),
+                           ),
+                         ),
+                       ),
+@@ -4158,7 +4204,10 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                             : IconButton(
+                                 tooltip: tr('clear'),
+                                 onPressed: _controller.clear,
+-                                icon: Icon(Icons.close_rounded, color: palette.mutedText),
++                                icon: Icon(
++                                  Icons.close_rounded,
++                                  color: palette.mutedText,
++                                ),
+                               ),
+                       ),
+                     ],
+@@ -4189,7 +4238,9 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                           child: Text(
+                             _error!,
+                             textAlign: TextAlign.center,
+-                            style: TextStyle(color: Theme.of(context).colorScheme.error),
++                            style: TextStyle(
++                              color: Theme.of(context).colorScheme.error,
++                            ),
+                           ),
+                         ),
+                       )
+@@ -4202,17 +4253,20 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                           AppSpace.gutter(context),
+                           20,
+                         ),
+-                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+-                          crossAxisCount: 2,
+-                          crossAxisSpacing: 14,
+-                          mainAxisSpacing: 14,
+-                          childAspectRatio: .64,
+-                        ),
++                        keyboardDismissBehavior:
++                            ScrollViewKeyboardDismissBehavior.onDrag,
++                        gridDelegate:
++                            const SliverGridDelegateWithFixedCrossAxisCount(
++                              crossAxisCount: 2,
++                              crossAxisSpacing: 14,
++                              mainAxisSpacing: 14,
++                              childAspectRatio: .64,
++                            ),
+                         itemCount: _results.length,
+                         itemBuilder: (context, index) {
+                           final result = _results[index];
+-                          final thumbnail = '${result.item['thumbnail_url'] ?? ''}'.trim();
++                          final thumbnail =
++                              '${result.item['thumbnail_url'] ?? ''}'.trim();
+                           return InkWell(
+                             borderRadius: BorderRadius.circular(12),
+                             onTap: () => Navigator.pop(context, result),
+@@ -4235,14 +4289,15 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                                           : CachedNetworkImage(
+                                               imageUrl: thumbnail,
+                                               fit: BoxFit.cover,
+-                                              errorWidget: (_, __, ___) => ColoredBox(
+-                                                color: palette.surface,
+-                                                child: Icon(
+-                                                  Icons.menu_book_rounded,
+-                                                  color: palette.mutedText,
+-                                                  size: 38,
+-                                                ),
+-                                              ),
++                                              errorWidget: (_, __, ___) =>
++                                                  ColoredBox(
++                                                    color: palette.surface,
++                                                    child: Icon(
++                                                      Icons.menu_book_rounded,
++                                                      color: palette.mutedText,
++                                                      size: 38,
++                                                    ),
++                                                  ),
+                                             ),
+                                     ),
+                                   ),
+@@ -4252,13 +4307,17 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                                   result.title,
+                                   maxLines: 2,
+                                   overflow: TextOverflow.ellipsis,
+-                                  style: AppType.cardTitle.copyWith(color: palette.foreground),
++                                  style: AppType.cardTitle.copyWith(
++                                    color: palette.foreground,
++                                  ),
+                                 ),
+                                 Text(
+                                   '${(result.score * 100).round()}% ${tr('manga_title_match')}',
+                                   maxLines: 1,
+                                   overflow: TextOverflow.ellipsis,
+-                                  style: AppType.metadata.copyWith(color: palette.mutedText),
++                                  style: AppType.metadata.copyWith(
++                                    color: palette.mutedText,
++                                  ),
+                                 ),
+                               ],
+                             ),
+@@ -4316,7 +4375,8 @@ class _SourceMenuIcon extends StatelessWidget {
+           width: 28,
+           height: 28,
+           fit: BoxFit.cover,
+-          errorBuilder: (_, __, ___) => const Icon(Icons.extension_rounded, size: 20),
++          errorBuilder: (_, __, ___) =>
++              const Icon(Icons.extension_rounded, size: 20),
+         ),
+       );
+     } on FormatException {
+@@ -4402,7 +4462,9 @@ class _MangaTabEmpty extends StatelessWidget {
+                   const SizedBox(height: 12),
+                   Text(
+                     title,
+-                    style: AppType.sectionHeader.copyWith(color: palette.foreground),
++                    style: AppType.sectionHeader.copyWith(
++                      color: palette.foreground,
++                    ),
+                     textAlign: TextAlign.center,
+                   ),
+                   const SizedBox(height: 6),
+@@ -4413,10 +4475,16 @@ class _MangaTabEmpty extends StatelessWidget {
+                   ),
+                   if (actionLabel != null && onAction != null) ...<Widget>[
+                     const SizedBox(height: 16),
+-                    FilledButton(onPressed: onAction, child: Text(actionLabel!)),
++                    FilledButton(
++                      onPressed: onAction,
++                      child: Text(actionLabel!),
++                    ),
+                   ],
+                   if (secondaryLabel != null && onSecondary != null)
+-                    TextButton(onPressed: onSecondary, child: Text(secondaryLabel!)),
++                    TextButton(
++                      onPressed: onSecondary,
++                      child: Text(secondaryLabel!),
++                    ),
+                 ],
+               ),
+             ),
+diff --git a/lib/mobile/app/mobile_nav_bar.dart b/lib/mobile/app/mobile_nav_bar.dart
+index dd92a27..6a858dd 100644
+--- a/lib/mobile/app/mobile_nav_bar.dart
++++ b/lib/mobile/app/mobile_nav_bar.dart
+@@ -480,8 +480,9 @@ class _MenuAction extends StatelessWidget {
+   Widget build(BuildContext context) {
+     final palette = AppPalette.of(context);
+     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+-    final hasSecondaryDestination =
+-        MobileTab.secondaryDestinations.contains(current);
++    final hasSecondaryDestination = MobileTab.secondaryDestinations.contains(
++      current,
++    );
+     final color = open || hasSecondaryDestination
+         ? palette.foreground
+         : palette.mutedText;
+@@ -489,13 +490,13 @@ class _MenuAction extends StatelessWidget {
+     final icon = open
+         ? PhosphorIcons.x()
+         : hasSecondaryDestination
+-            ? currentDestinationIcon
+-            : PhosphorIcons.list();
++        ? currentDestinationIcon
++        : PhosphorIcons.list();
+     final iconStateKey = open
+         ? 'open'
+         : hasSecondaryDestination
+-            ? 'destination-${current.id}'
+-            : 'closed';
++        ? 'destination-${current.id}'
++        : 'closed';
+     return Semantics(
+       button: true,
+       expanded: open,
+diff --git a/test/manga_reading_store_test.dart b/test/manga_reading_store_test.dart
+index f9d30b1..1703286 100644
+--- a/test/manga_reading_store_test.dart
++++ b/test/manga_reading_store_test.dart
+@@ -112,33 +112,36 @@ void main() {
+       expect(await store.lastGoodMangaSourceId(), isNull);
+     });
+ 
+-    test('persists view, order, selected tab and notification preferences per work', () async {
+-      await store.updateWorkPreferences(
+-        101,
+-        (current) => current.copyWith(
+-          gridView: true,
+-          ascendingInList: true,
+-          scanlator: 'Team X',
+-          selectedTab: 2,
+-          notifyNewChapters: true,
+-          lastKnownChapterCount: 18,
+-          notificationSourceId: 9001,
+-        ),
+-      );
+-
+-      final restored = await store.workPreferencesFor(101);
+-      expect(restored.gridView, isTrue);
+-      expect(restored.ascendingInList, isTrue);
+-      expect(restored.scanlator, 'Team X');
+-      expect(restored.selectedTab, 2);
+-      expect(restored.notifyNewChapters, isTrue);
+-      expect(restored.lastKnownChapterCount, 18);
+-      expect(restored.notificationSourceId, 9001);
+-
+-      final otherWork = await store.workPreferencesFor(202);
+-      expect(otherWork.gridView, isFalse);
+-      expect(otherWork.selectedTab, 0);
+-    });
++    test(
++      'persists view, order, selected tab and notification preferences per work',
++      () async {
++        await store.updateWorkPreferences(
++          101,
++          (current) => current.copyWith(
++            gridView: true,
++            ascendingInList: true,
++            scanlator: 'Team X',
++            selectedTab: 2,
++            notifyNewChapters: true,
++            lastKnownChapterCount: 18,
++            notificationSourceId: 9001,
++          ),
++        );
++
++        final restored = await store.workPreferencesFor(101);
++        expect(restored.gridView, isTrue);
++        expect(restored.ascendingInList, isTrue);
++        expect(restored.scanlator, 'Team X');
++        expect(restored.selectedTab, 2);
++        expect(restored.notifyNewChapters, isTrue);
++        expect(restored.lastKnownChapterCount, 18);
++        expect(restored.notificationSourceId, 9001);
++
++        final otherWork = await store.workPreferencesFor(202);
++        expect(otherWork.gridView, isFalse);
++        expect(otherWork.selectedTab, 0);
++      },
++    );
+ 
+     test('restoring preferences waits for a queued final route save', () async {
+       final pending = store.updateWorkPreferences(
+@@ -157,20 +160,23 @@ void main() {
+       expect(value.selectedTab, 3);
+     });
+ 
+-    test('atomic preference updates preserve fields changed by other operations', () async {
+-      await store.updateWorkPreferences(
+-        101,
+-        (current) => current.copyWith(gridView: true, ascendingInList: false),
+-      );
+-      await store.updateWorkPreferences(
+-        101,
+-        (current) => current.copyWith(lastKnownChapterCount: 22),
+-      );
+-      final restored = await store.workPreferencesFor(101);
+-      expect(restored.gridView, isTrue);
+-      expect(restored.ascendingInList, isFalse);
+-      expect(restored.lastKnownChapterCount, 22);
+-    });
++    test(
++      'atomic preference updates preserve fields changed by other operations',
++      () async {
++        await store.updateWorkPreferences(
++          101,
++          (current) => current.copyWith(gridView: true, ascendingInList: false),
++        );
++        await store.updateWorkPreferences(
++          101,
++          (current) => current.copyWith(lastKnownChapterCount: 22),
++        );
++        final restored = await store.workPreferencesFor(101);
++        expect(restored.gridView, isTrue);
++        expect(restored.ascendingInList, isFalse);
++        expect(restored.lastKnownChapterCount, 22);
++      },
++    );
+ 
+     test('keeps pinned Mihon sources in user-selected order', () async {
+       expect(await store.togglePinnedMihonSource(9002), isTrue);
+@@ -180,6 +186,5 @@ void main() {
+       expect(await store.togglePinnedMihonSource(9002), isFalse);
+       expect(await store.pinnedMihonSourceOrder(), <int>[9001]);
+     });
+-
+   });
+ }
+diff --git a/test/manga_source_matcher_test.dart b/test/manga_source_matcher_test.dart
+index 8886748..8d0f56d 100644
+--- a/test/manga_source_matcher_test.dart
++++ b/test/manga_source_matcher_test.dart
+@@ -41,34 +41,35 @@ void main() {
+   group('mangaTitleMatches', () {
+     test('accepts exact aliases after harmless source decorations', () {
+       expect(
+-        mangaTitleMatches(
+-          <String>['Solo Leveling', '나 혼자만 레벨업'],
+-          'Solo Leveling (2024) HD',
+-        ),
++        mangaTitleMatches(<String>[
++          'Solo Leveling',
++          '나 혼자만 레벨업',
++        ], 'Solo Leveling (2024) HD'),
+         isTrue,
+       );
+       expect(
+-        mangaTitleMatches(
+-          <String>['Solo Leveling', '나 혼자만 레벨업'],
+-          '나 혼자만 레벨업',
+-        ),
++        mangaTitleMatches(<String>['Solo Leveling', '나 혼자만 레벨업'], '나 혼자만 레벨업'),
+         isTrue,
+       );
+     });
+ 
+-    test('rejects related or partially overlapping titles for auto binding', () {
+-      expect(
+-        mangaTitleMatches(<String>['Solo Leveling'], 'Solo Leveling: Ragnarok'),
+-        isFalse,
+-      );
+-      expect(
+-        mangaTitleMatches(
+-          <String>['The Reluctant Preacher'],
+-          'The Reluctant Preacher of the Estate',
+-        ),
+-        isFalse,
+-      );
+-    });
++    test(
++      'rejects related or partially overlapping titles for auto binding',
++      () {
++        expect(
++          mangaTitleMatches(<String>[
++            'Solo Leveling',
++          ], 'Solo Leveling: Ragnarok'),
++          isFalse,
++        );
++        expect(
++          mangaTitleMatches(<String>[
++            'The Reluctant Preacher',
++          ], 'The Reluctant Preacher of the Estate'),
++          isFalse,
++        );
++      },
++    );
+   });
+ 
+   group('buildMangaTitleQueries', () {
+@@ -111,5 +112,4 @@ void main() {
+       expect(parseMangaChapterNumber('-1', 'Extra'), isNull);
+     });
+   });
+-
+ }
+diff --git a/test/mobile/mobile_nav_bar_test.dart b/test/mobile/mobile_nav_bar_test.dart
+index 9652560..c4e5bdb 100644
+--- a/test/mobile/mobile_nav_bar_test.dart
++++ b/test/mobile/mobile_nav_bar_test.dart
+@@ -9,8 +9,9 @@ import '../support/tv_localization.dart';
+ void main() {
+   initializeTvTranslations();
+ 
+-  testWidgets('uses the requested Phosphor icons on both navigation docks',
+-      (tester) async {
++  testWidgets('uses the requested Phosphor icons on both navigation docks', (
++    tester,
++  ) async {
+     await tester.pumpWidget(
+       MaterialApp(
+         theme: ThemeData.dark(),
+@@ -39,31 +40,36 @@ void main() {
+   });
+ 
+   testWidgets(
+-      'menu toggle shows the selected secondary destination and restores list',
+-      (tester) async {
+-    await tester.pumpWidget(const _NavigationHost());
+-    await tester.pumpAndSettle();
++    'menu toggle shows the selected secondary destination and restores list',
++    (tester) async {
++      await tester.pumpWidget(const _NavigationHost());
++      await tester.pumpAndSettle();
+ 
+-    expect(find.byIcon(PhosphorIcons.list()), findsOneWidget);
++      expect(find.byIcon(PhosphorIcons.list()), findsOneWidget);
+ 
+-    await tester.tap(find.byKey(
+-      const ValueKey<String>('mobile-nav-menu-toggle'),
+-    ));
+-    await tester.pumpAndSettle();
+-    expect(find.byIcon(PhosphorIcons.x()), findsOneWidget);
++      await tester.tap(
++        find.byKey(const ValueKey<String>('mobile-nav-menu-toggle')),
++      );
++      await tester.pumpAndSettle();
++      expect(find.byIcon(PhosphorIcons.x()), findsOneWidget);
+ 
+-    await tester.tap(find.text('Movies'));
+-    await tester.pumpAndSettle();
+-    expect(find.byIcon(PhosphorIcons.video(PhosphorIconsStyle.fill)),
+-        findsOneWidget);
+-    expect(find.byIcon(PhosphorIcons.list()), findsNothing);
++      await tester.tap(find.text('Movies'));
++      await tester.pumpAndSettle();
++      expect(
++        find.byIcon(PhosphorIcons.video(PhosphorIconsStyle.fill)),
++        findsOneWidget,
++      );
++      expect(find.byIcon(PhosphorIcons.list()), findsNothing);
+ 
+-    await tester.tap(find.text('Return home'));
+-    await tester.pumpAndSettle();
+-    expect(find.byIcon(PhosphorIcons.radioButton(PhosphorIconsStyle.fill)),
+-        findsOneWidget);
+-    expect(find.byIcon(PhosphorIcons.list()), findsOneWidget);
+-  });
++      await tester.tap(find.text('Return home'));
++      await tester.pumpAndSettle();
++      expect(
++        find.byIcon(PhosphorIcons.radioButton(PhosphorIconsStyle.fill)),
++        findsOneWidget,
++      );
++      expect(find.byIcon(PhosphorIcons.list()), findsOneWidget);
++    },
++  );
+ }
+ 
+ class _NavigationHost extends StatefulWidget {
