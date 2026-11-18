@@ -60,6 +60,13 @@ class AppEnvironment {
 
   /// Public OneSignal App ID; empty keeps push on the plain FCM client.
   final String oneSignalAppId;
+  /// Public catalogue requests use short timeouts.
   Duration get connectTimeout => const Duration(seconds: 10);
   Duration get receiveTimeout => const Duration(seconds: 20);
+
+  /// Render's free instance may need 50+ seconds to wake after idling.
+  /// Give Laravel requests enough time to receive the first response instead
+  /// of prompting users to resubmit non-idempotent signup/login requests.
+  Duration get laravelConnectTimeout => const Duration(seconds: 20);
+  Duration get laravelReceiveTimeout => const Duration(seconds: 90);
 }
