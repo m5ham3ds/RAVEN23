@@ -160,7 +160,7 @@ jobs:
           import re
           from pathlib import Path
           source = Path('lib/data/sources/google_identity_client.dart').read_text()
-          match = re.search(r"defaultValue:\\s*'([^']+)'", source)
+          match = re.search(r"defaultValue:\s*'([^']+)'", source)
           print(match.group(1) if match else '')
           PY
           )"
