@@ -318,7 +318,7 @@ void main() {
       await pressTvAction(tester);
     }
     expect(find.text('Enter your full name.'), findsOneWidget);
-    expect(find.text('Use at least 7 characters.'), findsWidgets);
+    expect(find.text('Use at least 8 characters.'), findsWidgets);
     expect(h.adapter.requests, isEmpty);
     expect(tester.takeException(), null);
   });
