@@ -36,15 +36,24 @@ class Raven23AuthService {
       }
     }
   }
-  Future<AuthSession> createAccount({required String fullName, required String email,
-      required String username, required String password, required int profileId,
-      bool verified = false}) async {
-    if (!_value(await session.repository.usernameAvailable(username))) {
-      throw const AuthActionException(code: 'username-already-in-use', message: 'That username is already in use.');
-    }
-    return _value(await session.signUp(RegisterRequest(name: fullName, email: email,
-        username: username, password: password, profileId: profileId)));
-  }
+  /// Sends one authoritative registration request. The backend owns the
+  /// unique-email/username checks; a preflight availability request is
+  /// race-prone and needlessly consumes the public API rate limit.
+  Future<AuthSession> createAccount({
+    required String fullName,
+    required String email,
+    required String username,
+    required String password,
+    required int profileId,
+    bool verified = false,
+  }) async =>
+      _value(await session.signUp(RegisterRequest(
+        name: fullName,
+        email: email,
+        username: username,
+        password: password,
+        profileId: profileId,
+      )));
   Future<AppUser> updateProfile(UpdateProfileRequest request) async => _value(await session.updateProfile(request));
   Future<AppUser> changeEmail(ChangeEmailRequest request) async => _value(await session.changeEmail(request));
   Future<void> changePassword(ChangePasswordRequest request) async => _value(await session.changePassword(request));
@@ -71,17 +80,26 @@ class AuthActionException implements Exception {
       DeviceLimitFailure() => 'device-limit-reached',
       ConflictFailure() => 'account-exists-with-different-credential',
       NetworkFailure() || TimeoutFailure() => 'network-request-failed',
+      RateLimitedFailure() => 'too-many-requests',
       ValidationFailure(:final fields) when fields.containsKey('requires_password_setup') => 'requires-password-setup',
       ValidationFailure(:final fields) when fields.containsKey('wallet_credit_remaining') => 'wallet-credit-remaining',
       ValidationFailure(:final fields) when fields.containsKey('username') => 'username-already-in-use',
       ValidationFailure(:final fields) when fields.containsKey('email') => 'email-already-in-use',
       _ => 'request-failed',
     };
-    final message = failure is ConflictFailure
-        ? 'This email already has a password account. Sign in with your password first.'
-        : failure is ValidationFailure && failure.fields.isNotEmpty
-          ? failure.message ?? failure.fields.values.expand((messages) => messages).firstOrNull ?? 'Unable to complete this request. Please try again.'
-          : failure.message ?? 'Unable to complete this request. Please try again.';
+    final message = switch (failure) {
+      ConflictFailure() =>
+        'This email already has a password account. Sign in with your password first.',
+      RateLimitedFailure(:final retryAfter) =>
+        retryAfter == null || retryAfter <= 0
+            ? 'Too many attempts. Please wait a minute and try again.'
+            : 'Too many attempts. Please wait $retryAfter seconds and try again.',
+      ValidationFailure(:final fields) when fields.isNotEmpty =>
+        fields.values.expand((messages) => messages).firstOrNull ??
+            failure.message ??
+            'Please check the entered information.',
+      _ => failure.message ?? 'Unable to complete this request. Please try again.',
+    };
     return AuthActionException(code: code, message: message,
         deviceLimit: failure is DeviceLimitFailure ? failure : null);
   }
