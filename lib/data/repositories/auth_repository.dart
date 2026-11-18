@@ -30,7 +30,9 @@ class AuthRepository {
                   data['errors']['requires_password_setup'] == true))) {
         return Result.err(Failure.validation({
           'requires_password_setup': ['Set a password using password reset.']
-        }, message: data['message'] as String?));
+        }, message: (data['message'] as String?)?.trim().isNotEmpty == true
+            ? (data['message'] as String).trim()
+            : 'Set a password using password reset.'));
       }
       if (e.response?.statusCode == 409 &&
           data is Map<String, dynamic> &&
