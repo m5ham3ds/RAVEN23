@@ -125,9 +125,15 @@ void main() {
     expect(find.byType(AccountSubmitButton), findsOneWidget);
     expect(tester.takeException(), null);
   });
-  authTest('signup checks username availability before posting registration',
+  authTest('signup sends one registration request and shows backend username validation',
       (tester) async {
-    h.adapter.enqueueJson({'success': true, 'available': false});
+    h.adapter.enqueueJson({
+      'success': false,
+      'message': 'The given data was invalid.',
+      'errors': {
+        'username': ['The username has already been taken.']
+      }
+    }, statusCode: 422);
     await pumpPage(tester, const SignupScreen());
     for (final entry in {
       'name': 'Test User',
@@ -141,8 +147,11 @@ void main() {
       await tester.enterText(field, entry.value);
     }
     await submit(tester);
-    expect(h.adapter.requests.single.uri.path, '/api/v1/users/check-username');
+    expect(h.adapter.requests, hasLength(1));
+    expect(h.adapter.requests.single.method, 'POST');
+    expect(h.adapter.requests.single.uri.path, '/api/v1/auth/register');
     expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('username_exists'), findsNothing);
     expect(h.tokens.value, null);
     expect(tester.takeException(), null);
   });
