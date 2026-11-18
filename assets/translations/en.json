@@ -1313,6 +1313,7 @@
   "tv_enter_your_full_name": "Enter your full name.",
   "tv_use_at_least_3_letters_or_numbers": "Use at least 3 letters or numbers.",
   "tv_use_at_least_7_characters": "Use at least 7 characters.",
+  "tv_use_at_least_8_characters": "Use at least 8 characters.",
   "tv_confirm_password": "Confirm password",
   "tv_passwords_do_not_match": "Passwords do not match.",
   "tv_please_wait": "Please wait…",
