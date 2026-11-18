@@ -1,0 +1,49 @@
+--- a/lib/mobile/screens/home_screen.dart
++++ b/lib/mobile/screens/home_screen.dart
+@@ -81,11 +81,7 @@
+ 
+   /// Fades the rows in on a new filter; the outgoing rows just go, as the
+   /// tabs do, so there is never two pages' worth of rows to draw.
+-  late final AnimationController _fade = AnimationController(
+-    vsync: this,
+-    duration: const Duration(milliseconds: 220),
+-    value: 1,
+-  );
++  late final AnimationController _fade;
+   final Map<HomeFilter, HomeFeed> _feeds = <HomeFilter, HomeFeed>{};
+   final Map<HomeFilter, Future<void>> _loading = <HomeFilter, Future<void>>{};
+   final Set<HomeFilter> _failed = <HomeFilter>{};
+@@ -104,6 +100,19 @@
+   MobileTabController? _tabs;
+   MobileTab? _resetTab;
+   TitleLogos? _logos;
++
++  @override
++  void initState() {
++    super.initState();
++    // Create the controller while the State is active. A lazy `late final`
++    // initializer can otherwise first run from dispose() on empty/error feeds,
++    // when SingleTickerProviderStateMixin can no longer look up TickerMode.
++    _fade = AnimationController(
++      vsync: this,
++      duration: const Duration(milliseconds: 220),
++      value: 1,
++    );
++  }
+ 
+   @override
+   void didChangeDependencies() {
+--- a/test/home_screen_test.dart
++++ b/test/home_screen_test.dart
+@@ -1157,6 +1157,11 @@
+     expect(find.text('no_results_found'), findsOneWidget);
+     expect(find.text('home_load_failed'), findsNothing);
+     expect(find.text('retry'), findsNothing);
++
++    // Explicitly unmount the empty Home so dispose-time ticker regressions are
++    // reported by this test instead of surfacing only during test teardown.
++    await tester.pumpWidget(const SizedBox.shrink());
++    expect(tester.takeException(), isNull);
+   });
+ 
+   testWidgets('when nothing loads, a quiet message and Retry', (tester) async {

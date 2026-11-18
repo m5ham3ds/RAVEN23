@@ -1,0 +1,22 @@
+RAVEN23 PHASE63.17 — STATIC PACKAGING CHECKS
+Date: 2026-11-15
+Scope: RAVEN23 project only
+
+PASS
+- AndroidManifest.xml parsed successfully as XML.
+- .github/workflows/android-ci.yml parsed successfully as YAML.
+- tool/format_phase57_dart.sh passed `bash -n` shell syntax validation.
+- All 76 scoped Dart formatter target paths exist; all are unique.
+- All 18 focused Flutter test files listed in android-ci.yml exist and are non-empty.
+- The `raven23/source_health_service` MethodChannel name matches across the session controller, app root and MainActivity.
+- Android foreground-service declaration, dataSync type, stopWithTask=false, notification icon and notification navigation wiring are present.
+- Source-health session persistence, explicit-confirmation recheck, in-memory repository-page cache, lazy sliver rows and bounded three-worker repository fetch pool were verified by source inspection.
+- Foreground-service completion now calls Context.stopService(), avoiding an ACTION_STOP startService request while the app is backgrounded.
+
+NOT RUN — TOOLCHAIN UNAVAILABLE
+- `dart format` (Dart executable not installed in the editing runtime).
+- `flutter analyze` (Flutter executable not installed).
+- Focused Flutter widget/unit tests (Flutter executable not installed).
+- Gradle compilation, Android ABI tests, Release APK build, APK audit and device tests.
+
+This report records static packaging checks only. It does not claim that PHASE63.17 has passed Flutter analysis, tests, Android compilation or APK build. These gates must be confirmed by the next GitHub Actions run and device testing.

@@ -1,0 +1,2239 @@
+diff --git a/lib/catalog/catalog_controller.dart b/lib/catalog/catalog_controller.dart
+index fac60e7..6ed97c8 100644
+--- a/lib/catalog/catalog_controller.dart
++++ b/lib/catalog/catalog_controller.dart
+@@ -757,15 +757,15 @@ class CatalogController {
+     bool strict = false,
+   }) async {
+     final genresFuture = fetchGenre(
+-        kind == MediaKind.movie
+-            ? Endpoints.movieGenresUrl(settings.appLanguage)
+-            : Endpoints.tvGenresUrl(settings.appLanguage),
+-        settings.enableProxy,
+-        dependencies.tmdbProxy,
+-        forceRefresh: forceRefresh,
+-        retryLimit: retryLimit,
+-        timeout: requestTimeout,
+-      );
++      kind == MediaKind.movie
++          ? Endpoints.movieGenresUrl(settings.appLanguage)
++          : Endpoints.tvGenresUrl(settings.appLanguage),
++      settings.enableProxy,
++      dependencies.tmdbProxy,
++      forceRefresh: forceRefresh,
++      retryLimit: retryLimit,
++      timeout: requestTimeout,
++    );
+     final genres = strict ? await genresFuture : await _orEmpty(genresFuture);
+     return genres
+         .where((genre) => genre.genreID != null && genre.genreName != null)
+diff --git a/lib/catalog/home_feed_controller.dart b/lib/catalog/home_feed_controller.dart
+index 7df65db..36e407e 100644
+--- a/lib/catalog/home_feed_controller.dart
++++ b/lib/catalog/home_feed_controller.dart
+@@ -563,12 +563,10 @@ class HomeFeedController {
+         filter: filter,
+         spotlight: trending.take(spotlightLength).toList(growable: false),
+         trendingAnime: trending,
+-        popularAnime:
+-            loaded[HomeList.popularAnime] ?? const <MediaItem>[],
++        popularAnime: loaded[HomeList.popularAnime] ?? const <MediaItem>[],
+         newEpisodesAnime:
+             loaded[HomeList.newEpisodesAnime] ?? const <MediaItem>[],
+-        topRatedAnime:
+-            loaded[HomeList.topRatedAnime] ?? const <MediaItem>[],
++        topRatedAnime: loaded[HomeList.topRatedAnime] ?? const <MediaItem>[],
+         hadErrors: _hadErrors,
+       );
+     }
+@@ -596,7 +594,8 @@ class HomeFeedController {
+             if (!snapshot.isEmpty) onProgress?.call(snapshot);
+           }(),
+       ]);
+-      trendingAnime = animeByList[HomeList.trendingAnime] ?? const <MediaItem>[];
++      trendingAnime =
++          animeByList[HomeList.trendingAnime] ?? const <MediaItem>[];
+       popularAnime = animeByList[HomeList.popularAnime] ?? const <MediaItem>[];
+       newEpisodesAnime =
+           animeByList[HomeList.newEpisodesAnime] ?? const <MediaItem>[];
+@@ -684,11 +683,11 @@ class HomeFeedController {
+       ...switch (filter) {
+         HomeFilter.all => allShelves,
+         HomeFilter.movies => <(int, MediaKind)>[
+-            for (final id in movieShelfProviders) (id, MediaKind.movie),
+-          ],
++          for (final id in movieShelfProviders) (id, MediaKind.movie),
++        ],
+         HomeFilter.series => <(int, MediaKind)>[
+-            for (final id in seriesShelfProviders) (id, MediaKind.series),
+-          ],
++          for (final id in seriesShelfProviders) (id, MediaKind.series),
++        ],
+         HomeFilter.anime || HomeFilter.manga => const <(int, MediaKind)>[],
+       },
+     ];
+@@ -699,22 +698,21 @@ class HomeFeedController {
+     );
+ 
+     final loadedAnimeLists = includeAnime && filter != HomeFilter.anime
+-        ? await _loadInBatches<List<MediaItem>>(
+-            <Future<List<MediaItem>> Function()>[
+-              () => _safeList(
+-                source.list(MediaKind.series, HomeList.trendingAnime),
+-              ),
+-              () => _safeList(
+-                source.list(MediaKind.series, HomeList.popularAnime),
+-              ),
+-              () => _safeList(
+-                source.list(MediaKind.series, HomeList.newEpisodesAnime),
+-              ),
+-              () => _safeList(
+-                source.list(MediaKind.series, HomeList.topRatedAnime),
+-              ),
+-            ],
+-          )
++        ? await _loadInBatches<List<MediaItem>>(<
++            Future<List<MediaItem>> Function()
++          >[
++            () => _safeList(
++              source.list(MediaKind.series, HomeList.trendingAnime),
++            ),
++            () =>
++                _safeList(source.list(MediaKind.series, HomeList.popularAnime)),
++            () => _safeList(
++              source.list(MediaKind.series, HomeList.newEpisodesAnime),
++            ),
++            () => _safeList(
++              source.list(MediaKind.series, HomeList.topRatedAnime),
++            ),
++          ])
+         : <List<MediaItem>>[
+             trendingAnime,
+             popularAnime,
+@@ -751,10 +749,14 @@ class HomeFeedController {
+         upcoming: base.upcoming,
+         serviceShelves: loadedShelves
+             .whereType<ServiceShelf>()
+-            .where((shelf) => shelfProviders.any((entry) =>
+-                entry.$2 == kind &&
+-                CatalogController.serviceFor(entry.$1)?.stableKey ==
+-                    shelf.service.stableKey))
++            .where(
++              (shelf) => shelfProviders.any(
++                (entry) =>
++                    entry.$2 == kind &&
++                    CatalogController.serviceFor(entry.$1)?.stableKey ==
++                        shelf.service.stableKey,
++              ),
++            )
+             .toList(growable: false),
+       );
+     }
+@@ -770,7 +772,9 @@ class HomeFeedController {
+       filter: filter,
+       spotlight: filter == HomeFilter.anime
+           ? trendingAnime.take(spotlightLength).toList(growable: false)
+-          : interleave(loadedSpotlights).take(spotlightLength).toList(growable: false),
++          : interleave(
++              loadedSpotlights,
++            ).take(spotlightLength).toList(growable: false),
+       categories: filter == HomeFilter.anime
+           ? _animeCategories(loadedGenres[1])
+           : _categories(loadedGenres[0], loadedGenres[1]),
+@@ -779,7 +783,9 @@ class HomeFeedController {
+       seriesGenres: loadedGenres[1],
+       trendingAnime: trendingAnime.take(rowLength).toList(growable: false),
+       popularAnime: popularAnime.take(rowLength).toList(growable: false),
+-      newEpisodesAnime: newEpisodesAnime.take(rowLength).toList(growable: false),
++      newEpisodesAnime: newEpisodesAnime
++          .take(rowLength)
++          .toList(growable: false),
+       topRatedAnime: topRatedAnime.take(rowLength).toList(growable: false),
+       hadErrors: _hadErrors,
+     );
+@@ -797,9 +803,7 @@ class HomeFeedController {
+           ? start + batchSize
+           : loaders.length;
+       values.addAll(
+-        await Future.wait<T>(
+-          loaders.sublist(start, end).map((load) => load()),
+-        ),
++        await Future.wait<T>(loaders.sublist(start, end).map((load) => load())),
+       );
+     }
+     return values;
+@@ -837,11 +841,12 @@ class HomeFeedController {
+   }
+ 
+   Future<KindRows> _completeRows(_HomeBaseRows base) async {
+-    final optional = await Future.wait<List<MediaItem>>(<Future<List<MediaItem>>>[
+-      _safeList(source.list(base.kind, HomeList.newReleases)),
+-      _safeList(source.list(base.kind, HomeList.topRated)),
+-      _safeList(source.list(base.kind, HomeList.upcoming)),
+-    ]);
++    final optional =
++        await Future.wait<List<MediaItem>>(<Future<List<MediaItem>>>[
++          _safeList(source.list(base.kind, HomeList.newReleases)),
++          _safeList(source.list(base.kind, HomeList.topRated)),
++          _safeList(source.list(base.kind, HomeList.upcoming)),
++        ]);
+     final releases = optional[0];
+     final topRated = optional[1];
+     final upcoming = optional[2];
+@@ -975,7 +980,6 @@ class HomeFeedController {
+ 
+   static List<MediaItem> _row(List<MediaItem> items) =>
+       items.take(rowLength).toList(growable: false);
+-
+ }
+ 
+ /// A title's identity across rows: an episode in Continue Watching is the
+diff --git a/lib/core/cache/cache_interceptor.dart b/lib/core/cache/cache_interceptor.dart
+index fdf2dd9..5e1aea9 100644
+--- a/lib/core/cache/cache_interceptor.dart
++++ b/lib/core/cache/cache_interceptor.dart
+@@ -11,7 +11,7 @@ import 'http_cache.dart';
+ /// App policy surrounding the package's HTTP validator/serialization engine.
+ class CacheInterceptor extends cache.DioCacheInterceptor {
+   CacheInterceptor(this.dio, this.httpCache, {this.defaultScope})
+-      : super(options: cache.CacheOptions(store: httpCache.store));
++    : super(options: cache.CacheOptions(store: httpCache.store));
+   final Dio dio;
+   final HttpCache httpCache;
+   final String? defaultScope;
+@@ -19,11 +19,15 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+ 
+   @override
+   void onRequest(
+-      RequestOptions options, RequestInterceptorHandler handler) async {
++    RequestOptions options,
++    RequestInterceptorHandler handler,
++  ) async {
+     final request = options;
+     try {
+-      final selection =
+-          CacheRequest.select(request, defaultScope: defaultScope);
++      final selection = CacheRequest.select(
++        request,
++        defaultScope: defaultScope,
++      );
+       request.extra['cacheSelection'] = selection;
+       request.extra['cacheGeneration'] = httpCache.generation;
+       if (selection == null) {
+@@ -31,18 +35,22 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+         return;
+       }
+       final forceRefresh = request.extra['forceCacheRefresh'] == true;
+-      final requestStore = request.extra.putIfAbsent(
+-        'cacheStoreView',
+-        () => httpCache.forRequest(
+-          selection.policy,
+-          bypassReads: forceRefresh,
+-        ),
+-      ) as cache.CacheStore;
+-      request.extra.addAll(cache.CacheOptions(
+-        store: requestStore,
+-        hitCacheOnNetworkFailure: true,
+-        keyBuilder: ({required url, headers, body}) => selection.key,
+-      ).toExtra());
++      final requestStore =
++          request.extra.putIfAbsent(
++                'cacheStoreView',
++                () => httpCache.forRequest(
++                  selection.policy,
++                  bypassReads: forceRefresh,
++                ),
++              )
++              as cache.CacheStore;
++      request.extra.addAll(
++        cache.CacheOptions(
++          store: requestStore,
++          hitCacheOnNetworkFailure: true,
++          keyBuilder: ({required url, headers, body}) => selection.key,
++        ).toExtra(),
++      );
+       final existing = forceRefresh
+           ? null
+           : await requestStore.get(selection.key);
+@@ -51,13 +59,15 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+           existing.isExpired(cache.CacheControl())) {
+         _refreshing.putIfAbsent(selection.key, () {
+           final future = dio
+-              .fetch<dynamic>(request.copyWith(extra: {
+-                ...request.extra,
+-                'refreshStale': false,
+-              }))
++              .fetch<dynamic>(
++                request.copyWith(
++                  extra: {...request.extra, 'refreshStale': false},
++                ),
++              )
+               .then<void>((_) {}, onError: (Object _) {});
+           unawaited(
+-              future.whenComplete(() => _refreshing.remove(selection.key)));
++            future.whenComplete(() => _refreshing.remove(selection.key)),
++          );
+           return future;
+         });
+         final response = existing.toResponse(request)..extra['cache'] = 'stale';
+@@ -67,9 +77,9 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+       super.onRequest(request, handler);
+     } catch (error, stack) {
+       handler.reject(
+-          DioException(
+-              requestOptions: request, error: error, stackTrace: stack),
+-          true);
++        DioException(requestOptions: request, error: error, stackTrace: stack),
++        true,
++      );
+     }
+   }
+ 
+@@ -87,9 +97,11 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+       super.onResponse(response, handler);
+       return;
+     }
+-    final control =
+-        cache.CacheControl.fromHeader(response.headers['cache-control']);
+-    final uncacheable = control.noStore ||
++    final control = cache.CacheControl.fromHeader(
++      response.headers['cache-control'],
++    );
++    final uncacheable =
++        control.noStore ||
+         (control.privacy == 'private' && cacheOwnerIsPublic(selection.key)) ||
+         response.headers['set-cookie'] != null ||
+         _variesOnEverything(response.headers);
+@@ -104,23 +116,26 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+     }
+     final fresh = selection.policy.fresh.inSeconds;
+     response.headers.set(
+-        'cache-control',
+-        cache.CacheControl(
+-          maxAge: control.maxAge < 0 || control.maxAge > fresh
+-              ? fresh
+-              : control.maxAge,
+-          privacy: control.privacy,
+-          noCache: control.noCache,
+-          mustRevalidate: control.mustRevalidate,
+-          other: control.other,
+-        ).toHeader());
+-    response.extra['cache'] =
+-        response.statusCode == 304 ? 'revalidated' : 'miss';
++      'cache-control',
++      cache.CacheControl(
++        maxAge: control.maxAge < 0 || control.maxAge > fresh
++            ? fresh
++            : control.maxAge,
++        privacy: control.privacy,
++        noCache: control.noCache,
++        mustRevalidate: control.mustRevalidate,
++        other: control.other,
++      ).toHeader(),
++    );
++    response.extra['cache'] = response.statusCode == 304
++        ? 'revalidated'
++        : 'miss';
+     super.onResponse(
+-        response,
+-        response.statusCode == 304
+-            ? _CacheResponseHandler(handler, 'revalidated')
+-            : handler);
++      response,
++      response.statusCode == 304
++          ? _CacheResponseHandler(handler, 'revalidated')
++          : handler,
++    );
+   }
+ 
+   @override
+@@ -161,8 +176,9 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+     }
+     if (error.response?.statusCode == 304) {
+       final response = error.response!;
+-      final control =
+-          cache.CacheControl.fromHeader(response.headers['cache-control']);
++      final control = cache.CacheControl.fromHeader(
++        response.headers['cache-control'],
++      );
+       final selection =
+           error.requestOptions.extra['cacheSelection'] as CacheRequest;
+       if (control.noStore ||
+@@ -172,8 +188,10 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+         final stored = await httpCache.store.get(selection.key);
+         await httpCache.store.delete(selection.key);
+         if (stored != null) {
+-          handler.resolve(stored.toResponse(error.requestOptions)
+-            ..extra['cache'] = 'revalidated');
++          handler.resolve(
++            stored.toResponse(error.requestOptions)
++              ..extra['cache'] = 'revalidated',
++          );
+         } else {
+           handler.next(error);
+         }
+@@ -181,9 +199,12 @@ class CacheInterceptor extends cache.DioCacheInterceptor {
+       }
+     }
+     super.onError(
+-        error,
+-        _CacheErrorHandler(handler,
+-            error.response?.statusCode == 304 ? 'revalidated' : 'stale'));
++      error,
++      _CacheErrorHandler(
++        handler,
++        error.response?.statusCode == 304 ? 'revalidated' : 'stale',
++      ),
++    );
+   }
+ }
+ 
+@@ -220,7 +241,8 @@ class _CacheResponseHandler extends ResponseInterceptorHandler {
+   }
+ 
+   @override
+-  void reject(DioException error,
+-          [bool callFollowingErrorInterceptor = false]) =>
+-      delegate.reject(error, callFollowingErrorInterceptor);
++  void reject(
++    DioException error, [
++    bool callFollowingErrorInterceptor = false,
++  ]) => delegate.reject(error, callFollowingErrorInterceptor);
+ }
+diff --git a/lib/core/cache/http_cache.dart b/lib/core/cache/http_cache.dart
+index 8085e65..a7364e6 100644
+--- a/lib/core/cache/http_cache.dart
++++ b/lib/core/cache/http_cache.dart
+@@ -30,8 +30,8 @@ class HttpCache {
+         if (scope == 'user'
+             ? parts[1] != 'public'
+             : scope.startsWith('user:')
+-                ? parts[1] == scope
+-                : parts[0] == scope) {
++            ? parts[1] == scope
++            : parts[0] == scope) {
+           await backing.delete(entry.key);
+         }
+       }
+@@ -47,9 +47,10 @@ class HttpCache {
+     final backing = (store as _SafeCacheStore).backing;
+     if (backing is ResponseCacheStore) return backing.sizeBytes();
+     return (await backing.getFromPath(RegExp('.*'))).fold<int>(
+-        0,
+-        (sum, entry) =>
+-            sum + (entry.content?.length ?? 0) + (entry.headers?.length ?? 0));
++      0,
++      (sum, entry) =>
++          sum + (entry.content?.length ?? 0) + (entry.headers?.length ?? 0),
++    );
+   }
+ 
+   Future<void> pruneExpired() => store.clean(staleOnly: true);
+@@ -91,31 +92,37 @@ class _SafeCacheStore extends CacheStore {
+         response = response.copyWith(maxStale: previous.maxStale);
+       }
+       await backing.set(response);
+-    } catch (_) {/* Cache writes do not affect network availability. */}
++    } catch (_) {
++      /* Cache writes do not affect network availability. */
++    }
+   }
+ 
+   @override
+   Future<void> delete(String key, {bool staleOnly = false}) async {
+     try {
+       await backing.delete(key, staleOnly: staleOnly);
+-    } catch (_) {/* Best effort. */}
++    } catch (_) {
++      /* Best effort. */
++    }
+   }
+ 
+   @override
+   Future<bool> exists(String key) async => await get(key) != null;
+   @override
+-  Future<List<CacheResponse>> getFromPath(RegExp pathPattern,
+-          {Map<String, String?>? queryParams}) =>
+-      backing.getFromPath(pathPattern, queryParams: queryParams);
++  Future<List<CacheResponse>> getFromPath(
++    RegExp pathPattern, {
++    Map<String, String?>? queryParams,
++  }) => backing.getFromPath(pathPattern, queryParams: queryParams);
+   @override
+-  Future<void> deleteFromPath(RegExp pathPattern,
+-          {Map<String, String?>? queryParams}) =>
+-      backing.deleteFromPath(pathPattern, queryParams: queryParams);
++  Future<void> deleteFromPath(
++    RegExp pathPattern, {
++    Map<String, String?>? queryParams,
++  }) => backing.deleteFromPath(pathPattern, queryParams: queryParams);
+   @override
+-  Future<void> clean(
+-          {CachePriority priorityOrBelow = CachePriority.high,
+-          bool staleOnly = false}) =>
+-      backing.clean(priorityOrBelow: priorityOrBelow, staleOnly: staleOnly);
++  Future<void> clean({
++    CachePriority priorityOrBelow = CachePriority.high,
++    bool staleOnly = false,
++  }) => backing.clean(priorityOrBelow: priorityOrBelow, staleOnly: staleOnly);
+   @override
+   Future<void> close() => backing.close();
+ }
+@@ -138,41 +145,44 @@ class _RequestCacheStore extends CacheStore {
+     }
+     return cache.store.get(key);
+   }
++
+   @override
+   Future<void> set(CacheResponse response) => cache._mutate(() async {
+-        if (generation != cache.generation) return;
+-        final control = response.cacheControl;
+-        final fresh = policy.fresh.inSeconds;
+-        final cappedControl = CacheControl(
+-          maxAge: control.maxAge < 0 || control.maxAge > fresh
+-              ? fresh
+-              : control.maxAge,
+-          privacy: control.privacy,
+-          noCache: control.noCache,
+-          noStore: control.noStore,
+-          mustRevalidate: control.mustRevalidate,
+-          other: control.other,
+-        );
+-        final deadline = policy.maxStale == null
+-            ? null
+-            : response.responseDate.add(policy.fresh + policy.maxStale!);
+-        await cache.store.set(CacheResponse(
+-          key: response.key,
+-          url: response.url,
+-          statusCode: response.statusCode,
+-          cacheControl: cappedControl,
+-          content: response.content,
+-          headers: response.headers,
+-          requestDate: response.requestDate,
+-          responseDate: response.responseDate,
+-          priority: response.priority,
+-          maxStale: deadline,
+-          expires: response.expires,
+-          date: policy.validators ? response.date : null,
+-          eTag: policy.validators ? response.eTag : null,
+-          lastModified: policy.validators ? response.lastModified : null,
+-        ));
+-      });
++    if (generation != cache.generation) return;
++    final control = response.cacheControl;
++    final fresh = policy.fresh.inSeconds;
++    final cappedControl = CacheControl(
++      maxAge: control.maxAge < 0 || control.maxAge > fresh
++          ? fresh
++          : control.maxAge,
++      privacy: control.privacy,
++      noCache: control.noCache,
++      noStore: control.noStore,
++      mustRevalidate: control.mustRevalidate,
++      other: control.other,
++    );
++    final deadline = policy.maxStale == null
++        ? null
++        : response.responseDate.add(policy.fresh + policy.maxStale!);
++    await cache.store.set(
++      CacheResponse(
++        key: response.key,
++        url: response.url,
++        statusCode: response.statusCode,
++        cacheControl: cappedControl,
++        content: response.content,
++        headers: response.headers,
++        requestDate: response.requestDate,
++        responseDate: response.responseDate,
++        priority: response.priority,
++        maxStale: deadline,
++        expires: response.expires,
++        date: policy.validators ? response.date : null,
++        eTag: policy.validators ? response.eTag : null,
++        lastModified: policy.validators ? response.lastModified : null,
++      ),
++    );
++  });
+ 
+   @override
+   Future<void> delete(String key, {bool staleOnly = false}) async {
+@@ -183,20 +193,24 @@ class _RequestCacheStore extends CacheStore {
+ 
+   @override
+   Future<bool> exists(String key) async =>
+-      !bypassReads && generation == cache.generation &&
++      !bypassReads &&
++      generation == cache.generation &&
+       await cache.store.exists(key);
+   @override
+-  Future<List<CacheResponse>> getFromPath(RegExp pathPattern,
+-          {Map<String, String?>? queryParams}) =>
+-      cache.store.getFromPath(pathPattern, queryParams: queryParams);
++  Future<List<CacheResponse>> getFromPath(
++    RegExp pathPattern, {
++    Map<String, String?>? queryParams,
++  }) => cache.store.getFromPath(pathPattern, queryParams: queryParams);
+   @override
+-  Future<void> deleteFromPath(RegExp pathPattern,
+-          {Map<String, String?>? queryParams}) =>
+-      cache.store.deleteFromPath(pathPattern, queryParams: queryParams);
++  Future<void> deleteFromPath(
++    RegExp pathPattern, {
++    Map<String, String?>? queryParams,
++  }) => cache.store.deleteFromPath(pathPattern, queryParams: queryParams);
+   @override
+-  Future<void> clean(
+-          {CachePriority priorityOrBelow = CachePriority.high,
+-          bool staleOnly = false}) =>
++  Future<void> clean({
++    CachePriority priorityOrBelow = CachePriority.high,
++    bool staleOnly = false,
++  }) =>
+       cache.store.clean(priorityOrBelow: priorityOrBelow, staleOnly: staleOnly);
+   @override
+   Future<void> close() async {}
+diff --git a/lib/core/network/interceptors/single_flight_interceptor.dart b/lib/core/network/interceptors/single_flight_interceptor.dart
+index 3d23cea..ca7c4ad 100644
+--- a/lib/core/network/interceptors/single_flight_interceptor.dart
++++ b/lib/core/network/interceptors/single_flight_interceptor.dart
+@@ -10,7 +10,9 @@ class SingleFlightInterceptor extends Interceptor {
+ 
+   @override
+   void onRequest(
+-      RequestOptions options, RequestInterceptorHandler handler) async {
++    RequestOptions options,
++    RequestInterceptorHandler handler,
++  ) async {
+     final request = options;
+     final selection = CacheRequest.select(request, defaultScope: defaultScope);
+     if (selection == null || request.extra['singleFlightOwner'] == true) {
+@@ -22,28 +24,33 @@ class SingleFlightInterceptor extends Interceptor {
+         : 'normal';
+     final key = '${selection.key}:${request.responseType.name}:$refreshMode';
+     final operation = _pending.putIfAbsent(
+-        key,
+-        () => dio.fetch<dynamic>(
+-              request.copyWith(
+-                  extra: {...request.extra, 'singleFlightOwner': true},
+-                  cancelToken: CancelToken()),
+-            ));
++      key,
++      () => dio.fetch<dynamic>(
++        request.copyWith(
++          extra: {...request.extra, 'singleFlightOwner': true},
++          cancelToken: CancelToken(),
++        ),
++      ),
++    );
+     try {
+       final response = await operation;
+-      handler.resolve(Response<dynamic>(
++      handler.resolve(
++        Response<dynamic>(
+           data: response.data,
+           headers: response.headers,
+           statusCode: response.statusCode,
+           statusMessage: response.statusMessage,
+           requestOptions: request,
+-          extra: {...response.extra}));
++          extra: {...response.extra},
++        ),
++      );
+     } on DioException catch (error) {
+       handler.reject(error.copyWith(requestOptions: request));
+     } catch (error, stack) {
+       handler.reject(
+-          DioException(
+-              requestOptions: request, error: error, stackTrace: stack),
+-          true);
++        DioException(requestOptions: request, error: error, stackTrace: stack),
++        true,
++      );
+     } finally {
+       if (identical(_pending[key], operation)) _pending.remove(key);
+     }
+diff --git a/lib/data/repositories/tmdb_repository.dart b/lib/data/repositories/tmdb_repository.dart
+index e4f97bc..35fca79 100644
+--- a/lib/data/repositories/tmdb_repository.dart
++++ b/lib/data/repositories/tmdb_repository.dart
+@@ -23,24 +23,29 @@ class TmdbRepository {
+     bool forceRefresh = false,
+   }) async {
+     try {
+-      return Result.ok(await TmdbConnectivity.instance.route(
+-        proxyUrl,
+-        (proxied, proxyUrl) => api.getJson(url,
++      return Result.ok(
++        await TmdbConnectivity.instance.route(
++          proxyUrl,
++          (proxied, proxyUrl) => api.getJson(
++            url,
+             policy: policy,
+             proxyEnabled: proxied,
+             proxyUrl: proxyUrl,
+             cancelToken: cancelToken,
+             timeout: timeout,
+             retryLimit: retryLimit,
+-            forceRefresh: forceRefresh),
+-        blocked: (_) => false,
+-        routeFailure: _routeFailure,
+-      ));
++            forceRefresh: forceRefresh,
++          ),
++          blocked: (_) => false,
++          routeFailure: _routeFailure,
++        ),
++      );
+     } on DioException catch (error) {
+       return Result.err(failureForDio(error));
+     } on FormatException {
+       return const Result.err(
+-          Failure.unknown(message: 'Invalid TMDB response.'));
++        Failure.unknown(message: 'Invalid TMDB response.'),
++      );
+     }
+   }
+ 
+diff --git a/lib/functions/network.dart b/lib/functions/network.dart
+index b7dede2..ec92a88 100644
+--- a/lib/functions/network.dart
++++ b/lib/functions/network.dart
+@@ -30,8 +30,10 @@ Future<Map<String, dynamic>> _tmdbJson(
+     retryLimit: retryLimit,
+     timeout: timeout,
+   );
+-  return result.when(ok: (data) => data,
+-      err: (failure) => throw FailureException(failure));
++  return result.when(
++    ok: (data) => data,
++    err: (failure) => throw FailureException(failure),
++  );
+ }
+ 
+ Future<List<Movie>> fetchMovies(
+@@ -59,49 +61,73 @@ Future<List<Movie>> fetchMovies(
+ }
+ 
+ Future<List<Movie>> fetchCollectionMovies(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return CollectionMovieList.fromJson(data).movies ?? [];
+ }
+ 
+ Future<CollectionDetails> fetchCollectionDetails(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return CollectionDetails.fromJson(data);
+ }
+ 
+ Future<List<Movie>> fetchPersonMovies(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return PersonMoviesList.fromJson(data).movies ?? [];
+ }
+ 
+ Future<Images> fetchImages(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return Images.fromJson(data);
+ }
+ 
+ Future<PersonImages> fetchPersonImages(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return PersonImages.fromJson(data);
+ }
+ 
+ Future<Videos> fetchVideos(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return Videos.fromJson(data);
+ }
+ 
+ Future<Credits> fetchCredits(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return Credits.fromJson(data);
+ }
+ 
+ Future<List<Person>> fetchPerson(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return PersonList.fromJson(data).person ?? [];
+ }
+@@ -126,19 +152,28 @@ Future<List<Genres>> fetchGenre(
+ }
+ 
+ Future<ExternalLinks> fetchSocialLinks(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return ExternalLinks.fromJson(data);
+ }
+ 
+ Future fetchBelongsToCollection(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return BelongsToCollection.fromJson(data);
+ }
+ 
+ Future<MovieDetails> fetchMovieDetails(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return MovieDetails.fromJson(data);
+ }
+@@ -152,13 +187,20 @@ Future<MovieDetails> fetchMovieDetails(
+ // }
+ 
+ Future<PersonDetails> fetchPersonDetails(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return PersonDetails.fromJson(data);
+ }
+ 
+ Future<WatchProviders> fetchWatchProviders(
+-    String api, String country, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  String country,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return WatchProviders.fromJson(data, country);
+ }
+@@ -183,13 +225,19 @@ Future<List<TV>> fetchTV(
+ }
+ 
+ Future<TVDetails> fetchTVDetails(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return TVDetails.fromJson(data);
+ }
+ 
+ Future<List<TV>> fetchPersonTV(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return PersonTVList.fromJson(data).tv ?? [];
+ }
+@@ -206,31 +254,44 @@ Future<TV> getTV(String api, bool isProxyEnabled, String proxyUrl) async {
+ 
+ /// One episode, addressed by its series and its two numbers.
+ Future<EpisodeList> getEpisode(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return EpisodeList.fromJson(data);
+ }
+ 
+ /// What TMDB holds under an id belonging to another site, such as an IMDb id.
+ Future<ExternalIdLookup> findByExternalId(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return ExternalIdLookup.fromJson(data);
+ }
+ 
+ /// A collection's own name and artwork, for one reached without a film in hand.
+ Future<BelongsToCollection> fetchCollectionSummary(
+-    String api, bool isProxyEnabled, String proxyUrl) async {
++  String api,
++  bool isProxyEnabled,
++  String proxyUrl,
++) async {
+   final data = await _tmdbJson(api, isProxyEnabled, proxyUrl);
+   return BelongsToCollection.fromCollectionJson(data);
+ }
+ 
+ Future<String> getVttFileAsString(String url) async {
+-  final response = await NetworkRuntime.publicDio.get<List<int>>(url,
+-      options: Options(responseType: ResponseType.bytes,
+-          receiveTimeout: const Duration(seconds: 15),
+-          validateStatus: (_) => true,
+-          extra: {'cachePolicy': CachePolicy.noStore}));
++  final response = await NetworkRuntime.publicDio.get<List<int>>(
++    url,
++    options: Options(
++      responseType: ResponseType.bytes,
++      receiveTimeout: const Duration(seconds: 15),
++      validateStatus: (_) => true,
++      extra: {'cachePolicy': CachePolicy.noStore},
++    ),
++  );
+   if (response.statusCode != 200) return '';
+   final decoded = utf8.decode(response.data ?? []);
+   return decoded.startsWith('<') ? '' : decoded;
+@@ -240,23 +301,30 @@ const Map<String, String> _vixSrcHeaders = {
+   'accept': '*/*',
+   'origin': 'https://vixsrc.to',
+   'referer': 'https://vixsrc.to/',
+-  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
++  'user-agent':
++      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+       '(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+ };
+ 
+ Future<Response<String>> _vixResponse(String api) =>
+-    NetworkRuntime.publicDio.get<String>(api,
+-        options: Options(responseType: ResponseType.plain,
+-            headers: _vixSrcHeaders,
+-            receiveTimeout: const Duration(seconds: 30),
+-            validateStatus: (_) => true,
+-            extra: {'cachePolicy': CachePolicy.noStore, 'retryLimit': 0}));
++    NetworkRuntime.publicDio.get<String>(
++      api,
++      options: Options(
++        responseType: ResponseType.plain,
++        headers: _vixSrcHeaders,
++        receiveTimeout: const Duration(seconds: 30),
++        validateStatus: (_) => true,
++        extra: {'cachePolicy': CachePolicy.noStore, 'retryLimit': 0},
++      ),
++    );
+ 
+ Future<String> getVixSrcEmbedSrc(String api) async {
+   final response = await _vixResponse(api);
+   final data = jsonDecode(response.data ?? '');
+-  if (response.statusCode != 200 || data is! Map<String, dynamic> ||
+-      data['src'] == null || data['src'].toString().isEmpty) {
++  if (response.statusCode != 200 ||
++      data is! Map<String, dynamic> ||
++      data['src'] == null ||
++      data['src'].toString().isEmpty) {
+     throw NotFoundException();
+   }
+   return data['src'].toString();
+diff --git a/lib/manga/anilist/anilist_catalogue_cache.dart b/lib/manga/anilist/anilist_catalogue_cache.dart
+index 7a6ef0d..3ea36c2 100644
+--- a/lib/manga/anilist/anilist_catalogue_cache.dart
++++ b/lib/manga/anilist/anilist_catalogue_cache.dart
+@@ -35,10 +35,7 @@ class AniListCatalogueCache {
+ 
+   String _storageKey(String key) => '$_prefix$key';
+ 
+-  Future<AniListCatalogueCacheEntry?> read(
+-    String key, {
+-    DateTime? now,
+-  }) async {
++  Future<AniListCatalogueCacheEntry?> read(String key, {DateTime? now}) async {
+     try {
+       final raw = (await _prefs).getString(_storageKey(key));
+       if (raw == null || raw.isEmpty) return null;
+@@ -49,10 +46,7 @@ class AniListCatalogueCache {
+       if (payload is! Map || fetchedAt is! int) return null;
+       final entry = AniListCatalogueCacheEntry(
+         data: Map<String, dynamic>.from(payload),
+-        fetchedAt: DateTime.fromMillisecondsSinceEpoch(
+-          fetchedAt,
+-          isUtc: true,
+-        ),
++        fetchedAt: DateTime.fromMillisecondsSinceEpoch(fetchedAt, isUtc: true),
+       );
+       final age = (now ?? DateTime.now().toUtc()).difference(entry.fetchedAt);
+       if (age.isNegative || age > freshFor + maxStale) {
+@@ -106,7 +100,8 @@ class AniListCatalogueCache {
+     try {
+       await _serialize(() async {
+         final preferences = await _prefs;
+-        final keys = preferences.getKeys()
++        final keys = preferences
++            .getKeys()
+             .where((key) => key.startsWith(_prefix))
+             .toList(growable: false);
+         for (final key in keys) {
+diff --git a/test/data/tmdb_network_test.dart b/test/data/tmdb_network_test.dart
+index 5124e19..057ee0d 100644
+--- a/test/data/tmdb_network_test.dart
++++ b/test/data/tmdb_network_test.dart
+@@ -15,233 +15,264 @@ import 'package:flutter_test/flutter_test.dart';
+ import '../support/fake_dio.dart';
+ 
+ void main() {
+-  test('legacy fetchMovies uses the shared cache across API key rotation',
+-      () async {
+-    final cache = HttpCache(MemCacheStore());
+-    final adapter = FakeDioAdapter()
+-      ..enqueueJson({
+-        'page': 1,
+-        'total_pages': 1,
+-        'total_results': 1,
+-        'results': [
+-          {
+-            'id': 7,
+-            'title': 'Example',
+-            'overview': '',
+-            'poster_path': null,
+-            'backdrop_path': null,
+-            'release_date': '2026-10-03',
+-            'vote_average': 8.0,
+-            'genre_ids': [18]
+-          },
+-        ]
+-      });
+-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+-        httpCache: cache, debugLogging: false);
+-    dio.httpClientAdapter = adapter;
+-    NetworkRuntime.configure(publicDio: dio, httpCache: cache);
+-    addTearDown(dio.close);
+-    addTearDown(cache.close);
+-    final first = await fetchMovies(
+-        'https://api.themoviedb.org/3/movie/popular?api_key=one', false, '');
+-    final offline = await fetchMovies(
+-        'https://api.themoviedb.org/3/movie/popular?api_key=two', false, '');
+-    expect(first.single.id, 7);
+-    expect(offline.single.title, 'Example');
+-    expect(adapter.requests, hasLength(1));
+-  });
+-  test('expired retained TMDB rows render immediately and refresh in background', () async {
+-    final cache = HttpCache(MemCacheStore());
+-    final adapter = FakeDioAdapter()
+-      ..enqueueJson({
+-        'results': [
+-          {
+-            'id': 71,
+-            'title': 'Cached title',
+-            'overview': '',
+-            'poster_path': null,
+-            'backdrop_path': null,
+-            'release_date': '2026-10-03',
+-            'vote_average': 8.0,
+-            'genre_ids': [18]
+-          },
+-        ]
+-      })
+-      ..enqueueJson({
+-        'results': [
+-          {
+-            'id': 72,
+-            'title': 'Fresh title',
+-            'overview': '',
+-            'poster_path': null,
+-            'backdrop_path': null,
+-            'release_date': '2026-10-04',
+-            'vote_average': 8.2,
+-            'genre_ids': [18]
+-          },
+-        ]
+-      });
+-    final dio = createPublicDio(
+-      AppEnvironment.resolve(isDebug: true),
+-      httpCache: cache,
+-      debugLogging: false,
+-      retryDelay: (_) async {},
+-    );
+-    dio.httpClientAdapter = adapter;
+-    NetworkRuntime.configure(publicDio: dio, httpCache: cache);
+-    addTearDown(dio.close);
+-    addTearDown(cache.close);
+-    const url = 'https://api.themoviedb.org/3/movie/popular';
++  test(
++    'legacy fetchMovies uses the shared cache across API key rotation',
++    () async {
++      final cache = HttpCache(MemCacheStore());
++      final adapter = FakeDioAdapter()
++        ..enqueueJson({
++          'page': 1,
++          'total_pages': 1,
++          'total_results': 1,
++          'results': [
++            {
++              'id': 7,
++              'title': 'Example',
++              'overview': '',
++              'poster_path': null,
++              'backdrop_path': null,
++              'release_date': '2026-10-03',
++              'vote_average': 8.0,
++              'genre_ids': [18],
++            },
++          ],
++        });
++      final dio = createPublicDio(
++        AppEnvironment.resolve(isDebug: true),
++        httpCache: cache,
++        debugLogging: false,
++      );
++      dio.httpClientAdapter = adapter;
++      NetworkRuntime.configure(publicDio: dio, httpCache: cache);
++      addTearDown(dio.close);
++      addTearDown(cache.close);
++      final first = await fetchMovies(
++        'https://api.themoviedb.org/3/movie/popular?api_key=one',
++        false,
++        '',
++      );
++      final offline = await fetchMovies(
++        'https://api.themoviedb.org/3/movie/popular?api_key=two',
++        false,
++        '',
++      );
++      expect(first.single.id, 7);
++      expect(offline.single.title, 'Example');
++      expect(adapter.requests, hasLength(1));
++    },
++  );
++  test(
++    'expired retained TMDB rows render immediately and refresh in background',
++    () async {
++      final cache = HttpCache(MemCacheStore());
++      final adapter = FakeDioAdapter()
++        ..enqueueJson({
++          'results': [
++            {
++              'id': 71,
++              'title': 'Cached title',
++              'overview': '',
++              'poster_path': null,
++              'backdrop_path': null,
++              'release_date': '2026-10-03',
++              'vote_average': 8.0,
++              'genre_ids': [18],
++            },
++          ],
++        })
++        ..enqueueJson({
++          'results': [
++            {
++              'id': 72,
++              'title': 'Fresh title',
++              'overview': '',
++              'poster_path': null,
++              'backdrop_path': null,
++              'release_date': '2026-10-04',
++              'vote_average': 8.2,
++              'genre_ids': [18],
++            },
++          ],
++        });
++      final dio = createPublicDio(
++        AppEnvironment.resolve(isDebug: true),
++        httpCache: cache,
++        debugLogging: false,
++        retryDelay: (_) async {},
++      );
++      dio.httpClientAdapter = adapter;
++      NetworkRuntime.configure(publicDio: dio, httpCache: cache);
++      addTearDown(dio.close);
++      addTearDown(cache.close);
++      const url = 'https://api.themoviedb.org/3/movie/popular';
+ 
+-    final first = await fetchMovies(url, false, '');
+-    expect(first.single.title, 'Cached title');
+-    final key = normalizedCacheKey(RequestOptions(path: url), scope: 'tmdb');
+-    final entry = (await cache.store.get(key))!;
+-    final expiredAt = DateTime.now().subtract(const Duration(hours: 1));
+-    await cache.store.set(
+-      entry.copyWith(requestDate: expiredAt, responseDate: expiredAt),
+-    );
++      final first = await fetchMovies(url, false, '');
++      expect(first.single.title, 'Cached title');
++      final key = normalizedCacheKey(RequestOptions(path: url), scope: 'tmdb');
++      final entry = (await cache.store.get(key))!;
++      final expiredAt = DateTime.now().subtract(const Duration(hours: 1));
++      await cache.store.set(
++        entry.copyWith(requestDate: expiredAt, responseDate: expiredAt),
++      );
+ 
+-    final stale = await fetchMovies(url, false, '');
+-    expect(stale.single.title, 'Cached title');
++      final stale = await fetchMovies(url, false, '');
++      expect(stale.single.title, 'Cached title');
+ 
+-    for (var attempt = 0; attempt < 30; attempt++) {
+-      await Future<void>.delayed(const Duration(milliseconds: 10));
+-      if (adapter.requests.length >= 2) break;
+-    }
+-    expect(adapter.requests, hasLength(2));
+-    final refreshed = await fetchMovies(url, false, '');
+-    expect(refreshed.single.title, 'Fresh title');
+-    expect(adapter.requests, hasLength(2));
+-  });
++      for (var attempt = 0; attempt < 30; attempt++) {
++        await Future<void>.delayed(const Duration(milliseconds: 10));
++        if (adapter.requests.length >= 2) break;
++      }
++      expect(adapter.requests, hasLength(2));
++      final refreshed = await fetchMovies(url, false, '');
++      expect(refreshed.single.title, 'Fresh title');
++      expect(adapter.requests, hasLength(2));
++    },
++  );
+ 
++  test(
++    'manual TMDB refresh bypasses fresh cache and keeps stale fallback offline',
++    () async {
++      final cache = HttpCache(MemCacheStore());
++      final adapter = FakeDioAdapter()
++        ..enqueueJson({
++          'results': [
++            {
++              'id': 81,
++              'title': 'Cached title',
++              'overview': '',
++              'poster_path': null,
++              'backdrop_path': null,
++              'release_date': '2026-10-03',
++              'vote_average': 8.0,
++              'genre_ids': [18],
++            },
++          ],
++        })
++        ..enqueueJson({
++          'results': [
++            {
++              'id': 82,
++              'title': 'Fresh title',
++              'overview': '',
++              'poster_path': null,
++              'backdrop_path': null,
++              'release_date': '2026-10-04',
++              'vote_average': 8.2,
++              'genre_ids': [18],
++            },
++          ],
++        });
++      final dio = createPublicDio(
++        AppEnvironment.resolve(isDebug: true),
++        httpCache: cache,
++        debugLogging: false,
++        retryDelay: (_) async {},
++      );
++      dio.httpClientAdapter = adapter;
++      NetworkRuntime.configure(publicDio: dio, httpCache: cache);
++      addTearDown(dio.close);
++      addTearDown(cache.close);
+ 
+-  test('manual TMDB refresh bypasses fresh cache and keeps stale fallback offline', () async {
+-    final cache = HttpCache(MemCacheStore());
+-    final adapter = FakeDioAdapter()
+-      ..enqueueJson({
+-        'results': [
+-          {
+-            'id': 81,
+-            'title': 'Cached title',
+-            'overview': '',
+-            'poster_path': null,
+-            'backdrop_path': null,
+-            'release_date': '2026-10-03',
+-            'vote_average': 8.0,
+-            'genre_ids': [18]
+-          },
+-        ]
+-      })
+-      ..enqueueJson({
+-        'results': [
+-          {
+-            'id': 82,
+-            'title': 'Fresh title',
+-            'overview': '',
+-            'poster_path': null,
+-            'backdrop_path': null,
+-            'release_date': '2026-10-04',
+-            'vote_average': 8.2,
+-            'genre_ids': [18]
+-          },
+-        ]
++      final originalConnectivity = TmdbConnectivity.instance;
++      final offlineConnectivity = TmdbConnectivity(
++        hasNetwork: () async => false,
++      );
++      TmdbConnectivity.instance = offlineConnectivity;
++      addTearDown(() {
++        offlineConnectivity.dispose();
++        TmdbConnectivity.instance = originalConnectivity;
+       });
+-    final dio = createPublicDio(
+-      AppEnvironment.resolve(isDebug: true),
+-      httpCache: cache,
+-      debugLogging: false,
+-      retryDelay: (_) async {},
+-    );
+-    dio.httpClientAdapter = adapter;
+-    NetworkRuntime.configure(publicDio: dio, httpCache: cache);
+-    addTearDown(dio.close);
+-    addTearDown(cache.close);
+ 
+-    final originalConnectivity = TmdbConnectivity.instance;
+-    final offlineConnectivity = TmdbConnectivity(hasNetwork: () async => false);
+-    TmdbConnectivity.instance = offlineConnectivity;
+-    addTearDown(() {
+-      offlineConnectivity.dispose();
+-      TmdbConnectivity.instance = originalConnectivity;
+-    });
++      const url = 'https://api.themoviedb.org/3/movie/popular';
++      final initial = await fetchMovies(url, false, '');
++      expect(initial.single.title, 'Cached title');
+ 
+-    const url = 'https://api.themoviedb.org/3/movie/popular';
+-    final initial = await fetchMovies(url, false, '');
+-    expect(initial.single.title, 'Cached title');
++      final refreshed = await fetchMovies(
++        url,
++        false,
++        '',
++        forceRefresh: true,
++        retryLimit: 0,
++        timeout: const Duration(seconds: 2),
++      );
++      expect(refreshed.single.title, 'Fresh title');
++      expect(adapter.requests, hasLength(2));
+ 
+-    final refreshed = await fetchMovies(
+-      url,
+-      false,
+-      '',
+-      forceRefresh: true,
+-      retryLimit: 0,
+-      timeout: const Duration(seconds: 2),
+-    );
+-    expect(refreshed.single.title, 'Fresh title');
+-    expect(adapter.requests, hasLength(2));
++      final offlineAdapter = FakeDioAdapter()..enqueueError();
++      dio.httpClientAdapter = offlineAdapter;
++      final retained = await fetchMovies(
++        url,
++        false,
++        '',
++        forceRefresh: true,
++        retryLimit: 0,
++        timeout: const Duration(seconds: 2),
++      );
++      expect(retained.single.title, 'Fresh title');
++      expect(offlineAdapter.requests, hasLength(1));
++    },
++  );
+ 
+-    final offlineAdapter = FakeDioAdapter()..enqueueError();
+-    dio.httpClientAdapter = offlineAdapter;
+-    final retained = await fetchMovies(
+-      url,
+-      false,
+-      '',
+-      forceRefresh: true,
+-      retryLimit: 0,
+-      timeout: const Duration(seconds: 2),
+-    );
+-    expect(retained.single.title, 'Fresh title');
+-    expect(offlineAdapter.requests, hasLength(1));
+-  });
+-
+-  test('legacy TMDB rows render offline after restarting the SQLite cache',
+-      () async {
+-    sqfliteFfiInit();
+-    final directory =
+-        await Directory.systemTemp.createTemp('raven23-offline-');
+-    addTearDown(() => directory.delete(recursive: true));
+-    final path = '${directory.path}/cache.db';
+-    const url = 'https://api.themoviedb.org/3/movie/popular';
+-    final firstCache = HttpCache(
+-        await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path));
+-    final firstDio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+-        httpCache: firstCache, debugLogging: false);
+-    firstDio.httpClientAdapter = FakeDioAdapter()
+-      ..enqueueJson({
+-        'results': [
+-          {
+-            'id': 7,
+-            'title': 'Example',
+-            'overview': '',
+-            'poster_path': null,
+-            'backdrop_path': null,
+-            'release_date': '2026-10-03',
+-            'vote_average': 8.0,
+-            'genre_ids': [18]
+-          },
+-        ]
+-      });
+-    NetworkRuntime.configure(publicDio: firstDio, httpCache: firstCache);
+-    expect((await fetchMovies(url, false, '')).single.id, 7);
+-    final key = normalizedCacheKey(RequestOptions(path: url), scope: 'tmdb');
+-    final cached = (await firstCache.store.get(key))!;
+-    final old = DateTime.now().subtract(const Duration(hours: 1));
+-    await firstCache.store
+-        .set(cached.copyWith(requestDate: old, responseDate: old));
+-    firstDio.close();
+-    await firstCache.close();
+-    final cache = HttpCache(
+-        await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path));
+-    final dio = createPublicDio(AppEnvironment.resolve(isDebug: true),
+-        httpCache: cache, debugLogging: false, retryDelay: (_) async {});
+-    dio.httpClientAdapter = FakeDioAdapter()
+-      ..enqueueError()
+-      ..enqueueError()
+-      ..enqueueError();
+-    NetworkRuntime.configure(publicDio: dio, httpCache: cache);
+-    addTearDown(dio.close);
+-    addTearDown(cache.close);
+-    expect((await fetchMovies(url, false, '')).single.title, 'Example');
+-  });
++  test(
++    'legacy TMDB rows render offline after restarting the SQLite cache',
++    () async {
++      sqfliteFfiInit();
++      final directory = await Directory.systemTemp.createTemp(
++        'raven23-offline-',
++      );
++      addTearDown(() => directory.delete(recursive: true));
++      final path = '${directory.path}/cache.db';
++      const url = 'https://api.themoviedb.org/3/movie/popular';
++      final firstCache = HttpCache(
++        await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path),
++      );
++      final firstDio = createPublicDio(
++        AppEnvironment.resolve(isDebug: true),
++        httpCache: firstCache,
++        debugLogging: false,
++      );
++      firstDio.httpClientAdapter = FakeDioAdapter()
++        ..enqueueJson({
++          'results': [
++            {
++              'id': 7,
++              'title': 'Example',
++              'overview': '',
++              'poster_path': null,
++              'backdrop_path': null,
++              'release_date': '2026-10-03',
++              'vote_average': 8.0,
++              'genre_ids': [18],
++            },
++          ],
++        });
++      NetworkRuntime.configure(publicDio: firstDio, httpCache: firstCache);
++      expect((await fetchMovies(url, false, '')).single.id, 7);
++      final key = normalizedCacheKey(RequestOptions(path: url), scope: 'tmdb');
++      final cached = (await firstCache.store.get(key))!;
++      final old = DateTime.now().subtract(const Duration(hours: 1));
++      await firstCache.store.set(
++        cached.copyWith(requestDate: old, responseDate: old),
++      );
++      firstDio.close();
++      await firstCache.close();
++      final cache = HttpCache(
++        await ResponseCacheStore.open(factory: databaseFactoryFfi, path: path),
++      );
++      final dio = createPublicDio(
++        AppEnvironment.resolve(isDebug: true),
++        httpCache: cache,
++        debugLogging: false,
++        retryDelay: (_) async {},
++      );
++      dio.httpClientAdapter = FakeDioAdapter()
++        ..enqueueError()
++        ..enqueueError()
++        ..enqueueError();
++      NetworkRuntime.configure(publicDio: dio, httpCache: cache);
++      addTearDown(dio.close);
++      addTearDown(cache.close);
++      expect((await fetchMovies(url, false, '')).single.title, 'Example');
++    },
++  );
+ }
+diff --git a/test/home_screen_test.dart b/test/home_screen_test.dart
+index fe7bf83..31f049c 100644
+--- a/test/home_screen_test.dart
++++ b/test/home_screen_test.dart
+@@ -229,7 +229,6 @@ class _FailingMangaService extends AniListMangaService {
+   }) async => throw StateError('AniList unavailable');
+ }
+ 
+-
+ class _OptionalConcurrencySource extends _FakeSource {
+   int _activeOptional = 0;
+   int maxActiveOptional = 0;
+@@ -274,12 +273,7 @@ class _OptionalConcurrencySource extends _FakeSource {
+     required int year,
+     required int genreId,
+   }) => _track(
+-    () => super.discover(
+-      kind,
+-      page: page,
+-      year: year,
+-      genreId: genreId,
+-    ),
++    () => super.discover(kind, page: page, year: year, genreId: genreId),
+   );
+ 
+   @override
+@@ -629,66 +623,67 @@ void main() {
+     expect(find.text('retry'), findsNothing);
+   });
+ 
++  testWidgets(
++    'Manga All reveals the first completed region without waiting for all regions',
++    (tester) async {
++      final gates = <MangaContentKind, Completer<MangaCatalogue>>{
++        MangaContentKind.manga: Completer<MangaCatalogue>(),
++        MangaContentKind.manhwa: Completer<MangaCatalogue>(),
++        MangaContentKind.manhua: Completer<MangaCatalogue>(),
++      };
++      final service = _ProgressiveMangaService(gates);
++      const empty = MangaCatalogue(
++        recentlyReleased: <MangaTitle>[],
++        trending: <MangaTitle>[],
++        popular: <MangaTitle>[],
++        topRated: <MangaTitle>[],
++        action: <MangaTitle>[],
++        romance: <MangaTitle>[],
++      );
++      final early = MangaCatalogue(
++        recentlyReleased: const <MangaTitle>[],
++        trending: const <MangaTitle>[],
++        popular: <MangaTitle>[
++          MangaTitle(
++            id: 9821,
++            title: 'Early Manhwa Result',
++            coverUrl: null,
++            popularity: 900,
++          ),
++        ],
++        topRated: const <MangaTitle>[],
++        action: const <MangaTitle>[],
++        romance: const <MangaTitle>[],
++      );
+ 
+-  testWidgets('Manga All reveals the first completed region without waiting for all regions', (
+-    tester,
+-  ) async {
+-    final gates = <MangaContentKind, Completer<MangaCatalogue>>{
+-      MangaContentKind.manga: Completer<MangaCatalogue>(),
+-      MangaContentKind.manhwa: Completer<MangaCatalogue>(),
+-      MangaContentKind.manhua: Completer<MangaCatalogue>(),
+-    };
+-    final service = _ProgressiveMangaService(gates);
+-    const empty = MangaCatalogue(
+-      recentlyReleased: <MangaTitle>[],
+-      trending: <MangaTitle>[],
+-      popular: <MangaTitle>[],
+-      topRated: <MangaTitle>[],
+-      action: <MangaTitle>[],
+-      romance: <MangaTitle>[],
+-    );
+-    final early = MangaCatalogue(
+-      recentlyReleased: const <MangaTitle>[],
+-      trending: const <MangaTitle>[],
+-      popular: <MangaTitle>[
+-        MangaTitle(
+-          id: 9821,
+-          title: 'Early Manhwa Result',
+-          coverUrl: null,
+-          popularity: 900,
+-        ),
+-      ],
+-      topRated: const <MangaTitle>[],
+-      action: const <MangaTitle>[],
+-      romance: const <MangaTitle>[],
+-    );
++      await tester.pumpWidget(_app(child: MangaScreen(service: service)));
++      expect(find.byType(HomeSkeleton), findsOneWidget);
+ 
+-    await tester.pumpWidget(_app(child: MangaScreen(service: service)));
+-    expect(find.byType(HomeSkeleton), findsOneWidget);
++      gates[MangaContentKind.manhwa]!.complete(early);
++      await tester.pump();
++      await tester.pump(const Duration(milliseconds: 300));
+ 
+-    gates[MangaContentKind.manhwa]!.complete(early);
+-    await tester.pump();
+-    await tester.pump(const Duration(milliseconds: 300));
+-
+-    expect(find.byType(HomeSkeleton), findsNothing);
+-    expect(find.byType(HeroCarousel), findsOneWidget);
++      expect(find.byType(HomeSkeleton), findsNothing);
++      expect(find.byType(HeroCarousel), findsOneWidget);
+ 
+-    gates[MangaContentKind.manga]!.complete(empty);
+-    gates[MangaContentKind.manhua]!.complete(empty);
+-    await tester.pumpAndSettle();
+-  });
++      gates[MangaContentKind.manga]!.complete(empty);
++      gates[MangaContentKind.manhua]!.complete(empty);
++      await tester.pumpAndSettle();
++    },
++  );
+ 
+-  testWidgets('Manga cold offline failure shows retry instead of empty catalogue', (
+-    tester,
+-  ) async {
+-    await tester.pumpWidget(
+-      _app(child: MangaScreen(service: _FailingMangaService())),
+-    );
+-    await tester.pumpAndSettle();
++  testWidgets(
++    'Manga cold offline failure shows retry instead of empty catalogue',
++    (tester) async {
++      await tester.pumpWidget(
++        _app(child: MangaScreen(service: _FailingMangaService())),
++      );
++      await tester.pumpAndSettle();
+ 
+-    expect(find.text('retry'), findsOneWidget);
+-    expect(find.text('manga_catalogue_empty'), findsNothing);
+-  });
++      expect(find.text('retry'), findsOneWidget);
++      expect(find.text('manga_catalogue_empty'), findsNothing);
++    },
++  );
+ 
+   testWidgets('Manga uses the shared Home row builder and keeps its own rows', (
+     tester,
+@@ -1146,7 +1141,9 @@ void main() {
+     expect(heroes().first.item.stableId, hero.item.stableId);
+   });
+ 
+-  testWidgets('successful empty response shows No results, not Retry', (tester) async {
++  testWidgets('successful empty response shows No results, not Retry', (
++    tester,
++  ) async {
+     await tester.pumpWidget(
+       _app(
+         child: HomeScreen(
+@@ -1182,84 +1179,105 @@ void main() {
+     expect(find.byType(HeroCarousel), findsOneWidget);
+   });
+ 
+-  test('primary catalogue rows are published before service shelves finish', () async {
+-    final source = _SlowShelvesSource();
+-    final firstPaint = Completer<HomeFeed>();
+-    final loading = HomeFeedController(source).load(
+-      HomeFilter.movies,
+-      onProgress: (feed) {
+-        if (!firstPaint.isCompleted && !feed.isEmpty) firstPaint.complete(feed);
+-      },
+-    );
++  test(
++    'primary catalogue rows are published before service shelves finish',
++    () async {
++      final source = _SlowShelvesSource();
++      final firstPaint = Completer<HomeFeed>();
++      final loading = HomeFeedController(source).load(
++        HomeFilter.movies,
++        onProgress: (feed) {
++          if (!firstPaint.isCompleted && !feed.isEmpty)
++            firstPaint.complete(feed);
++        },
++      );
+ 
+-    final initial = await firstPaint.future.timeout(const Duration(seconds: 2));
+-    expect(initial.of(MediaKind.movie).topTen, isNotEmpty);
+-    expect(initial.of(MediaKind.movie).serviceShelves, isEmpty);
++      final initial = await firstPaint.future.timeout(
++        const Duration(seconds: 2),
++      );
++      expect(initial.of(MediaKind.movie).topTen, isNotEmpty);
++      expect(initial.of(MediaKind.movie).serviceShelves, isEmpty);
+ 
+-    source.shelfGate.complete();
+-    final complete = await loading;
+-    expect(complete.of(MediaKind.movie).serviceShelves, isNotEmpty);
+-  });
++      source.shelfGate.complete();
++      final complete = await loading;
++      expect(complete.of(MediaKind.movie).serviceShelves, isNotEmpty);
++    },
++  );
+ 
+-  test('All publishes Movies before a delayed Series catalogue completes', () async {
+-    final source = _SlowSeriesCoreSource();
+-    final firstMoviePaint = Completer<HomeFeed>();
+-    final loading = HomeFeedController(source).load(
+-      HomeFilter.all,
+-      onProgress: (feed) {
+-        if (!firstMoviePaint.isCompleted &&
+-            feed.of(MediaKind.movie).topTen.isNotEmpty &&
+-            feed.of(MediaKind.series).isEmpty) {
+-          firstMoviePaint.complete(feed);
+-        }
+-      },
+-    );
++  test(
++    'All publishes Movies before a delayed Series catalogue completes',
++    () async {
++      final source = _SlowSeriesCoreSource();
++      final firstMoviePaint = Completer<HomeFeed>();
++      final loading = HomeFeedController(source).load(
++        HomeFilter.all,
++        onProgress: (feed) {
++          if (!firstMoviePaint.isCompleted &&
++              feed.of(MediaKind.movie).topTen.isNotEmpty &&
++              feed.of(MediaKind.series).isEmpty) {
++            firstMoviePaint.complete(feed);
++          }
++        },
++      );
+ 
+-    final initial = await firstMoviePaint.future.timeout(
+-      const Duration(seconds: 2),
+-    );
+-    expect(initial.of(MediaKind.movie).topTen, isNotEmpty);
+-    expect(initial.of(MediaKind.series).isEmpty, isTrue);
++      final initial = await firstMoviePaint.future.timeout(
++        const Duration(seconds: 2),
++      );
++      expect(initial.of(MediaKind.movie).topTen, isNotEmpty);
++      expect(initial.of(MediaKind.series).isEmpty, isTrue);
+ 
+-    source.seriesGate.complete();
+-    final complete = await loading;
+-    expect(complete.of(MediaKind.series).topTen, isNotEmpty);
+-  });
++      source.seriesGate.complete();
++      final complete = await loading;
++      expect(complete.of(MediaKind.series).topTen, isNotEmpty);
++    },
++  );
+ 
+-  test('cached core rows skip optional requests when connectivity is lost', () async {
+-    final source = _OfflineButCachedSource();
+-    final feed = await HomeFeedController(source).load(HomeFilter.movies);
++  test(
++    'cached core rows skip optional requests when connectivity is lost',
++    () async {
++      final source = _OfflineButCachedSource();
++      final feed = await HomeFeedController(source).load(HomeFilter.movies);
+ 
+-    expect(feed.of(MediaKind.movie).topTen, isNotEmpty);
+-    expect(feed.hadErrors, isFalse);
+-    expect(source.secondaryCalls, 0);
+-  });
++      expect(feed.of(MediaKind.movie).topTen, isNotEmpty);
++      expect(feed.hadErrors, isFalse);
++      expect(source.secondaryCalls, 0);
++    },
++  );
+ 
+-  test('partial cached core rows stop optional requests after an offline failure', () async {
+-    final source = _PartialOfflineSource();
+-    final feed = await HomeFeedController(source).load(HomeFilter.movies);
++  test(
++    'partial cached core rows stop optional requests after an offline failure',
++    () async {
++      final source = _PartialOfflineSource();
++      final feed = await HomeFeedController(source).load(HomeFilter.movies);
+ 
+-    expect(feed.of(MediaKind.movie).topTen, isNotEmpty);
+-    expect(feed.hadErrors, isTrue);
+-    expect(source.secondaryCalls, 0);
+-  });
++      expect(feed.of(MediaKind.movie).topTen, isNotEmpty);
++      expect(feed.hadErrors, isTrue);
++      expect(source.secondaryCalls, 0);
++    },
++  );
+ 
+-  test('partial core failures keep loading optional shelves while online', () async {
+-    final source = _PartialOfflineSource(online: true);
+-    final feed = await HomeFeedController(source).load(HomeFilter.movies);
++  test(
++    'partial core failures keep loading optional shelves while online',
++    () async {
++      final source = _PartialOfflineSource(online: true);
++      final feed = await HomeFeedController(source).load(HomeFilter.movies);
+ 
+-    expect(feed.of(MediaKind.movie).topTen, isNotEmpty);
+-    expect(feed.hadErrors, isTrue);
+-    expect(source.secondaryCalls, greaterThan(0));
+-  });
++      expect(feed.of(MediaKind.movie).topTen, isNotEmpty);
++      expect(feed.hadErrors, isTrue);
++      expect(source.secondaryCalls, greaterThan(0));
++    },
++  );
+ 
+-  test('optional Home requests are limited to small concurrent batches', () async {
+-    final source = _OptionalConcurrencySource();
+-    await HomeFeedController(source).load(HomeFilter.all);
++  test(
++    'optional Home requests are limited to small concurrent batches',
++    () async {
++      final source = _OptionalConcurrencySource();
++      await HomeFeedController(source).load(HomeFilter.all);
+ 
+-    expect(source.maxActiveOptional, lessThanOrEqualTo(3));
+-    expect(source.maxActiveOptional, greaterThan(1));
+-  });
++      expect(source.maxActiveOptional, lessThanOrEqualTo(3));
++      expect(source.maxActiveOptional, greaterThan(1));
++    },
++  );
+ 
+   test('empty Series requests keep their explicit media kind', () async {
+     final source = _RecordingEmptySource();
+@@ -1268,7 +1286,10 @@ void main() {
+     expect(source.calls, contains((MediaKind.series, HomeList.newReleases)));
+     expect(source.calls, contains((MediaKind.series, HomeList.topRated)));
+     expect(source.calls, contains((MediaKind.series, HomeList.upcoming)));
+-    expect(source.calls, isNot(contains((MediaKind.movie, HomeList.newReleases))));
++    expect(
++      source.calls,
++      isNot(contains((MediaKind.movie, HomeList.newReleases))),
++    );
+   });
+ 
+   test('cold offline start skips optional catalogue requests', () async {
+@@ -1280,24 +1301,29 @@ void main() {
+     expect(source.secondaryCalls, 0);
+   });
+ 
+-  test('a successful empty catalogue is not classified as an offline error', () async {
+-    final feed = await HomeFeedController(_EmptyCatalogSource()).load(
+-      HomeFilter.movies,
+-    );
+-
+-    expect(feed.isEmpty, isTrue);
+-    expect(feed.hadErrors, isFalse);
+-  });
++  test(
++    'a successful empty catalogue is not classified as an offline error',
++    () async {
++      final feed = await HomeFeedController(
++        _EmptyCatalogSource(),
++      ).load(HomeFilter.movies);
+ 
++      expect(feed.isEmpty, isTrue);
++      expect(feed.hadErrors, isFalse);
++    },
++  );
+ 
+-  test('an offline probe does not turn a successful empty cache into an error', () async {
+-    final feed = await HomeFeedController(
+-      _OfflineEmptyCatalogSource(),
+-    ).load(HomeFilter.movies);
++  test(
++    'an offline probe does not turn a successful empty cache into an error',
++    () async {
++      final feed = await HomeFeedController(
++        _OfflineEmptyCatalogSource(),
++      ).load(HomeFilter.movies);
+ 
+-    expect(feed.isEmpty, isTrue);
+-    expect(feed.hadErrors, isFalse);
+-  });
++      expect(feed.isEmpty, isTrue);
++      expect(feed.hadErrors, isFalse);
++    },
++  );
+ 
+   for (final mode in <String>['dark', 'amoled', 'light']) {
+     testWidgets('$mode: the accent only on the kicker and progress', (
+diff --git a/test/manga/anilist_catalogue_cache_test.dart b/test/manga/anilist_catalogue_cache_test.dart
+index ea43df5..3b71fda 100644
+--- a/test/manga/anilist_catalogue_cache_test.dart
++++ b/test/manga/anilist_catalogue_cache_test.dart
+@@ -48,173 +48,199 @@ void main() {
+     };
+ 
+     await cache.write('JP', data, fetchedAt: now);
+-    final entry = await cache.read('JP', now: now.add(const Duration(minutes: 5)));
++    final entry = await cache.read(
++      'JP',
++      now: now.add(const Duration(minutes: 5)),
++    );
+ 
+     expect(entry, isNotNull);
+     expect(entry!.data, data);
+     expect(entry.isFresh(now: now.add(const Duration(minutes: 5))), isTrue);
+   });
+ 
+-
+-  test('catalogue cache skips writes after its generation is invalidated', () async {
+-    final preferences = await SharedPreferences.getInstance();
+-    final cache = AniListCatalogueCache(preferences: preferences);
+-
+-    await cache.write(
+-      'JP',
+-      <String, dynamic>{'top10': <String, dynamic>{}},
+-      shouldWrite: () => false,
+-    );
+-
+-    expect(await cache.read('JP'), isNull);
+-  });
+-
+-  test('stale catalogue remains available for offline fallback for seven days', () async {
+-    final preferences = await SharedPreferences.getInstance();
+-    final cache = AniListCatalogueCache(preferences: preferences);
+-    final fetchedAt = DateTime.utc(2026, 11, 1);
+-    await cache.write('KR', <String, dynamic>{'popular': <String, dynamic>{}},
+-        fetchedAt: fetchedAt);
+-
+-    final stale = await cache.read(
+-      'KR',
+-      now: fetchedAt.add(const Duration(days: 2)),
+-    );
+-    final expired = await cache.read(
+-      'KR',
+-      now: fetchedAt.add(const Duration(days: 8)),
+-    );
+-
+-    expect(stale, isNotNull);
+-    expect(stale!.isFresh(now: fetchedAt.add(const Duration(days: 2))), isFalse);
+-    expect(expired, isNull);
+-  });
+-
+-
+-  test('AniList catalogue reopens from persistent cache when the network is offline', () async {
+-    final preferences = await SharedPreferences.getInstance();
+-    final cache = AniListCatalogueCache(preferences: preferences);
+-    final now = DateTime.utc(2026, 11, 14, 12);
+-    final payload = <String, dynamic>{
+-      'data': <String, dynamic>{
+-        'top10': <String, dynamic>{
+-          'media': <Object>[
+-            <String, Object>{
+-              'id': 401,
+-              'title': <String, String>{'romaji': 'Cached manga'},
+-              'coverImage': <String, String>{'large': 'https://img.test/401.jpg'},
+-            },
+-          ],
+-        },
+-      },
+-    };
+-    final onlineAdapter = FakeDioAdapter()..enqueueJson(payload);
+-    final onlineDio = Dio()..httpClientAdapter = onlineAdapter;
+-    addTearDown(onlineDio.close);
+-    final onlineService = AniListMangaService(
+-      dio: onlineDio,
+-      catalogueCache: cache,
+-    );
+-
+-    final online = await onlineService.home(
+-      kind: MangaContentKind.manga,
+-      now: now,
+-    );
+-    expect(online.top10.single.title, 'Cached manga');
+-    expect(onlineAdapter.requests, hasLength(1));
+-
+-    final offlineAdapter = FakeDioAdapter()..enqueueError();
+-    final offlineDio = Dio()..httpClientAdapter = offlineAdapter;
+-    addTearDown(offlineDio.close);
+-    final restartedService = AniListMangaService(
+-      dio: offlineDio,
+-      catalogueCache: AniListCatalogueCache(preferences: preferences),
+-    );
+-
+-    final staleOffline = await restartedService.home(
+-      kind: MangaContentKind.manga,
+-      now: now.add(const Duration(days: 2)),
+-    ).timeout(const Duration(seconds: 1));
+-
+-    expect(staleOffline.top10.single.title, 'Cached manga');
+-    await Future<void>.delayed(const Duration(milliseconds: 20));
+-    expect(offlineAdapter.requests, hasLength(1));
+-  });
+-
+-  test('manual refresh bypasses fresh cache but falls back when AniList is offline', () async {
+-    final preferences = await SharedPreferences.getInstance();
+-    final cache = AniListCatalogueCache(preferences: preferences);
+-    final now = DateTime.utc(2026, 11, 14, 12);
+-    final initialPayload = <String, dynamic>{
+-      'data': <String, dynamic>{
+-        'top10': <String, dynamic>{
+-          'media': <Object>[
+-            <String, Object>{
+-              'id': 501,
+-              'title': <String, String>{'romaji': 'Retained title'},
+-              'coverImage': <String, String>{'large': 'https://img.test/501.jpg'},
+-            },
+-          ],
++  test(
++    'catalogue cache skips writes after its generation is invalidated',
++    () async {
++      final preferences = await SharedPreferences.getInstance();
++      final cache = AniListCatalogueCache(preferences: preferences);
++
++      await cache.write('JP', <String, dynamic>{
++        'top10': <String, dynamic>{},
++      }, shouldWrite: () => false);
++
++      expect(await cache.read('JP'), isNull);
++    },
++  );
++
++  test(
++    'stale catalogue remains available for offline fallback for seven days',
++    () async {
++      final preferences = await SharedPreferences.getInstance();
++      final cache = AniListCatalogueCache(preferences: preferences);
++      final fetchedAt = DateTime.utc(2026, 11, 1);
++      await cache.write('KR', <String, dynamic>{
++        'popular': <String, dynamic>{},
++      }, fetchedAt: fetchedAt);
++
++      final stale = await cache.read(
++        'KR',
++        now: fetchedAt.add(const Duration(days: 2)),
++      );
++      final expired = await cache.read(
++        'KR',
++        now: fetchedAt.add(const Duration(days: 8)),
++      );
++
++      expect(stale, isNotNull);
++      expect(
++        stale!.isFresh(now: fetchedAt.add(const Duration(days: 2))),
++        isFalse,
++      );
++      expect(expired, isNull);
++    },
++  );
++
++  test(
++    'AniList catalogue reopens from persistent cache when the network is offline',
++    () async {
++      final preferences = await SharedPreferences.getInstance();
++      final cache = AniListCatalogueCache(preferences: preferences);
++      final now = DateTime.utc(2026, 11, 14, 12);
++      final payload = <String, dynamic>{
++        'data': <String, dynamic>{
++          'top10': <String, dynamic>{
++            'media': <Object>[
++              <String, Object>{
++                'id': 401,
++                'title': <String, String>{'romaji': 'Cached manga'},
++                'coverImage': <String, String>{
++                  'large': 'https://img.test/401.jpg',
++                },
++              },
++            ],
++          },
+         },
+-      },
+-    };
+-    await cache.write(
+-      'JP',
+-      Map<String, dynamic>.from(initialPayload['data'] as Map),
+-      fetchedAt: now,
+-    );
+-    final offlineAdapter = FakeDioAdapter()..enqueueError();
+-    final dio = Dio()..httpClientAdapter = offlineAdapter;
+-    addTearDown(dio.close);
+-    final service = AniListMangaService(dio: dio, catalogueCache: cache);
+-
+-    final refreshed = await service.home(
+-      kind: MangaContentKind.manga,
+-      now: now,
+-      forceRefresh: true,
+-    );
+-
+-    expect(offlineAdapter.requests, hasLength(1));
+-    expect(refreshed.top10.single.title, 'Retained title');
+-  });
+-
+-  test('clearing AniList cache blocks an in-flight response from repopulating it', () async {
+-    final preferences = await SharedPreferences.getInstance();
+-    final cache = AniListCatalogueCache(preferences: preferences);
+-    final adapter = _DelayedResponseAdapter();
+-    final dio = Dio()..httpClientAdapter = adapter;
+-    addTearDown(dio.close);
+-    final service = AniListMangaService(dio: dio, catalogueCache: cache);
+-    final pending = service.home(kind: MangaContentKind.manga);
+-
+-    await adapter.requestStarted.future;
+-    await AniListMangaService.clearPersistentCache();
+-    adapter.response.complete(
+-      ResponseBody.fromString(
+-        jsonEncode(<String, dynamic>{
+-          'data': <String, dynamic>{
+-            'top10': <String, dynamic>{
+-              'media': <Object>[
+-                <String, Object>{
+-                  'id': 601,
+-                  'title': <String, String>{'romaji': 'In-flight title'},
+-                  'coverImage': <String, String>{'large': 'https://img.test/601.jpg'},
++      };
++      final onlineAdapter = FakeDioAdapter()..enqueueJson(payload);
++      final onlineDio = Dio()..httpClientAdapter = onlineAdapter;
++      addTearDown(onlineDio.close);
++      final onlineService = AniListMangaService(
++        dio: onlineDio,
++        catalogueCache: cache,
++      );
++
++      final online = await onlineService.home(
++        kind: MangaContentKind.manga,
++        now: now,
++      );
++      expect(online.top10.single.title, 'Cached manga');
++      expect(onlineAdapter.requests, hasLength(1));
++
++      final offlineAdapter = FakeDioAdapter()..enqueueError();
++      final offlineDio = Dio()..httpClientAdapter = offlineAdapter;
++      addTearDown(offlineDio.close);
++      final restartedService = AniListMangaService(
++        dio: offlineDio,
++        catalogueCache: AniListCatalogueCache(preferences: preferences),
++      );
++
++      final staleOffline = await restartedService
++          .home(
++            kind: MangaContentKind.manga,
++            now: now.add(const Duration(days: 2)),
++          )
++          .timeout(const Duration(seconds: 1));
++
++      expect(staleOffline.top10.single.title, 'Cached manga');
++      await Future<void>.delayed(const Duration(milliseconds: 20));
++      expect(offlineAdapter.requests, hasLength(1));
++    },
++  );
++
++  test(
++    'manual refresh bypasses fresh cache but falls back when AniList is offline',
++    () async {
++      final preferences = await SharedPreferences.getInstance();
++      final cache = AniListCatalogueCache(preferences: preferences);
++      final now = DateTime.utc(2026, 11, 14, 12);
++      final initialPayload = <String, dynamic>{
++        'data': <String, dynamic>{
++          'top10': <String, dynamic>{
++            'media': <Object>[
++              <String, Object>{
++                'id': 501,
++                'title': <String, String>{'romaji': 'Retained title'},
++                'coverImage': <String, String>{
++                  'large': 'https://img.test/501.jpg',
+                 },
+-              ],
+-            },
++              },
++            ],
+           },
+-        }),
+-        200,
+-        headers: <String, List<String>>{
+-          Headers.contentTypeHeader: <String>['application/json'],
+         },
+-      ),
+-    );
+-
+-    final result = await pending;
+-    expect(result.top10.single.title, 'In-flight title');
+-    expect(await cache.read('JP'), isNull);
+-  });
++      };
++      await cache.write(
++        'JP',
++        Map<String, dynamic>.from(initialPayload['data'] as Map),
++        fetchedAt: now,
++      );
++      final offlineAdapter = FakeDioAdapter()..enqueueError();
++      final dio = Dio()..httpClientAdapter = offlineAdapter;
++      addTearDown(dio.close);
++      final service = AniListMangaService(dio: dio, catalogueCache: cache);
++
++      final refreshed = await service.home(
++        kind: MangaContentKind.manga,
++        now: now,
++        forceRefresh: true,
++      );
++
++      expect(offlineAdapter.requests, hasLength(1));
++      expect(refreshed.top10.single.title, 'Retained title');
++    },
++  );
++
++  test(
++    'clearing AniList cache blocks an in-flight response from repopulating it',
++    () async {
++      final preferences = await SharedPreferences.getInstance();
++      final cache = AniListCatalogueCache(preferences: preferences);
++      final adapter = _DelayedResponseAdapter();
++      final dio = Dio()..httpClientAdapter = adapter;
++      addTearDown(dio.close);
++      final service = AniListMangaService(dio: dio, catalogueCache: cache);
++      final pending = service.home(kind: MangaContentKind.manga);
++
++      await adapter.requestStarted.future;
++      await AniListMangaService.clearPersistentCache();
++      adapter.response.complete(
++        ResponseBody.fromString(
++          jsonEncode(<String, dynamic>{
++            'data': <String, dynamic>{
++              'top10': <String, dynamic>{
++                'media': <Object>[
++                  <String, Object>{
++                    'id': 601,
++                    'title': <String, String>{'romaji': 'In-flight title'},
++                    'coverImage': <String, String>{
++                      'large': 'https://img.test/601.jpg',
++                    },
++                  },
++                ],
++              },
++            },
++          }),
++          200,
++          headers: <String, List<String>>{
++            Headers.contentTypeHeader: <String>['application/json'],
++          },
++        ),
++      );
++
++      final result = await pending;
++      expect(result.top10.single.title, 'In-flight title');
++      expect(await cache.read('JP'), isNull);
++    },
++  );
+ 
+   test('clear removes all RAVEN23 AniList catalogue entries', () async {
+     final preferences = await SharedPreferences.getInstance();

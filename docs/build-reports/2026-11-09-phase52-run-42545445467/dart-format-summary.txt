@@ -1,0 +1,12 @@
+ lib/screens/common/source_repositories_screen.dart |  190 +++-
+ .../unified/source_priority_manager.dart           |    7 +-
+ .../unified/source_priority_policy.dart            |  155 +--
+ .../unified/source_repository_parser.dart          |    9 +-
+ .../unified/unified_source_service.dart            |   63 +-
+ .../phase44_quickjs_catalog_test.dart              |   11 +-
+ .../source_priority_policy_test.dart               | 1035 ++++++++++++--------
+ .../source_repository_client_test.dart             |   43 +-
+ .../source_repository_parser_test.dart             |   12 +-
+ .../unified/quickjs_source_engine_test.dart        |   42 +-
+ .../unified_source_service_execution_test.dart     |   87 +-
+ 11 files changed, 984 insertions(+), 670 deletions(-)

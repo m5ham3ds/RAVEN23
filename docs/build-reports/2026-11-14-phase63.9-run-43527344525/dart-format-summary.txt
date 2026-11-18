@@ -1,0 +1,13 @@
+ .../mihon/mihon_default_extension_installer.dart   |   3 +-
+ lib/manga/mihon/mihon_source_browser_screen.dart   | 104 ++--
+ lib/manga/ui/manga_reader_crop.dart                |  20 +-
+ lib/manga/ui/manga_reader_screen.dart              | 324 ++++++-----
+ lib/mobile/app/mobile_nav_bar.dart                 |   7 +-
+ lib/raven23_main.dart                              | 337 ++++++-----
+ lib/screens/common/server_status_screen.dart       | 183 +++---
+ lib/screens/common/settings.dart                   | 178 +++---
+ lib/screens/common/source_repositories_screen.dart | 642 +++++++++++----------
+ lib/screens/common/sync_screen.dart                |   7 +-
+ .../mihon_default_extension_installer_test.dart    |  26 +-
+ test/mobile/mobile_nav_bar_test.dart               |   5 +-
+ 12 files changed, 974 insertions(+), 862 deletions(-)

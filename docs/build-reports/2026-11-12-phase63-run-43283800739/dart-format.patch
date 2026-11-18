@@ -1,0 +1,3286 @@
+diff --git a/lib/manga/anilist/anilist_manga_service.dart b/lib/manga/anilist/anilist_manga_service.dart
+index ae947b1..730a3a8 100644
+--- a/lib/manga/anilist/anilist_manga_service.dart
++++ b/lib/manga/anilist/anilist_manga_service.dart
+@@ -28,7 +28,10 @@ class MangaPersonCredit {
+   final String? imageUrl;
+   final bool isStaff;
+ 
+-  factory MangaPersonCredit.fromEdge(Map<String, dynamic> edge, {required bool isStaff}) {
++  factory MangaPersonCredit.fromEdge(
++    Map<String, dynamic> edge, {
++    required bool isStaff,
++  }) {
+     final node = edge['node'] is Map
+         ? Map<String, dynamic>.from(edge['node'] as Map)
+         : const <String, dynamic>{};
+@@ -93,7 +96,8 @@ class MangaRelatedWork {
+         : const <String, dynamic>{};
+     return MangaRelatedWork(
+       id: (node['id'] as num?)?.toInt() ?? 0,
+-      title: '${titles['romaji'] ?? titles['english'] ?? titles['native'] ?? 'Untitled'}',
++      title:
++          '${titles['romaji'] ?? titles['english'] ?? titles['native'] ?? 'Untitled'}',
+       englishTitle: _cleanString(titles['english']),
+       nativeTitle: _cleanString(titles['native']),
+       coverUrl: _cleanString(cover['large']),
+@@ -110,7 +114,6 @@ String? _cleanString(Object? value) {
+   return trimmed.isEmpty ? null : trimmed;
+ }
+ 
+-
+ /// AniList content tag, including spoiler metadata used by the reference
+ /// detail screen to keep spoiler tags hidden until the reader opts in.
+ class MangaTag {
+@@ -201,6 +204,7 @@ class MangaTitle {
+         if (value['day'] != null) '${value['day']}'.padLeft(2, '0'),
+       ].join('-');
+     }
++
+     final start = dateValue(json['startDate']);
+     final end = dateValue(json['endDate']);
+     final characterEdges = _edgeList(json['characters']);
+@@ -431,15 +435,15 @@ class MangaCatalogue {
+         collect((catalogue) => catalogue.recentlyReleased),
+         compareDateDescending,
+       ),
+-      trending: sorted(
+-        collect((catalogue) => catalogue.trending),
+-        (left, right) {
+-          final trend = descendingNullable(left.trending, right.trending);
+-          return trend != 0
+-              ? trend
+-              : descendingNullable(left.popularity, right.popularity);
+-        },
+-      ),
++      trending: sorted(collect((catalogue) => catalogue.trending), (
++        left,
++        right,
++      ) {
++        final trend = descendingNullable(left.trending, right.trending);
++        return trend != 0
++            ? trend
++            : descendingNullable(left.popularity, right.popularity);
++      }),
+       popular: popularItems,
+       topRated: sorted(
+         collect((catalogue) => catalogue.topRated),
+diff --git a/lib/manga/translation/manga_page_translation_service.dart b/lib/manga/translation/manga_page_translation_service.dart
+index 9f7bc28..7bbe51b 100644
+--- a/lib/manga/translation/manga_page_translation_service.dart
++++ b/lib/manga/translation/manga_page_translation_service.dart
+@@ -8,22 +8,27 @@ import 'manga_translation_platform.dart';
+ /// Page-level translation: image recognition is local; online services receive
+ /// OCR strings only. The offline path uses the Android ML Kit text translator.
+ class MangaPageTranslationService {
+-  MangaPageTranslationService({
+-    MangaTranslationPlatform? platform,
+-    Dio? dio,
+-  }) : _platform = platform ?? const MangaTranslationPlatform(),
+-       _dio = dio ?? Dio(BaseOptions(
+-         connectTimeout: const Duration(seconds: 15),
+-         receiveTimeout: const Duration(seconds: 20),
+-       ));
++  MangaPageTranslationService({MangaTranslationPlatform? platform, Dio? dio})
++    : _platform = platform ?? const MangaTranslationPlatform(),
++      _dio =
++          dio ??
++          Dio(
++            BaseOptions(
++              connectTimeout: const Duration(seconds: 15),
++              receiveTimeout: const Duration(seconds: 20),
++            ),
++          );
+ 
+   final MangaTranslationPlatform _platform;
+   final Dio _dio;
+-  final Map<String, MangaPageTranslation> _cache = <String, MangaPageTranslation>{};
++  final Map<String, MangaPageTranslation> _cache =
++      <String, MangaPageTranslation>{};
+   int _generation = 0;
+ 
+-  Future<Set<String>> supportedOcrLanguages() => _platform.supportedOcrLanguages();
+-  Future<Set<String>> supportedOfflineLanguages() => _platform.supportedOfflineLanguages();
++  Future<Set<String>> supportedOcrLanguages() =>
++      _platform.supportedOcrLanguages();
++  Future<Set<String>> supportedOfflineLanguages() =>
++      _platform.supportedOfflineLanguages();
+ 
+   Future<MangaTranslationModelStatus> modelStatus({
+     required String sourceLanguage,
+@@ -71,7 +76,9 @@ class MangaPageTranslationService {
+       );
+     }
+ 
+-    final originalTexts = ocr.regions.map((region) => region.text).toList(growable: false);
++    final originalTexts = ocr.regions
++        .map((region) => region.text)
++        .toList(growable: false);
+     final translated = engine == MangaTranslationEngine.offline
+         ? await _platform.translateOffline(
+             texts: originalTexts,
+@@ -85,7 +92,9 @@ class MangaPageTranslationService {
+           );
+     if (generation != _generation) throw StateError('Translation cancelled.');
+     if (translated.length != ocr.regions.length) {
+-      throw const FormatException('The translation count does not match the OCR regions.');
++      throw const FormatException(
++        'The translation count does not match the OCR regions.',
++      );
+     }
+     final page = MangaPageTranslation(
+       imageWidth: ocr.width,
+@@ -128,18 +137,24 @@ class MangaPageTranslationService {
+       );
+       final body = response.data?.trim();
+       if (body == null || body.isEmpty || body.startsWith('<')) {
+-        throw const FormatException('The online translation service returned an invalid response.');
++        throw const FormatException(
++          'The online translation service returned an invalid response.',
++        );
+       }
+       final decoded = jsonDecode(body);
+       if (decoded is! List || decoded.isEmpty || decoded.first is! List) {
+-        throw const FormatException('The online translation response has an unexpected format.');
++        throw const FormatException(
++          'The online translation response has an unexpected format.',
++        );
+       }
+       final translatedText = (decoded.first as List)
+           .whereType<List>()
+           .map((segment) => segment.isEmpty ? '' : '${segment.first ?? ''}')
+           .join();
+       if (translatedText.isEmpty) {
+-        throw const FormatException('The online translation response was empty.');
++        throw const FormatException(
++          'The online translation response was empty.',
++        );
+       }
+       results.add(translatedText);
+     }
+diff --git a/lib/manga/translation/manga_translation_models.dart b/lib/manga/translation/manga_translation_models.dart
+index c2d009e..cda49b5 100644
+--- a/lib/manga/translation/manga_translation_models.dart
++++ b/lib/manga/translation/manga_translation_models.dart
+@@ -3,10 +3,7 @@ import 'dart:ui';
+ enum MangaTranslationEngine { online, offline }
+ 
+ class MangaTextRegion {
+-  const MangaTextRegion({
+-    required this.text,
+-    required this.bounds,
+-  });
++  const MangaTextRegion({required this.text, required this.bounds});
+ 
+   final String text;
+   final Rect bounds;
+diff --git a/lib/manga/translation/manga_translation_overlay.dart b/lib/manga/translation/manga_translation_overlay.dart
+index 6b0ac3b..8dfd474 100644
+--- a/lib/manga/translation/manga_translation_overlay.dart
++++ b/lib/manga/translation/manga_translation_overlay.dart
+@@ -52,8 +52,14 @@ class _MangaTranslationPainter extends CustomPainter {
+ 
+   @override
+   void paint(Canvas canvas, Size size) {
+-    if (size.isEmpty || translation.imageWidth <= 0 || translation.imageHeight <= 0) return;
+-    final imageSize = Size(translation.imageWidth.toDouble(), translation.imageHeight.toDouble());
++    if (size.isEmpty ||
++        translation.imageWidth <= 0 ||
++        translation.imageHeight <= 0)
++      return;
++    final imageSize = Size(
++      translation.imageWidth.toDouble(),
++      translation.imageHeight.toDouble(),
++    );
+     final fitted = applyBoxFit(
+       switch (fitMode) {
+         'height' => BoxFit.fitHeight,
+@@ -63,9 +69,14 @@ class _MangaTranslationPainter extends CustomPainter {
+       imageSize,
+       size,
+     );
+-    final imageRect = Alignment.center.inscribe(fitted.destination, Offset.zero & size);
++    final imageRect = Alignment.center.inscribe(
++      fitted.destination,
++      Offset.zero & size,
++    );
+     final background = Paint()
+-      ..color = Colors.white.withValues(alpha: backgroundOpacity.clamp(0.0, 1.0).toDouble());
++      ..color = Colors.white.withValues(
++        alpha: backgroundOpacity.clamp(0.0, 1.0).toDouble(),
++      );
+     final border = Paint()
+       ..color = Colors.black.withValues(alpha: .18)
+       ..style = PaintingStyle.stroke
+@@ -79,8 +90,11 @@ class _MangaTranslationPainter extends CustomPainter {
+         imageRect.left + source.right * imageRect.width,
+         imageRect.top + source.bottom * imageRect.height,
+       );
+-      if (rect.width < 1 || rect.height < 1 || region.translated.trim().isEmpty) continue;
+-      final maxBubbleWidth = (size.width * .46).clamp(42.0, size.width).toDouble();
++      if (rect.width < 1 || rect.height < 1 || region.translated.trim().isEmpty)
++        continue;
++      final maxBubbleWidth = (size.width * .46)
++          .clamp(42.0, size.width)
++          .toDouble();
+       final textPainter = TextPainter(
+         text: TextSpan(
+           text: region.translated,
+@@ -97,10 +111,18 @@ class _MangaTranslationPainter extends CustomPainter {
+         ellipsis: '…',
+       )..layout(maxWidth: maxBubbleWidth - 8);
+ 
+-      final bubbleWidth = (textPainter.width + 8).clamp(34.0, maxBubbleWidth).toDouble();
+-      final bubbleHeight = (textPainter.height + 6).clamp(20.0, size.height).toDouble();
+-      final left = (rect.center.dx - bubbleWidth / 2).clamp(0.0, size.width - bubbleWidth).toDouble();
+-      final top = (rect.center.dy - bubbleHeight / 2).clamp(0.0, size.height - bubbleHeight).toDouble();
++      final bubbleWidth = (textPainter.width + 8)
++          .clamp(34.0, maxBubbleWidth)
++          .toDouble();
++      final bubbleHeight = (textPainter.height + 6)
++          .clamp(20.0, size.height)
++          .toDouble();
++      final left = (rect.center.dx - bubbleWidth / 2)
++          .clamp(0.0, size.width - bubbleWidth)
++          .toDouble();
++      final top = (rect.center.dy - bubbleHeight / 2)
++          .clamp(0.0, size.height - bubbleHeight)
++          .toDouble();
+       final bubble = Rect.fromLTWH(left, top, bubbleWidth, bubbleHeight);
+       final rounded = RRect.fromRectAndRadius(bubble, const Radius.circular(3));
+       canvas.drawRRect(rounded, background);
+diff --git a/lib/manga/translation/manga_translation_platform.dart b/lib/manga/translation/manga_translation_platform.dart
+index 6b4d9cf..9b2aab1 100644
+--- a/lib/manga/translation/manga_translation_platform.dart
++++ b/lib/manga/translation/manga_translation_platform.dart
+@@ -8,15 +8,21 @@ import 'manga_translation_models.dart';
+ class MangaTranslationPlatform {
+   const MangaTranslationPlatform();
+ 
+-  static const MethodChannel _channel = MethodChannel('raven23/manga_translation');
++  static const MethodChannel _channel = MethodChannel(
++    'raven23/manga_translation',
++  );
+ 
+   Future<Set<String>> supportedOcrLanguages() async {
+-    final values = await _channel.invokeListMethod<String>('supportedOcrLanguages');
++    final values = await _channel.invokeListMethod<String>(
++      'supportedOcrLanguages',
++    );
+     return values?.toSet() ?? <String>{};
+   }
+ 
+   Future<Set<String>> supportedOfflineLanguages() async {
+-    final values = await _channel.invokeListMethod<String>('supportedOfflineLanguages');
++    final values = await _channel.invokeListMethod<String>(
++      'supportedOfflineLanguages',
++    );
+     return values?.toSet() ?? <String>{};
+   }
+ 
+@@ -69,7 +75,11 @@ class MangaTranslationPlatform {
+       final top = item['top'];
+       final right = item['right'];
+       final bottom = item['bottom'];
+-      if (text is! String || left is! num || top is! num || right is! num || bottom is! num) {
++      if (text is! String ||
++          left is! num ||
++          top is! num ||
++          right is! num ||
++          bottom is! num) {
+         continue;
+       }
+       final bounds = Rect.fromLTRB(
+@@ -100,14 +110,20 @@ class MangaTranslationPlatform {
+       'targetLanguage': targetLanguage,
+     });
+     if (result == null || result.length != texts.length) {
+-      throw const FormatException('Offline translation returned an invalid result.');
++      throw const FormatException(
++        'Offline translation returned an invalid result.',
++      );
+     }
+     return result;
+   }
+ }
+ 
+ class MangaOcrPageData {
+-  const MangaOcrPageData({required this.width, required this.height, required this.regions});
++  const MangaOcrPageData({
++    required this.width,
++    required this.height,
++    required this.regions,
++  });
+   final int width;
+   final int height;
+   final List<MangaTextRegion> regions;
+diff --git a/lib/manga/ui/manga_chapter_download_store.dart b/lib/manga/ui/manga_chapter_download_store.dart
+index 41549d5..2c71cb3 100644
+--- a/lib/manga/ui/manga_chapter_download_store.dart
++++ b/lib/manga/ui/manga_chapter_download_store.dart
+@@ -17,9 +17,7 @@ class MangaChapterDownloadStore {
+ 
+   Future<Directory> _workDirectory(int anilistId, int sourceId) async {
+     final support = await getApplicationSupportDirectory();
+-    return Directory(
+-      '${support.path}/manga_offline/$anilistId/$sourceId',
+-    );
++    return Directory('${support.path}/manga_offline/$anilistId/$sourceId');
+   }
+ 
+   String _chapterKey(String chapterUrl) =>
+@@ -61,7 +59,9 @@ class MangaChapterDownloadStore {
+         if (!await file.exists() || await file.length() == 0) return null;
+         pages.add(<String, dynamic>{
+           'imageUrl': item['imageUrl'],
+-          'headers': item['headers'] is Map ? item['headers'] : const <String, String>{},
++          'headers': item['headers'] is Map
++              ? item['headers']
++              : const <String, String>{},
+           'localPath': file.path,
+           'index': item['index'],
+         });
+@@ -112,7 +112,8 @@ class MangaChapterDownloadStore {
+     final pages = onlinePages
+         .where((page) => '${page['imageUrl'] ?? ''}'.trim().isNotEmpty)
+         .toList(growable: false);
+-    if (pages.isEmpty) throw StateError('The source returned no readable pages.');
++    if (pages.isEmpty)
++      throw StateError('The source returned no readable pages.');
+ 
+     final target = await _chapterDirectory(anilistId, source.id, chapterUrl);
+     final staging = Directory('${target.path}.partial');
+@@ -125,11 +126,19 @@ class MangaChapterDownloadStore {
+         final imageUrl = '${page['imageUrl']}';
+         final rawHeaders = page['headers'];
+         final headers = rawHeaders is Map
+-            ? rawHeaders.map((key, value) => MapEntry(key.toString(), value.toString()))
++            ? rawHeaders.map(
++                (key, value) => MapEntry(key.toString(), value.toString()),
++              )
+             : const <String, String>{};
+-        final bytes = await runtime.image(source.id, imageUrl, headers: headers);
++        final bytes = await runtime.image(
++          source.id,
++          imageUrl,
++          headers: headers,
++        );
+         final filename = '${(index + 1).toString().padLeft(4, '0')}.page';
+-        await File('${staging.path}/$filename').writeAsBytes(bytes, flush: true);
++        await File(
++          '${staging.path}/$filename',
++        ).writeAsBytes(bytes, flush: true);
+         manifestPages.add(<String, dynamic>{
+           'index': index,
+           'file': filename,
+diff --git a/lib/manga/ui/manga_reader_screen.dart b/lib/manga/ui/manga_reader_screen.dart
+index 22321cd..296bc5f 100644
+--- a/lib/manga/ui/manga_reader_screen.dart
++++ b/lib/manga/ui/manga_reader_screen.dart
+@@ -23,7 +23,9 @@ import '../translation/manga_translation_overlay.dart';
+ import 'manga_chapter_download_store.dart';
+ import 'manga_reading_store.dart';
+ 
+-const MethodChannel _mangaReaderComfortChannel = MethodChannel('raven23/reader_comfort');
++const MethodChannel _mangaReaderComfortChannel = MethodChannel(
++  'raven23/reader_comfort',
++);
+ 
+ /// Native Mihon chapter reader. The source extension owns HTTP, cookies,
+ /// Cloudflare state and image delivery; this screen owns reader presentation,
+@@ -56,10 +58,12 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+   final PageController _pageController = PageController();
+   final ScrollController _stripController = ScrollController();
+   final GlobalKey _menuButtonKey = GlobalKey();
+-  final MangaPageTranslationService _translationService = MangaPageTranslationService();
++  final MangaPageTranslationService _translationService =
++      MangaPageTranslationService();
+   final Map<int, Uint8List> _loadedPageBytes = <int, Uint8List>{};
+   final Map<int, String> _translationPageFiles = <int, String>{};
+-  final Map<String, MangaPageTranslation> _translatedPages = <String, MangaPageTranslation>{};
++  final Map<String, MangaPageTranslation> _translatedPages =
++      <String, MangaPageTranslation>{};
+ 
+   List<Map<String, dynamic>> _pages = const <Map<String, dynamic>>[];
+   int _chapterIndex = 0;
+@@ -99,7 +103,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+   @override
+   void initState() {
+     super.initState();
+-    _chapterIndex = widget.startIndex.clamp(0, widget.chapters.length - 1).toInt();
++    _chapterIndex = widget.startIndex
++        .clamp(0, widget.chapters.length - 1)
++        .toInt();
+     unawaited(_initializeReader());
+   }
+ 
+@@ -137,34 +143,46 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       _background = settings['background'] is String
+           ? settings['background'] as String
+           : 'black';
+-      _colorFilter = settings['colorFilter'] is String ? settings['colorFilter'] as String : 'none';
++      _colorFilter = settings['colorFilter'] is String
++          ? settings['colorFilter'] as String
++          : 'none';
+       _keepScreenOn = settings['keepScreenOn'] != false;
+       _readerBrightness = (settings['brightness'] as num?)?.toDouble() ?? -1.0;
+-      _autoScrollSpeed = ((settings['autoScrollSpeed'] as num?)?.toDouble() ?? 1.5).clamp(0.5, 5.0).toDouble();
++      _autoScrollSpeed =
++          ((settings['autoScrollSpeed'] as num?)?.toDouble() ?? 1.5)
++              .clamp(0.5, 5.0)
++              .toDouble();
+       _fullScreen = settings['fullScreen'] == true;
+-      _translationSource = settings['translationSource'] is String ? settings['translationSource'] as String : 'ja';
+-      _translationTarget = settings['translationTarget'] is String ? settings['translationTarget'] as String : 'ar';
+-      _translationEngine = settings['translationEngine'] == 'offline' ? MangaTranslationEngine.offline : MangaTranslationEngine.online;
++      _translationSource = settings['translationSource'] is String
++          ? settings['translationSource'] as String
++          : 'ja';
++      _translationTarget = settings['translationTarget'] is String
++          ? settings['translationTarget'] as String
++          : 'ar';
++      _translationEngine = settings['translationEngine'] == 'offline'
++          ? MangaTranslationEngine.offline
++          : MangaTranslationEngine.online;
+     });
+     await _applyComfortSettings();
+     await _applyReaderBrightness();
+   }
+ 
+-  Future<void> _persistSettings() => _store.saveReaderSettings(<String, dynamic>{
+-    'vertical': _vertical,
+-    'rightToLeft': _rightToLeft,
+-    'fitHeight': _fitHeight,
+-    'fitMode': _fitMode,
+-    'background': _background,
+-    'colorFilter': _colorFilter,
+-    'keepScreenOn': _keepScreenOn,
+-    'brightness': _readerBrightness,
+-    'autoScrollSpeed': _autoScrollSpeed,
+-    'fullScreen': _fullScreen,
+-    'translationSource': _translationSource,
+-    'translationTarget': _translationTarget,
+-    'translationEngine': _translationEngine.name,
+-  });
++  Future<void> _persistSettings() =>
++      _store.saveReaderSettings(<String, dynamic>{
++        'vertical': _vertical,
++        'rightToLeft': _rightToLeft,
++        'fitHeight': _fitHeight,
++        'fitMode': _fitMode,
++        'background': _background,
++        'colorFilter': _colorFilter,
++        'keepScreenOn': _keepScreenOn,
++        'brightness': _readerBrightness,
++        'autoScrollSpeed': _autoScrollSpeed,
++        'fullScreen': _fullScreen,
++        'translationSource': _translationSource,
++        'translationTarget': _translationTarget,
++        'translationEngine': _translationEngine.name,
++      });
+ 
+   Future<void> _applyComfortSettings() async {
+     if (_keepScreenOn) {
+@@ -219,17 +237,22 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       _autoScrollPaused = false;
+     });
+     _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+-      if (!mounted || !_autoScrollActive || _autoScrollPaused || !_stripController.hasClients) return;
++      if (!mounted ||
++          !_autoScrollActive ||
++          _autoScrollPaused ||
++          !_stripController.hasClients)
++        return;
+       final position = _stripController.position;
+       if (position.pixels >= position.maxScrollExtent - 1) {
+         _autoScrollTimer?.cancel();
+         setState(() => _autoScrollActive = false);
+         return;
+       }
+-      _stripController.jumpTo((position.pixels + _autoScrollSpeed).clamp(
+-        position.minScrollExtent,
+-        position.maxScrollExtent,
+-      ).toDouble());
++      _stripController.jumpTo(
++        (position.pixels + _autoScrollSpeed)
++            .clamp(position.minScrollExtent, position.maxScrollExtent)
++            .toDouble(),
++      );
+     });
+   }
+ 
+@@ -282,11 +305,13 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       _translationTotal = 0;
+     });
+     try {
+-      var pages = await MangaChapterDownloadStore.instance.cachedPages(
+-        anilistId: widget.anilistId,
+-        sourceId: widget.source.id,
+-        chapterUrl: '${widget.chapters[index]['url'] ?? ''}',
+-      ) ?? const <Map<String, dynamic>>[];
++      var pages =
++          await MangaChapterDownloadStore.instance.cachedPages(
++            anilistId: widget.anilistId,
++            sourceId: widget.source.id,
++            chapterUrl: '${widget.chapters[index]['url'] ?? ''}',
++          ) ??
++          const <Map<String, dynamic>>[];
+       if (pages.isEmpty) {
+         Object? lastError;
+         for (var attempt = 0; attempt < 2; attempt++) {
+@@ -400,7 +425,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+     final safe = index.clamp(0, _pages.length - 1).toInt();
+     if (_vertical && _stripController.hasClients) {
+       final max = _stripController.position.maxScrollExtent;
+-      _stripController.jumpTo(max * (safe / (_pages.length > 1 ? _pages.length - 1 : 1)));
++      _stripController.jumpTo(
++        max * (safe / (_pages.length > 1 ? _pages.length - 1 : 1)),
++      );
+       _setPage(safe);
+     } else if (_pageController.hasClients) {
+       await _pageController.animateToPage(
+@@ -427,7 +454,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                   padding: const EdgeInsets.all(AppSpace.md),
+                   child: Text(
+                     tr('manga_chapter_list'),
+-                    style: AppType.sectionHeader.copyWith(color: palette.foreground),
++                    style: AppType.sectionHeader.copyWith(
++                      color: palette.foreground,
++                    ),
+                   ),
+                 ),
+                 Expanded(
+@@ -440,7 +469,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                         selected: active,
+                         title: Text('${chapter['name'] ?? tr('chapter')}'),
+                         subtitle: Text('${chapter['scanlator'] ?? ''}'),
+-                        trailing: active ? const Icon(Icons.play_arrow_rounded) : null,
++                        trailing: active
++                            ? const Icon(Icons.play_arrow_rounded)
++                            : null,
+                         onTap: () => Navigator.pop(sheetContext, index),
+                       );
+                     },
+@@ -474,14 +505,23 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+             child: Column(
+               crossAxisAlignment: CrossAxisAlignment.start,
+               children: <Widget>[
+-                Text(title, style: AppType.sectionHeader.copyWith(color: palette.foreground)),
++                Text(
++                  title,
++                  style: AppType.sectionHeader.copyWith(
++                    color: palette.foreground,
++                  ),
++                ),
+                 const SizedBox(height: AppSpace.sm),
+                 child,
+               ],
+             ),
+           );
+ 
+-          Widget choices(List<(String, String)> values, String selected, ValueChanged<String> onSelected) => Wrap(
++          Widget choices(
++            List<(String, String)> values,
++            String selected,
++            ValueChanged<String> onSelected,
++          ) => Wrap(
+             spacing: 8,
+             runSpacing: 8,
+             children: <Widget>[
+@@ -494,33 +534,64 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+             ],
+           );
+ 
+-          Widget settingsRow({required IconData icon, required String title, String? subtitle, required Widget trailing, VoidCallback? onTap}) => ListTile(
++          Widget settingsRow({
++            required IconData icon,
++            required String title,
++            String? subtitle,
++            required Widget trailing,
++            VoidCallback? onTap,
++          }) => ListTile(
+             contentPadding: EdgeInsets.zero,
+             leading: Icon(icon, color: palette.mutedText),
+-            title: Text(title, style: AppType.body.copyWith(color: palette.foreground)),
+-            subtitle: subtitle == null ? null : Text(subtitle, style: AppType.caption.copyWith(color: palette.mutedText)),
++            title: Text(
++              title,
++              style: AppType.body.copyWith(color: palette.foreground),
++            ),
++            subtitle: subtitle == null
++                ? null
++                : Text(
++                    subtitle,
++                    style: AppType.caption.copyWith(color: palette.mutedText),
++                  ),
+             trailing: trailing,
+             onTap: onTap,
+           );
+ 
+-          final direction = _vertical ? 'vertical' : _rightToLeft ? 'rtl' : 'ltr';
++          final direction = _vertical
++              ? 'vertical'
++              : _rightToLeft
++              ? 'rtl'
++              : 'ltr';
+           return SafeArea(
+             child: ConstrainedBox(
+-              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * .88),
++              constraints: BoxConstraints(
++                maxHeight: MediaQuery.sizeOf(sheetContext).height * .88,
++              ),
+               child: SingleChildScrollView(
+-                padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, AppSpace.xl),
++                padding: const EdgeInsets.fromLTRB(
++                  AppSpace.lg,
++                  AppSpace.lg,
++                  AppSpace.lg,
++                  AppSpace.xl,
++                ),
+                 child: Column(
+                   mainAxisSize: MainAxisSize.min,
+                   crossAxisAlignment: CrossAxisAlignment.start,
+                   children: <Widget>[
+-                    Text(tr('manga_reader_settings'), style: AppType.sectionHeader.copyWith(color: palette.foreground)),
++                    Text(
++                      tr('manga_reader_settings'),
++                      style: AppType.sectionHeader.copyWith(
++                        color: palette.foreground,
++                      ),
++                    ),
+                     const SizedBox(height: AppSpace.lg),
+                     section(
+                       tr('manga_reader_section_translation'),
+                       settingsRow(
+                         icon: Icons.translate_rounded,
+                         title: tr('manga_translate_chapter'),
+-                        subtitle: '${mangaOcrLanguages[_translationSource] ?? _translationSource} → ${mangaTranslationLanguages[_translationTarget] ?? _translationTarget}',
++                        subtitle:
++                            '${mangaOcrLanguages[_translationSource] ?? _translationSource} → ${mangaTranslationLanguages[_translationTarget] ?? _translationTarget}',
+                         trailing: const Icon(Icons.chevron_right_rounded),
+                         onTap: () {
+                           Navigator.of(sheetContext).pop();
+@@ -555,7 +626,12 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                       Column(
+                         crossAxisAlignment: CrossAxisAlignment.start,
+                         children: <Widget>[
+-                          Text(tr('manga_reader_fit'), style: AppType.body.copyWith(color: palette.foreground)),
++                          Text(
++                            tr('manga_reader_fit'),
++                            style: AppType.body.copyWith(
++                              color: palette.foreground,
++                            ),
++                          ),
+                           const SizedBox(height: AppSpace.xs),
+                           choices(
+                             <(String, String)>[
+@@ -570,7 +646,12 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                             }),
+                           ),
+                           const SizedBox(height: AppSpace.md),
+-                          Text(tr('manga_reader_background'), style: AppType.body.copyWith(color: palette.foreground)),
++                          Text(
++                            tr('manga_reader_background'),
++                            style: AppType.body.copyWith(
++                              color: palette.foreground,
++                            ),
++                          ),
+                           const SizedBox(height: AppSpace.xs),
+                           choices(
+                             <(String, String)>[
+@@ -583,12 +664,20 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                             (value) => update(() => _background = value),
+                           ),
+                           const SizedBox(height: AppSpace.md),
+-                          Text(tr('manga_reader_filter'), style: AppType.body.copyWith(color: palette.foreground)),
++                          Text(
++                            tr('manga_reader_filter'),
++                            style: AppType.body.copyWith(
++                              color: palette.foreground,
++                            ),
++                          ),
+                           const SizedBox(height: AppSpace.xs),
+                           choices(
+                             <(String, String)>[
+                               ('none', tr('manga_reader_filter_none')),
+-                              ('grayscale', tr('manga_reader_filter_grayscale')),
++                              (
++                                'grayscale',
++                                tr('manga_reader_filter_grayscale'),
++                              ),
+                               ('invert', tr('manga_reader_filter_invert')),
+                               ('sepia', tr('manga_reader_filter_sepia')),
+                             ],
+@@ -619,13 +708,21 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                             Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: <Widget>[
+-                                Text(tr('manga_reader_auto_scroll_speed'), style: AppType.body.copyWith(color: palette.foreground)),
++                                Text(
++                                  tr('manga_reader_auto_scroll_speed'),
++                                  style: AppType.body.copyWith(
++                                    color: palette.foreground,
++                                  ),
++                                ),
+                                 Slider(
+                                   min: .5,
+                                   max: 5,
+                                   divisions: 18,
+-                                  value: _autoScrollSpeed.clamp(.5, 5).toDouble(),
+-                                  onChanged: (value) => update(() => _autoScrollSpeed = value),
++                                  value: _autoScrollSpeed
++                                      .clamp(.5, 5)
++                                      .toDouble(),
++                                  onChanged: (value) =>
++                                      update(() => _autoScrollSpeed = value),
+                                 ),
+                               ],
+                             ),
+@@ -656,13 +753,22 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                           ),
+                           Row(
+                             children: <Widget>[
+-                              Expanded(child: Text(tr('manga_reader_brightness'), style: AppType.body.copyWith(color: palette.foreground))),
++                              Expanded(
++                                child: Text(
++                                  tr('manga_reader_brightness'),
++                                  style: AppType.body.copyWith(
++                                    color: palette.foreground,
++                                  ),
++                                ),
++                              ),
+                               TextButton(
+                                 onPressed: () {
+                                   update(() => _readerBrightness = -1.0);
+                                   unawaited(_applyReaderBrightness());
+                                 },
+-                                child: Text(tr('manga_reader_brightness_system')),
++                                child: Text(
++                                  tr('manga_reader_brightness_system'),
++                                ),
+                               ),
+                             ],
+                           ),
+@@ -670,7 +776,10 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                             min: .1,
+                             max: 1,
+                             divisions: 18,
+-                            value: (_readerBrightness < 0 ? .6 : _readerBrightness).clamp(.1, 1).toDouble(),
++                            value:
++                                (_readerBrightness < 0 ? .6 : _readerBrightness)
++                                    .clamp(.1, 1)
++                                    .toDouble(),
+                             onChanged: (value) {
+                               update(() => _readerBrightness = value);
+                               unawaited(_applyReaderBrightness());
+@@ -697,7 +806,8 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+     final existingPath = _translationPageFiles[index];
+     if (existingPath != null) {
+       final existing = File(existingPath);
+-      if (await existing.exists() && await existing.length() > 0) return existing;
++      if (await existing.exists() && await existing.length() > 0)
++        return existing;
+       _translationPageFiles.remove(index);
+     }
+ 
+@@ -712,20 +822,29 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+     }
+ 
+     final imageUrl = '${page['imageUrl'] ?? ''}'.trim();
+-    if (imageUrl.isEmpty) throw StateError('The manga page has no image address.');
++    if (imageUrl.isEmpty)
++      throw StateError('The manga page has no image address.');
+     var bytes = _loadedPageBytes[index];
+     if (bytes == null || bytes.isEmpty) {
+       final rawHeaders = page['headers'];
+       final headers = rawHeaders is Map
+-          ? rawHeaders.map((key, value) => MapEntry(key.toString(), value.toString()))
++          ? rawHeaders.map(
++              (key, value) => MapEntry(key.toString(), value.toString()),
++            )
+           : const <String, String>{};
+-      bytes = await _runtime.image(widget.source.id, imageUrl, headers: headers);
++      bytes = await _runtime.image(
++        widget.source.id,
++        imageUrl,
++        headers: headers,
++      );
+       if (bytes.isEmpty) throw StateError('The manga page image is empty.');
+       _loadedPageBytes[index] = bytes;
+     }
+ 
+     final temporary = await getTemporaryDirectory();
+-    final cacheDirectory = Directory(p.join(temporary.path, 'raven23_manga_ocr'));
++    final cacheDirectory = Directory(
++      p.join(temporary.path, 'raven23_manga_ocr'),
++    );
+     await cacheDirectory.create(recursive: true);
+     final name = sha256.convert(utf8.encode(imageUrl)).toString();
+     final file = File(p.join(cacheDirectory.path, '$name.page'));
+@@ -739,139 +858,219 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+     final chapterGeneration = _loadGeneration;
+     try {
+       final installedOcr = await _translationService.supportedOcrLanguages();
+-      final supportedOffline = await _translationService.supportedOfflineLanguages();
++      final supportedOffline = await _translationService
++          .supportedOfflineLanguages();
+       if (!mounted || chapterGeneration != _loadGeneration) return;
+       final sourceOptions = mangaOcrLanguages.keys
+           .where(installedOcr.contains)
+           .toList(growable: false);
+       if (sourceOptions.isEmpty) {
+-        throw StateError('No supported on-device OCR language packs are available.');
++        throw StateError(
++          'No supported on-device OCR language packs are available.',
++        );
+       }
+ 
+       var engine = _translationEngine;
+-      var source = sourceOptions.contains(_translationSource) ? _translationSource : sourceOptions.first;
+-      List<String> availableSources() => engine == MangaTranslationEngine.offline
+-          ? sourceOptions.where(supportedOffline.contains).toList(growable: false)
++      var source = sourceOptions.contains(_translationSource)
++          ? _translationSource
++          : sourceOptions.first;
++      List<String> availableSources() =>
++          engine == MangaTranslationEngine.offline
++          ? sourceOptions
++                .where(supportedOffline.contains)
++                .toList(growable: false)
+           : sourceOptions;
+       List<String> availableTargets() => mangaTranslationLanguages.keys
+-          .where((code) => code != source && (engine == MangaTranslationEngine.online || supportedOffline.contains(code)))
++          .where(
++            (code) =>
++                code != source &&
++                (engine == MangaTranslationEngine.online ||
++                    supportedOffline.contains(code)),
++          )
+           .toList(growable: false);
+       if (engine == MangaTranslationEngine.offline &&
+           (!supportedOffline.contains(source) ||
+-              !mangaTranslationLanguages.keys.any((code) => code != source && supportedOffline.contains(code)))) {
++              !mangaTranslationLanguages.keys.any(
++                (code) => code != source && supportedOffline.contains(code),
++              ))) {
+         engine = MangaTranslationEngine.online;
+       }
+       var targets = availableTargets();
+-      var target = targets.contains(_translationTarget) ? _translationTarget : targets.contains('ar') ? 'ar' : targets.first;
+-
+-      final selected = await showModalBottomSheet<(String, String, MangaTranslationEngine)>(
+-        context: context,
+-        isScrollControlled: true,
+-        backgroundColor: AppPalette.of(context).surface,
+-        builder: (sheetContext) => StatefulBuilder(
+-          builder: (sheetContext, setSheetState) {
+-            final currentSources = availableSources();
+-            targets = availableTargets();
+-            if (currentSources.isNotEmpty && !currentSources.contains(source)) source = currentSources.first;
+-            if (targets.isNotEmpty && !targets.contains(target)) target = targets.first;
+-            final palette = AppPalette.of(sheetContext);
+-            Widget fieldLabel(String value) => Padding(
+-              padding: const EdgeInsets.only(bottom: 7),
+-              child: Text(value, style: AppType.body.copyWith(color: palette.mutedText)),
+-            );
+-            return SafeArea(
+-              child: Padding(
+-                padding: EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, MediaQuery.viewInsetsOf(sheetContext).bottom + AppSpace.lg),
+-                child: SingleChildScrollView(
+-                  child: Column(
+-                    mainAxisSize: MainAxisSize.min,
+-                    crossAxisAlignment: CrossAxisAlignment.start,
+-                    children: <Widget>[
+-                      Text(tr('manga_translate_chapter'), style: AppType.sectionHeader.copyWith(color: palette.foreground)),
+-                      const SizedBox(height: AppSpace.md),
+-                      fieldLabel(tr('manga_translation_engine')),
+-                      Wrap(
+-                        spacing: 8,
++      var target = targets.contains(_translationTarget)
++          ? _translationTarget
++          : targets.contains('ar')
++          ? 'ar'
++          : targets.first;
++
++      final selected =
++          await showModalBottomSheet<(String, String, MangaTranslationEngine)>(
++            context: context,
++            isScrollControlled: true,
++            backgroundColor: AppPalette.of(context).surface,
++            builder: (sheetContext) => StatefulBuilder(
++              builder: (sheetContext, setSheetState) {
++                final currentSources = availableSources();
++                targets = availableTargets();
++                if (currentSources.isNotEmpty &&
++                    !currentSources.contains(source))
++                  source = currentSources.first;
++                if (targets.isNotEmpty && !targets.contains(target))
++                  target = targets.first;
++                final palette = AppPalette.of(sheetContext);
++                Widget fieldLabel(String value) => Padding(
++                  padding: const EdgeInsets.only(bottom: 7),
++                  child: Text(
++                    value,
++                    style: AppType.body.copyWith(color: palette.mutedText),
++                  ),
++                );
++                return SafeArea(
++                  child: Padding(
++                    padding: EdgeInsets.fromLTRB(
++                      AppSpace.lg,
++                      AppSpace.lg,
++                      AppSpace.lg,
++                      MediaQuery.viewInsetsOf(sheetContext).bottom +
++                          AppSpace.lg,
++                    ),
++                    child: SingleChildScrollView(
++                      child: Column(
++                        mainAxisSize: MainAxisSize.min,
++                        crossAxisAlignment: CrossAxisAlignment.start,
+                         children: <Widget>[
+-                          ChoiceChip(
+-                            label: Text(tr('manga_translation_online')),
+-                            selected: engine == MangaTranslationEngine.online,
+-                            onSelected: (_) => setSheetState(() {
+-                              engine = MangaTranslationEngine.online;
+-                              final nextSources = availableSources();
+-                              if (!nextSources.contains(source) && nextSources.isNotEmpty) source = nextSources.first;
+-                              final nextTargets = availableTargets();
+-                              if (!nextTargets.contains(target) && nextTargets.isNotEmpty) target = nextTargets.first;
+-                            }),
++                          Text(
++                            tr('manga_translate_chapter'),
++                            style: AppType.sectionHeader.copyWith(
++                              color: palette.foreground,
++                            ),
+                           ),
+-                          ChoiceChip(
+-                            label: Text(tr('manga_translation_offline')),
+-                            selected: engine == MangaTranslationEngine.offline,
+-                            onSelected: supportedOffline.isEmpty ? null : (_) => setSheetState(() {
+-                              engine = MangaTranslationEngine.offline;
+-                              final nextSources = availableSources();
+-                              if (!nextSources.contains(source) && nextSources.isNotEmpty) source = nextSources.first;
+-                              final nextTargets = availableTargets();
+-                              if (!nextTargets.contains(target) && nextTargets.isNotEmpty) target = nextTargets.first;
+-                            }),
++                          const SizedBox(height: AppSpace.md),
++                          fieldLabel(tr('manga_translation_engine')),
++                          Wrap(
++                            spacing: 8,
++                            children: <Widget>[
++                              ChoiceChip(
++                                label: Text(tr('manga_translation_online')),
++                                selected:
++                                    engine == MangaTranslationEngine.online,
++                                onSelected: (_) => setSheetState(() {
++                                  engine = MangaTranslationEngine.online;
++                                  final nextSources = availableSources();
++                                  if (!nextSources.contains(source) &&
++                                      nextSources.isNotEmpty)
++                                    source = nextSources.first;
++                                  final nextTargets = availableTargets();
++                                  if (!nextTargets.contains(target) &&
++                                      nextTargets.isNotEmpty)
++                                    target = nextTargets.first;
++                                }),
++                              ),
++                              ChoiceChip(
++                                label: Text(tr('manga_translation_offline')),
++                                selected:
++                                    engine == MangaTranslationEngine.offline,
++                                onSelected: supportedOffline.isEmpty
++                                    ? null
++                                    : (_) => setSheetState(() {
++                                        engine = MangaTranslationEngine.offline;
++                                        final nextSources = availableSources();
++                                        if (!nextSources.contains(source) &&
++                                            nextSources.isNotEmpty)
++                                          source = nextSources.first;
++                                        final nextTargets = availableTargets();
++                                        if (!nextTargets.contains(target) &&
++                                            nextTargets.isNotEmpty)
++                                          target = nextTargets.first;
++                                      }),
++                              ),
++                            ],
++                          ),
++                          const SizedBox(height: AppSpace.md),
++                          fieldLabel(tr('manga_translation_source_language')),
++                          DropdownButtonFormField<String>(
++                            value: currentSources.contains(source)
++                                ? source
++                                : currentSources.isNotEmpty
++                                ? currentSources.first
++                                : null,
++                            isExpanded: true,
++                            items: <DropdownMenuItem<String>>[
++                              for (final code in currentSources)
++                                DropdownMenuItem<String>(
++                                  value: code,
++                                  child: Text(mangaOcrLanguages[code] ?? code),
++                                ),
++                            ],
++                            onChanged: currentSources.isEmpty
++                                ? null
++                                : (value) => setSheetState(() {
++                                    if (value == null) return;
++                                    source = value;
++                                    targets = availableTargets();
++                                    if (!targets.contains(target) &&
++                                        targets.isNotEmpty)
++                                      target = targets.first;
++                                  }),
++                          ),
++                          const SizedBox(height: AppSpace.md),
++                          fieldLabel(tr('manga_translation_target_language')),
++                          DropdownButtonFormField<String>(
++                            value: targets.contains(target)
++                                ? target
++                                : targets.isNotEmpty
++                                ? targets.first
++                                : null,
++                            isExpanded: true,
++                            items: <DropdownMenuItem<String>>[
++                              for (final code in targets)
++                                DropdownMenuItem<String>(
++                                  value: code,
++                                  child: Text(
++                                    mangaTranslationLanguages[code] ?? code,
++                                  ),
++                                ),
++                            ],
++                            onChanged: targets.isEmpty
++                                ? null
++                                : (value) => setSheetState(() {
++                                    if (value != null) target = value;
++                                  }),
++                          ),
++                          const SizedBox(height: AppSpace.md),
++                          Text(
++                            engine == MangaTranslationEngine.online
++                                ? tr('manga_translation_online_privacy_note')
++                                : tr('manga_translation_offline_note'),
++                            style: AppType.caption.copyWith(
++                              color: palette.mutedText,
++                            ),
++                          ),
++                          const SizedBox(height: AppSpace.lg),
++                          SizedBox(
++                            width: double.infinity,
++                            child: FilledButton.icon(
++                              onPressed:
++                                  currentSources.isEmpty || targets.isEmpty
++                                  ? null
++                                  : () => Navigator.of(
++                                      sheetContext,
++                                    ).pop((source, target, engine)),
++                              icon: const Icon(Icons.translate_rounded),
++                              label: Text(tr('manga_translation_start')),
++                            ),
+                           ),
+                         ],
+                       ),
+-                      const SizedBox(height: AppSpace.md),
+-                      fieldLabel(tr('manga_translation_source_language')),
+-                      DropdownButtonFormField<String>(
+-                        value: currentSources.contains(source) ? source : currentSources.isNotEmpty ? currentSources.first : null,
+-                        isExpanded: true,
+-                        items: <DropdownMenuItem<String>>[
+-                          for (final code in currentSources)
+-                            DropdownMenuItem<String>(value: code, child: Text(mangaOcrLanguages[code] ?? code)),
+-                        ],
+-                        onChanged: currentSources.isEmpty ? null : (value) => setSheetState(() {
+-                          if (value == null) return;
+-                          source = value;
+-                          targets = availableTargets();
+-                          if (!targets.contains(target) && targets.isNotEmpty) target = targets.first;
+-                        }),
+-                      ),
+-                      const SizedBox(height: AppSpace.md),
+-                      fieldLabel(tr('manga_translation_target_language')),
+-                      DropdownButtonFormField<String>(
+-                        value: targets.contains(target) ? target : targets.isNotEmpty ? targets.first : null,
+-                        isExpanded: true,
+-                        items: <DropdownMenuItem<String>>[
+-                          for (final code in targets)
+-                            DropdownMenuItem<String>(value: code, child: Text(mangaTranslationLanguages[code] ?? code)),
+-                        ],
+-                        onChanged: targets.isEmpty ? null : (value) => setSheetState(() { if (value != null) target = value; }),
+-                      ),
+-                      const SizedBox(height: AppSpace.md),
+-                      Text(
+-                        engine == MangaTranslationEngine.online
+-                            ? tr('manga_translation_online_privacy_note')
+-                            : tr('manga_translation_offline_note'),
+-                        style: AppType.caption.copyWith(color: palette.mutedText),
+-                      ),
+-                      const SizedBox(height: AppSpace.lg),
+-                      SizedBox(
+-                        width: double.infinity,
+-                        child: FilledButton.icon(
+-                          onPressed: currentSources.isEmpty || targets.isEmpty
+-                              ? null
+-                              : () => Navigator.of(sheetContext).pop((source, target, engine)),
+-                          icon: const Icon(Icons.translate_rounded),
+-                          label: Text(tr('manga_translation_start')),
+-                        ),
+-                      ),
+-                    ],
++                    ),
+                   ),
+-                ),
+-              ),
+-            );
+-          },
+-        ),
+-      );
+-      if (!mounted || chapterGeneration != _loadGeneration || selected == null) return;
+-      final translationConfigChanged = _translationSource != selected.$1 ||
++                );
++              },
++            ),
++          );
++      if (!mounted || chapterGeneration != _loadGeneration || selected == null)
++        return;
++      final translationConfigChanged =
++          _translationSource != selected.$1 ||
+           _translationTarget != selected.$2 ||
+           _translationEngine != selected.$3;
+       if (translationConfigChanged) {
+@@ -893,7 +1092,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       );
+     } catch (error) {
+       if (!mounted) return;
+-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(error.toString())));
+     }
+   }
+ 
+@@ -920,12 +1121,19 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+           title: Text(tr('manga_translation_prepare_models')),
+           content: Text(message),
+           actions: <Widget>[
+-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(tr('cancel'))),
+-            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(tr('download'))),
++            TextButton(
++              onPressed: () => Navigator.pop(dialogContext, false),
++              child: Text(tr('cancel')),
++            ),
++            FilledButton(
++              onPressed: () => Navigator.pop(dialogContext, true),
++              child: Text(tr('download')),
++            ),
+           ],
+         ),
+       );
+-      if (!mounted || chapterGeneration != _loadGeneration || confirmed != true) return;
++      if (!mounted || chapterGeneration != _loadGeneration || confirmed != true)
++        return;
+       await _translationService.downloadModels(
+         sourceLanguage: sourceLanguage,
+         targetLanguage: targetLanguage,
+@@ -945,11 +1153,17 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+     var failedPages = 0;
+     try {
+       for (var index = 0; index < _pages.length; index++) {
+-        if (!mounted || chapterGeneration != _loadGeneration || _translationStopRequested) break;
++        if (!mounted ||
++            chapterGeneration != _loadGeneration ||
++            _translationStopRequested)
++          break;
+         final pageUrl = '${_pages[index]['imageUrl'] ?? ''}';
+         try {
+           final file = await _translationFileForPage(index);
+-          if (!mounted || chapterGeneration != _loadGeneration || _translationStopRequested) break;
++          if (!mounted ||
++              chapterGeneration != _loadGeneration ||
++              _translationStopRequested)
++            break;
+           final translated = await _translationService.translatePage(
+             pageUrl: pageUrl,
+             filePath: file.path,
+@@ -977,9 +1191,17 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+           _translationStopRequested = false;
+         });
+         final message = failedPages == 0
+-            ? tr('manga_translation_completed', args: ['${_translatedPages.length}'])
+-            : tr('manga_translation_completed_with_errors', args: ['$failedPages']);
+-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
++            ? tr(
++                'manga_translation_completed',
++                args: ['${_translatedPages.length}'],
++              )
++            : tr(
++                'manga_translation_completed_with_errors',
++                args: ['$failedPages'],
++              );
++        ScaffoldMessenger.of(
++          context,
++        ).showSnackBar(SnackBar(content: Text(message)));
+       }
+     }
+   }
+@@ -994,8 +1216,10 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+   }
+ 
+   Future<void> _openReaderMenu() async {
+-    final button = _menuButtonKey.currentContext?.findRenderObject() as RenderBox?;
+-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
++    final button =
++        _menuButtonKey.currentContext?.findRenderObject() as RenderBox?;
++    final overlay =
++        Overlay.of(context).context.findRenderObject() as RenderBox?;
+     if (button == null || overlay == null) return;
+     final origin = button.localToGlobal(Offset.zero, ancestor: overlay);
+     final position = RelativeRect.fromLTRB(
+@@ -1014,22 +1238,37 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+         if (uri != null) ...<PopupMenuEntry<String>>[
+           PopupMenuItem<String>(
+             value: 'webview',
+-            child: _menuRow(Icons.public_rounded, tr('manga_reader_open_webview')),
++            child: _menuRow(
++              Icons.public_rounded,
++              tr('manga_reader_open_webview'),
++            ),
+           ),
+           PopupMenuItem<String>(
+             value: 'browser',
+-            child: _menuRow(Icons.open_in_new_rounded, tr('manga_reader_open_browser')),
++            child: _menuRow(
++              Icons.open_in_new_rounded,
++              tr('manga_reader_open_browser'),
++            ),
+           ),
+         ],
+         PopupMenuItem<String>(
+           value: 'translate',
+-          child: _menuRow(Icons.translate_rounded, tr('manga_translate_chapter')) ,
++          child: _menuRow(
++            Icons.translate_rounded,
++            tr('manga_translate_chapter'),
++          ),
+         ),
+         PopupMenuItem<String>(
+           value: 'read',
+           child: _menuRow(
+-            _isChapterRead ? Icons.remove_done_rounded : Icons.check_circle_outline_rounded,
+-            tr(_isChapterRead ? 'manga_reader_mark_unread' : 'manga_reader_mark_read'),
++            _isChapterRead
++                ? Icons.remove_done_rounded
++                : Icons.check_circle_outline_rounded,
++            tr(
++              _isChapterRead
++                  ? 'manga_reader_mark_unread'
++                  : 'manga_reader_mark_read',
++            ),
+           ),
+         ),
+         PopupMenuItem<String>(
+@@ -1043,7 +1282,10 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       switch (selected) {
+         case 'webview':
+           if (uri != null) {
+-            await _runtime.openSourceWebView(uri.toString(), title: _chapterTitle);
++            await _runtime.openSourceWebView(
++              uri.toString(),
++              title: _chapterTitle,
++            );
+           }
+           break;
+         case 'browser':
+@@ -1075,9 +1317,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       }
+     } catch (error) {
+       if (!mounted) return;
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(error.toString())),
+-      );
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(error.toString())));
+     }
+   }
+ 
+@@ -1085,7 +1327,9 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+     children: <Widget>[
+       Icon(icon, size: 20, color: Colors.white70),
+       const SizedBox(width: 12),
+-      Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
++      Expanded(
++        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
++      ),
+     ],
+   );
+ 
+@@ -1107,7 +1351,11 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+         height: 44,
+         child: Tooltip(
+           message: tooltip,
+-          child: Icon(icon, color: enabled ? Colors.white : Colors.white30, size: 21),
++          child: Icon(
++            icon,
++            color: enabled ? Colors.white : Colors.white30,
++            size: 21,
++          ),
+         ),
+       ),
+     ),
+@@ -1140,15 +1388,23 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+               behavior: HitTestBehavior.opaque,
+               onTap: () => setState(() => _showChrome = !_showChrome),
+               child: _loading
+-                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
++                  ? const Center(
++                      child: CircularProgressIndicator(color: Colors.white),
++                    )
+                   : _error != null
+                   ? _ReaderError(
+                       message: _error!,
+-                      onRetry: () => _loadChapter(_chapterIndex, savePrevious: false),
++                      onRetry: () =>
++                          _loadChapter(_chapterIndex, savePrevious: false),
+                       onCloudflare: _solveCloudflare,
+                     )
+                   : _pages.isEmpty
+-                  ? Center(child: Text(tr('mihon_pages_empty'), style: const TextStyle(color: Colors.white70)))
++                  ? Center(
++                      child: Text(
++                        tr('mihon_pages_empty'),
++                        style: const TextStyle(color: Colors.white70),
++                      ),
++                    )
+                   : _vertical
+                   ? _buildVerticalReader(background)
+                   : _buildPagedReader(background),
+@@ -1183,7 +1439,10 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                               borderRadius: BorderRadius.circular(24),
+                               onTap: _openChapterPicker,
+                               child: Padding(
+-                                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
++                                padding: const EdgeInsets.symmetric(
++                                  horizontal: 15,
++                                  vertical: 9,
++                                ),
+                                 child: Column(
+                                   mainAxisSize: MainAxisSize.min,
+                                   children: <Widget>[
+@@ -1191,16 +1450,29 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                                       widget.workTitle,
+                                       maxLines: 1,
+                                       overflow: TextOverflow.ellipsis,
+-                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
++                                      style: const TextStyle(
++                                        color: Colors.white,
++                                        fontSize: 13,
++                                        fontWeight: FontWeight.w600,
++                                      ),
+                                     ),
+                                     const SizedBox(height: 2),
+                                     Text(
+                                       _chapterTitle,
+                                       maxLines: 1,
+                                       overflow: TextOverflow.ellipsis,
+-                                      style: const TextStyle(color: Colors.white70, fontSize: 11),
++                                      style: const TextStyle(
++                                        color: Colors.white70,
++                                        fontSize: 11,
++                                      ),
++                                    ),
++                                    Text(
++                                      subtitle,
++                                      style: const TextStyle(
++                                        color: Colors.white54,
++                                        fontSize: 10,
++                                      ),
+                                     ),
+-                                    Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                                   ],
+                                 ),
+                               ),
+@@ -1239,12 +1511,17 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                         color: const Color(0xE6222222),
+                         borderRadius: BorderRadius.circular(28),
+                         child: Padding(
+-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
++                          padding: const EdgeInsets.symmetric(
++                            horizontal: 7,
++                            vertical: 4,
++                          ),
+                           child: Row(
+                             children: <Widget>[
+                               IconButton(
+                                 tooltip: tr('manga_previous_chapter'),
+-                                onPressed: canPrevious ? _previousChapter : null,
++                                onPressed: canPrevious
++                                    ? _previousChapter
++                                    : null,
+                                 color: Colors.white,
+                                 disabledColor: Colors.white30,
+                                 icon: const Icon(Icons.skip_previous_rounded),
+@@ -1253,17 +1530,27 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                                 child: _pages.length > 1
+                                     ? SliderTheme(
+                                         data: SliderTheme.of(context).copyWith(
+-                                          activeTrackColor: Theme.of(context).colorScheme.primary,
++                                          activeTrackColor: Theme.of(
++                                            context,
++                                          ).colorScheme.primary,
+                                           inactiveTrackColor: Colors.white30,
+                                           thumbColor: Colors.white,
+                                           trackHeight: 2,
+-                                          overlayShape: SliderComponentShape.noOverlay,
++                                          overlayShape:
++                                              SliderComponentShape.noOverlay,
+                                         ),
+                                         child: Slider(
+                                           min: 0,
+                                           max: (_pages.length - 1).toDouble(),
+-                                          value: _pageIndex.toDouble().clamp(0.0, (_pages.length - 1).toDouble()).toDouble(),
+-                                          onChanged: (value) => _jumpToPage(value.round()),
++                                          value: _pageIndex
++                                              .toDouble()
++                                              .clamp(
++                                                0.0,
++                                                (_pages.length - 1).toDouble(),
++                                              )
++                                              .toDouble(),
++                                          onChanged: (value) =>
++                                              _jumpToPage(value.round()),
+                                         ),
+                                       )
+                                     : const SizedBox(height: 40),
+@@ -1295,10 +1582,18 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                   mainAxisSize: MainAxisSize.min,
+                   children: <Widget>[
+                     IconButton(
+-                      tooltip: tr(_autoScrollPaused ? 'manga_reader_auto_scroll_resume' : 'manga_reader_auto_scroll_pause'),
++                      tooltip: tr(
++                        _autoScrollPaused
++                            ? 'manga_reader_auto_scroll_resume'
++                            : 'manga_reader_auto_scroll_pause',
++                      ),
+                       onPressed: _toggleAutoScrollPause,
+                       color: Colors.white,
+-                      icon: Icon(_autoScrollPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
++                      icon: Icon(
++                        _autoScrollPaused
++                            ? Icons.play_arrow_rounded
++                            : Icons.pause_rounded,
++                      ),
+                     ),
+                     IconButton(
+                       tooltip: tr('manga_reader_auto_scroll_stop'),
+@@ -1318,24 +1613,43 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+                 color: const Color(0xE6222222),
+                 borderRadius: BorderRadius.circular(24),
+                 child: Padding(
+-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
++                  padding: const EdgeInsets.symmetric(
++                    horizontal: 5,
++                    vertical: 3,
++                  ),
+                   child: Row(
+                     mainAxisSize: MainAxisSize.min,
+                     children: <Widget>[
+                       IconButton(
+-                        tooltip: tr(_showTranslations ? 'manga_translation_show_original' : 'manga_translation_show_translated'),
++                        tooltip: tr(
++                          _showTranslations
++                              ? 'manga_translation_show_original'
++                              : 'manga_translation_show_translated',
++                        ),
+                         onPressed: _toggleTranslationVisibility,
+                         color: Colors.white,
+-                        icon: Icon(_showTranslations ? Icons.visibility_off_rounded : Icons.visibility_rounded),
++                        icon: Icon(
++                          _showTranslations
++                              ? Icons.visibility_off_rounded
++                              : Icons.visibility_rounded,
++                        ),
+                       ),
+                       if (_translationRunning) ...<Widget>[
+                         Padding(
+                           padding: const EdgeInsets.symmetric(horizontal: 3),
+-                          child: Text('$_translationCompleted/$_translationTotal', style: const TextStyle(color: Colors.white70, fontSize: 11)),
++                          child: Text(
++                            '$_translationCompleted/$_translationTotal',
++                            style: const TextStyle(
++                              color: Colors.white70,
++                              fontSize: 11,
++                            ),
++                          ),
+                         ),
+                         IconButton(
+                           tooltip: tr('manga_translation_stop'),
+-                          onPressed: _translationStopRequested ? null : _stopChapterTranslation,
++                          onPressed: _translationStopRequested
++                              ? null
++                              : _stopChapterTranslation,
+                           color: Colors.white,
+                           icon: const Icon(Icons.stop_rounded),
+                         ),
+@@ -1398,7 +1712,6 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
+       ),
+     ),
+   );
+-
+ }
+ 
+ class _MangaReaderPage extends StatefulWidget {
+@@ -1468,8 +1781,8 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+       height: widget.fitMode == 'width'
+           ? null
+           : widget.fitMode == 'height'
+-              ? MediaQuery.sizeOf(context).height
+-              : height,
++          ? MediaQuery.sizeOf(context).height
++          : height,
+       fit: switch (widget.fitMode) {
+         'height' => BoxFit.fitHeight,
+         'contain' => BoxFit.contain,
+@@ -1480,26 +1793,76 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+     );
+     final filter = switch (widget.colorFilter) {
+       'grayscale' => const ColorFilter.matrix(<double>[
+-        .2126, .7152, .0722, 0, 0,
+-        .2126, .7152, .0722, 0, 0,
+-        .2126, .7152, .0722, 0, 0,
+-        0, 0, 0, 1, 0,
++        .2126,
++        .7152,
++        .0722,
++        0,
++        0,
++        .2126,
++        .7152,
++        .0722,
++        0,
++        0,
++        .2126,
++        .7152,
++        .0722,
++        0,
++        0,
++        0,
++        0,
++        0,
++        1,
++        0,
+       ]),
+       'invert' => const ColorFilter.matrix(<double>[
+-        -1, 0, 0, 0, 255,
+-        0, -1, 0, 0, 255,
+-        0, 0, -1, 0, 255,
+-        0, 0, 0, 1, 0,
++        -1,
++        0,
++        0,
++        0,
++        255,
++        0,
++        -1,
++        0,
++        0,
++        255,
++        0,
++        0,
++        -1,
++        0,
++        255,
++        0,
++        0,
++        0,
++        1,
++        0,
+       ]),
+       'sepia' => const ColorFilter.matrix(<double>[
+-        .393, .769, .189, 0, 0,
+-        .349, .686, .168, 0, 0,
+-        .272, .534, .131, 0, 0,
+-        0, 0, 0, 1, 0,
++        .393,
++        .769,
++        .189,
++        0,
++        0,
++        .349,
++        .686,
++        .168,
++        0,
++        0,
++        .272,
++        .534,
++        .131,
++        0,
++        0,
++        0,
++        0,
++        0,
++        1,
++        0,
+       ]),
+       _ => null,
+     };
+-    return filter == null ? image : ColorFiltered(colorFilter: filter, child: image);
++    return filter == null
++        ? image
++        : ColorFiltered(colorFilter: filter, child: image);
+   }
+ 
+   @override
+@@ -1515,9 +1878,16 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+           child: Column(
+             mainAxisSize: MainAxisSize.min,
+             children: <Widget>[
+-              const Icon(Icons.broken_image_outlined, color: Colors.white70, size: 30),
++              const Icon(
++                Icons.broken_image_outlined,
++                color: Colors.white70,
++                size: 30,
++              ),
+               const SizedBox(height: 8),
+-              Text(tr('mihon_page_failed', args: ['${widget.index + 1}']), style: const TextStyle(color: Colors.white70)),
++              Text(
++                tr('mihon_page_failed', args: ['${widget.index + 1}']),
++                style: const TextStyle(color: Colors.white70),
++              ),
+               TextButton.icon(
+                 onPressed: () => setState(() => _image = _fetch()),
+                 icon: const Icon(Icons.refresh_rounded),
+@@ -1533,7 +1903,10 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+           height: 260,
+           color: widget.backgroundColor,
+           alignment: Alignment.center,
+-          child: const CircularProgressIndicator(color: Colors.white70, strokeWidth: 2),
++          child: const CircularProgressIndicator(
++            color: Colors.white70,
++            strokeWidth: 2,
++          ),
+         );
+       }
+       widget.onBytesReady(widget.index, snapshot.data!);
+@@ -1552,7 +1925,11 @@ class _MangaReaderPageState extends State<_MangaReaderPage> {
+             child: Stack(
+               fit: StackFit.passthrough,
+               children: <Widget>[
+-                _buildFilteredImage(snapshot.data!, availableWidth, availableHeight),
++                _buildFilteredImage(
++                  snapshot.data!,
++                  availableWidth,
++                  availableHeight,
++                ),
+                 if (widget.showTranslation && widget.translation != null)
+                   Positioned.fill(
+                     child: MangaTranslationOverlay(
+@@ -1590,10 +1967,21 @@ class _ReaderError extends StatelessWidget {
+         children: <Widget>[
+           const Icon(Icons.cloud_off_rounded, color: Colors.white70, size: 40),
+           const SizedBox(height: 12),
+-          Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
++          Text(
++            message,
++            textAlign: TextAlign.center,
++            style: const TextStyle(color: Colors.white70),
++          ),
+           const SizedBox(height: 12),
+-          FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: Text(tr('retry'))),
+-          TextButton(onPressed: onCloudflare, child: Text(tr('manga_solve_cloudflare'))),
++          FilledButton.icon(
++            onPressed: onRetry,
++            icon: const Icon(Icons.refresh_rounded),
++            label: Text(tr('retry')),
++          ),
++          TextButton(
++            onPressed: onCloudflare,
++            child: Text(tr('manga_solve_cloudflare')),
++          ),
+         ],
+       ),
+     ),
+diff --git a/lib/manga/ui/manga_reading_store.dart b/lib/manga/ui/manga_reading_store.dart
+index da8d3c0..223dbd7 100644
+--- a/lib/manga/ui/manga_reading_store.dart
++++ b/lib/manga/ui/manga_reading_store.dart
+@@ -156,7 +156,9 @@ class MangaReadingStore {
+     final prefix = '$anilistId::$sourceId::';
+     for (final entry in values.entries) {
+       if (!entry.key.startsWith(prefix) || entry.value is! Map) continue;
+-      result[entry.key.substring(prefix.length)] = MangaChapterProgress.fromJson(
++      result[entry.key.substring(
++        prefix.length,
++      )] = MangaChapterProgress.fromJson(
+         Map<String, dynamic>.from(entry.value as Map),
+       );
+     }
+@@ -190,7 +192,9 @@ class MangaReadingStore {
+           )
+         : null;
+     values[id] = MangaChapterProgress(
+-      pageIndex: pageIndex.clamp(0, totalPages > 0 ? totalPages - 1 : 0).toInt(),
++      pageIndex: pageIndex
++          .clamp(0, totalPages > 0 ? totalPages - 1 : 0)
++          .toInt(),
+       totalPages: totalPages,
+       isRead: isRead ?? previous?.isRead ?? false,
+     ).toJson();
+@@ -250,8 +254,7 @@ class MangaReadingStore {
+         await _writeMap(_readingStatusesKey, values);
+       });
+ 
+-  Future<Map<String, dynamic>> readerSettings() =>
+-      _readMap(_readerSettingsKey);
++  Future<Map<String, dynamic>> readerSettings() => _readMap(_readerSettingsKey);
+ 
+   Future<void> saveReaderSettings(Map<String, dynamic> settings) =>
+       _serialized(() => _writeMap(_readerSettingsKey, settings));
+diff --git a/lib/manga/ui/manga_work_screen.dart b/lib/manga/ui/manga_work_screen.dart
+index bbf5635..3f8eb1e 100644
+--- a/lib/manga/ui/manga_work_screen.dart
++++ b/lib/manga/ui/manga_work_screen.dart
+@@ -248,13 +248,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+         throw StateError(tr('manga_bound_source_missing'));
+       }
+       final resolvedSource = source;
+-      final rawChapters = await _runtime.chapters(resolvedSource.id, binding.mangaUrl);
++      final rawChapters = await _runtime.chapters(
++        resolvedSource.id,
++        binding.mangaUrl,
++      );
+       final chapters = _sortChapters(rawChapters);
+-      final progress = await _store.progressForWork(_title.id, resolvedSource.id);
+-      final downloaded = await MangaChapterDownloadStore.instance.downloadedChapterUrls(
+-        anilistId: _title.id,
+-        sourceId: resolvedSource.id,
++      final progress = await _store.progressForWork(
++        _title.id,
++        resolvedSource.id,
+       );
++      final downloaded = await MangaChapterDownloadStore.instance
++          .downloadedChapterUrls(
++            anilistId: _title.id,
++            sourceId: resolvedSource.id,
++          );
+       if (!mounted) return;
+       setState(() {
+         _boundSource = resolvedSource;
+@@ -273,9 +280,7 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     }
+   }
+ 
+-  List<Map<String, dynamic>> _sortChapters(
+-    List<Map<String, dynamic>> input,
+-  ) {
++  List<Map<String, dynamic>> _sortChapters(List<Map<String, dynamic>> input) {
+     final values = <Map<String, dynamic>>[
+       for (var index = 0; index < input.length; index++)
+         <String, dynamic>{...input[index], '_sourceOrder': index},
+@@ -307,7 +312,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       final candidate = value?.trim();
+       if (candidate != null &&
+           candidate.isNotEmpty &&
+-          !result.any((item) => item.toLowerCase() == candidate.toLowerCase())) {
++          !result.any(
++            (item) => item.toLowerCase() == candidate.toLowerCase(),
++          )) {
+         result.add(candidate);
+       }
+     }
+@@ -345,7 +352,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+         }
+         if (mounted && request == _sourceRequest) {
+           results.sort((a, b) => b.score.compareTo(a.score));
+-          setState(() => _matches = List<_MangaSourceMatch>.unmodifiable(results));
++          setState(
++            () => _matches = List<_MangaSourceMatch>.unmodifiable(results),
++          );
+         }
+       }
+       if (!mounted || request != _sourceRequest) return;
+@@ -494,9 +503,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       }
+     } catch (error) {
+       if (!mounted) return;
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(error.toString())),
+-      );
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(error.toString())));
+     }
+   }
+ 
+@@ -584,9 +593,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+               onTap: () => Navigator.pop(sheetContext, 'toggle'),
+             ),
+             ListTile(
+-              leading: Icon(isDownloaded ? Icons.delete_outline_rounded : Icons.download_for_offline_outlined),
+-              title: Text(isDownloaded ? tr('manga_remove_offline_copy') : tr('manga_download_chapter')),
+-              onTap: () => Navigator.pop(sheetContext, isDownloaded ? 'deleteOffline' : 'download'),
++              leading: Icon(
++                isDownloaded
++                    ? Icons.delete_outline_rounded
++                    : Icons.download_for_offline_outlined,
++              ),
++              title: Text(
++                isDownloaded
++                    ? tr('manga_remove_offline_copy')
++                    : tr('manga_download_chapter'),
++              ),
++              onTap: () => Navigator.pop(
++                sheetContext,
++                isDownloaded ? 'deleteOffline' : 'download',
++              ),
+             ),
+             ListTile(
+               leading: const Icon(Icons.play_arrow_rounded),
+@@ -604,7 +624,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     );
+     if (action == 'toggle') await _setChapterRead(chapter, read: !isRead);
+     if (action == 'download' && mounted) await _downloadChapter(chapter);
+-    if (action == 'deleteOffline' && mounted) await _removeOfflineChapter(chapter);
++    if (action == 'deleteOffline' && mounted)
++      await _removeOfflineChapter(chapter);
+     if (action == 'read' && mounted) {
+       final index = _chapters.indexWhere(
+         (item) => item['url'] == chapter['url'],
+@@ -629,10 +650,12 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     );
+     if (downloaded == true && mounted) {
+       final url = '${chapter['url'] ?? ''}';
+-      setState(() => _downloadedChapters = <String>{..._downloadedChapters, url});
+-      ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text(tr('manga_download_complete'))),
++      setState(
++        () => _downloadedChapters = <String>{..._downloadedChapters, url},
+       );
++      ScaffoldMessenger.of(
++        context,
++      ).showSnackBar(SnackBar(content: Text(tr('manga_download_complete'))));
+     }
+   }
+ 
+@@ -640,14 +663,21 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final source = _boundSource;
+     if (source == null) return;
+     final pending = _chapters
+-        .where((chapter) => !_downloadedChapters.contains('${chapter['url'] ?? ''}'))
++        .where(
++          (chapter) => !_downloadedChapters.contains('${chapter['url'] ?? ''}'),
++        )
+         .toList(growable: false);
+     if (pending.isEmpty) return;
+     final confirmed = await showDialog<bool>(
+       context: context,
+       builder: (dialogContext) => AlertDialog(
+         title: Text(tr('manga_download_remaining')),
+-        content: Text(tr('manga_confirm_download_remaining', args: <String>['${pending.length}'])),
++        content: Text(
++          tr(
++            'manga_confirm_download_remaining',
++            args: <String>['${pending.length}'],
++          ),
++        ),
+         actions: <Widget>[
+           TextButton(
+             onPressed: () => Navigator.pop(dialogContext, false),
+@@ -672,10 +702,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       ),
+     );
+     if (mounted) {
+-      final downloaded = await MangaChapterDownloadStore.instance.downloadedChapterUrls(
+-        anilistId: _title.id,
+-        sourceId: source.id,
+-      );
++      final downloaded = await MangaChapterDownloadStore.instance
++          .downloadedChapterUrls(anilistId: _title.id, sourceId: source.id);
+       if (!mounted) return;
+       setState(() => _downloadedChapters = downloaded);
+       if (completed == true) {
+@@ -693,10 +721,16 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       context: context,
+       builder: (dialogContext) => AlertDialog(
+         title: Text(tr('manga_remove_offline_copy')),
+-        content: Text(tr('manga_remove_offline_confirm')) ,
++        content: Text(tr('manga_remove_offline_confirm')),
+         actions: <Widget>[
+-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(tr('cancel'))),
+-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: Text(tr('remove'))),
++          TextButton(
++            onPressed: () => Navigator.pop(dialogContext, false),
++            child: Text(tr('cancel')),
++          ),
++          FilledButton(
++            onPressed: () => Navigator.pop(dialogContext, true),
++            child: Text(tr('remove')),
++          ),
+         ],
+       ),
+     );
+@@ -707,11 +741,13 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       sourceId: source.id,
+       chapterUrl: url,
+     );
+-    if (mounted) setState(() => _downloadedChapters = <String>{..._downloadedChapters}..remove(url));
++    if (mounted)
++      setState(
++        () =>
++            _downloadedChapters = <String>{..._downloadedChapters}..remove(url),
++      );
+   }
+ 
+-
+-
+   List<String> get _scanlators {
+     final values = <String>{};
+     for (final chapter in _chapters) {
+@@ -725,7 +761,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final filtered = _scanlator == null
+         ? _chapters
+         : _chapters
+-              .where((chapter) => '${chapter['scanlator'] ?? ''}'.trim() == _scanlator)
++              .where(
++                (chapter) =>
++                    '${chapter['scanlator'] ?? ''}'.trim() == _scanlator,
++              )
+               .toList(growable: false);
+     return _ascendingInList
+         ? filtered
+@@ -737,7 +776,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     final palette = AppPalette.of(context);
+     final cover = _title.coverUrl;
+     final banner = _title.bannerUrl ?? cover;
+-    final canRead = _binding != null && _boundSource != null && _chapters.isNotEmpty;
++    final canRead =
++        _binding != null && _boundSource != null && _chapters.isNotEmpty;
+     final readLabel = _chapters.isEmpty
+         ? tr('manga_find_source')
+         : _progress.values.any((item) => item.pageIndex > 0 && !item.isRead)
+@@ -760,7 +800,13 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+               overflow: TextOverflow.ellipsis,
+             ),
+             flexibleSpace: FlexibleSpaceBar(
+-              background: _buildHero(context, banner, cover, readLabel, canRead),
++              background: _buildHero(
++                context,
++                banner,
++                cover,
++                readLabel,
++                canRead,
++              ),
+             ),
+             bottom: PreferredSize(
+               preferredSize: const Size.fromHeight(49),
+@@ -803,7 +849,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     bool canRead,
+   ) {
+     final palette = AppPalette.of(context);
+-    final synopsis = (_title.description ?? '').replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
++    final synopsis = (_title.description ?? '')
++        .replaceAll(RegExp(r'<[^>]*>'), ' ')
++        .trim();
+     return Stack(
+       fit: StackFit.expand,
+       children: <Widget>[
+@@ -811,7 +859,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           CachedNetworkImage(
+             imageUrl: banner,
+             fit: BoxFit.cover,
+-            errorWidget: (_, __, ___) => ColoredBox(color: palette.raisedSurface),
++            errorWidget: (_, __, ___) =>
++                ColoredBox(color: palette.raisedSurface),
+           )
+         else
+           ColoredBox(color: palette.raisedSurface),
+@@ -853,14 +902,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                         child: cover == null || cover.isEmpty
+                             ? const ColoredBox(
+                                 color: Color(0xFF303030),
+-                                child: Icon(Icons.menu_book_rounded, color: Colors.white70),
++                                child: Icon(
++                                  Icons.menu_book_rounded,
++                                  color: Colors.white70,
++                                ),
+                               )
+                             : CachedNetworkImage(
+                                 imageUrl: cover,
+                                 fit: BoxFit.cover,
+                                 errorWidget: (_, __, ___) => const ColoredBox(
+                                   color: Color(0xFF303030),
+-                                  child: Icon(Icons.menu_book_rounded, color: Colors.white70),
++                                  child: Icon(
++                                    Icons.menu_book_rounded,
++                                    color: Colors.white70,
++                                  ),
+                                 ),
+                               ),
+                       ),
+@@ -883,13 +938,16 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                               ),
+                             ),
+                             if (_title.englishTitle != null &&
+-                                _title.englishTitle != _title.title) ...<Widget>[
++                                _title.englishTitle !=
++                                    _title.title) ...<Widget>[
+                               const SizedBox(height: 3),
+                               Text(
+                                 _title.englishTitle!,
+                                 maxLines: 1,
+                                 overflow: TextOverflow.ellipsis,
+-                                style: AppType.metadata.copyWith(color: Colors.white70),
++                                style: AppType.metadata.copyWith(
++                                  color: Colors.white70,
++                                ),
+                               ),
+                             ],
+                             const SizedBox(height: 7),
+@@ -899,9 +957,13 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                               children: <Widget>[
+                                 _HeroTag(_title.format ?? tr('manga')),
+                                 if (_title.countryOfOrigin != null)
+-                                  _HeroTag(_countryLabel(_title.countryOfOrigin!)),
++                                  _HeroTag(
++                                    _countryLabel(_title.countryOfOrigin!),
++                                  ),
+                                 if (_title.averageScore != null)
+-                                  _HeroTag('★ ${(_title.averageScore! / 10).toStringAsFixed(1)}/10'),
++                                  _HeroTag(
++                                    '★ ${(_title.averageScore! / 10).toStringAsFixed(1)}/10',
++                                  ),
+                               ],
+                             ),
+                             const SizedBox(height: 10),
+@@ -911,10 +973,12 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                 onPressed: _loadingBoundWork
+                                     ? null
+                                     : canRead
+-                                        ? () => _openReader(_resumeIndex())
+-                                        : _openSourceManager,
++                                    ? () => _openReader(_resumeIndex())
++                                    : _openSourceManager,
+                                 icon: Icon(
+-                                  canRead ? Icons.menu_book_rounded : Icons.search_rounded,
++                                  canRead
++                                      ? Icons.menu_book_rounded
++                                      : Icons.search_rounded,
+                                   size: 18,
+                                 ),
+                                 label: Text(readLabel),
+@@ -932,7 +996,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     synopsis,
+                     maxLines: 2,
+                     overflow: TextOverflow.ellipsis,
+-                    style: AppType.metadata.copyWith(color: Colors.white70, height: 1.35),
++                    style: AppType.metadata.copyWith(
++                      color: Colors.white70,
++                      height: 1.35,
++                    ),
+                   ),
+                   Align(
+                     alignment: AlignmentDirectional.centerEnd,
+@@ -950,15 +1017,24 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                 if (_title.characters.isNotEmpty)
+                   _heroMetadataLine(
+                     tr('starring'),
+-                    _title.characters.take(3).map((person) => person.name).join(' · '),
++                    _title.characters
++                        .take(3)
++                        .map((person) => person.name)
++                        .join(' · '),
+                   ),
+                 if (_title.staff.isNotEmpty)
+                   _heroMetadataLine(
+                     tr('creators'),
+-                    _title.staff.take(3).map((person) => person.name).join(' · '),
++                    _title.staff
++                        .take(3)
++                        .map((person) => person.name)
++                        .join(' · '),
+                   ),
+                 if (_title.genres.isNotEmpty)
+-                  _heroMetadataLine(tr('genres'), _title.genres.take(4).join(' · ')),
++                  _heroMetadataLine(
++                    tr('genres'),
++                    _title.genres.take(4).join(' · '),
++                  ),
+                 const SizedBox(height: 6),
+                 Row(
+                   mainAxisAlignment: MainAxisAlignment.spaceAround,
+@@ -974,7 +1050,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                       label: tr('share'),
+                       onTap: _shareWork,
+                     ),
+-                    if (_boundSource != null && _boundSource!.baseUrl.isNotEmpty)
++                    if (_boundSource != null &&
++                        _boundSource!.baseUrl.isNotEmpty)
+                       _heroAction(
+                         icon: Icons.public_rounded,
+                         label: tr('web'),
+@@ -1016,7 +1093,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           children: <Widget>[
+             Icon(
+               icon,
+-              color: active ? Theme.of(context).colorScheme.primary : Colors.white,
++              color: active
++                  ? Theme.of(context).colorScheme.primary
++                  : Colors.white,
+               size: 21,
+             ),
+             const SizedBox(height: 3),
+@@ -1024,7 +1103,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+               label,
+               maxLines: 1,
+               overflow: TextOverflow.ellipsis,
+-              style: AppType.metadata.copyWith(color: Colors.white70, fontSize: 10),
++              style: AppType.metadata.copyWith(
++                color: Colors.white70,
++                fontSize: 10,
++              ),
+             ),
+           ],
+         ),
+@@ -1100,12 +1182,16 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           _binding!.mangaTitle,
+                           maxLines: 1,
+                           overflow: TextOverflow.ellipsis,
+-                          style: AppType.cardTitle.copyWith(color: palette.foreground),
++                          style: AppType.cardTitle.copyWith(
++                            color: palette.foreground,
++                          ),
+                         ),
+                         const SizedBox(height: 2),
+                         Text(
+                           '${_boundSource!.name} · ${_chapters.length} ${tr('chapters').toLowerCase()}',
+-                          style: AppType.metadata.copyWith(color: palette.mutedText),
++                          style: AppType.metadata.copyWith(
++                            color: palette.mutedText,
++                          ),
+                         ),
+                       ],
+                     ),
+@@ -1124,7 +1210,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   ),
+                   IconButton(
+                     tooltip: tr('manga_reverse_chapters'),
+-                    onPressed: () => setState(() => _ascendingInList = !_ascendingInList),
++                    onPressed: () =>
++                        setState(() => _ascendingInList = !_ascendingInList),
+                     icon: Icon(
+                       _ascendingInList
+                           ? Icons.arrow_downward_rounded
+@@ -1133,9 +1220,14 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   ),
+                   IconButton(
+                     tooltip: tr('manga_download_remaining'),
+-                    onPressed: _loadingBoundWork || _chapters.isEmpty || _chapters.every(
+-                      (chapter) => _downloadedChapters.contains('${chapter['url'] ?? ''}'),
+-                    )
++                    onPressed:
++                        _loadingBoundWork ||
++                            _chapters.isEmpty ||
++                            _chapters.every(
++                              (chapter) => _downloadedChapters.contains(
++                                '${chapter['url'] ?? ''}',
++                              ),
++                            )
+                         ? null
+                         : _downloadRemainingChapters,
+                     icon: const Icon(Icons.download_for_offline_outlined),
+@@ -1149,7 +1241,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+               child: SizedBox(
+                 height: 46,
+                 child: ListView(
+-                  padding: EdgeInsets.symmetric(horizontal: AppSpace.gutter(context)),
++                  padding: EdgeInsets.symmetric(
++                    horizontal: AppSpace.gutter(context),
++                  ),
+                   scrollDirection: Axis.horizontal,
+                   children: <Widget>[
+                     Padding(
+@@ -1182,7 +1276,8 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+             ),
+             sliver: SliverList.separated(
+               itemCount: chapters.length,
+-              separatorBuilder: (_, __) => Divider(height: 1, color: palette.hairline),
++              separatorBuilder: (_, __) =>
++                  Divider(height: 1, color: palette.hairline),
+               itemBuilder: (context, index) {
+                 final chapter = chapters[index];
+                 final url = '${chapter['url'] ?? ''}';
+@@ -1194,7 +1289,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                 final fraction = mark?.fraction ?? 0.0;
+                 return InkWell(
+                   onTap: () {
+-                    final chapterIndex = _chapters.indexWhere((item) => item['url'] == chapter['url']);
++                    final chapterIndex = _chapters.indexWhere(
++                      (item) => item['url'] == chapter['url'],
++                    );
+                     if (chapterIndex >= 0) _openReader(chapterIndex);
+                   },
+                   onLongPress: () => _showChapterActions(chapter),
+@@ -1206,13 +1303,21 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                           width: 42,
+                           height: 42,
+                           decoration: BoxDecoration(
+-                            color: done ? Theme.of(context).colorScheme.primary.withValues(alpha: .13) : palette.surface,
++                            color: done
++                                ? Theme.of(
++                                    context,
++                                  ).colorScheme.primary.withValues(alpha: .13)
++                                : palette.surface,
+                             borderRadius: BorderRadius.circular(AppRadii.card),
+                           ),
+                           alignment: Alignment.center,
+                           child: Icon(
+-                            done ? Icons.done_rounded : Icons.menu_book_outlined,
+-                            color: done ? Theme.of(context).colorScheme.primary : palette.mutedText,
++                            done
++                                ? Icons.done_rounded
++                                : Icons.menu_book_outlined,
++                            color: done
++                                ? Theme.of(context).colorScheme.primary
++                                : palette.mutedText,
+                             size: 20,
+                           ),
+                         ),
+@@ -1226,22 +1331,33 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                 maxLines: 2,
+                                 overflow: TextOverflow.ellipsis,
+                                 style: AppType.cardTitle.copyWith(
+-                                  color: done ? palette.mutedText : palette.foreground,
+-                                  decoration: done ? TextDecoration.lineThrough : null,
++                                  color: done
++                                      ? palette.mutedText
++                                      : palette.foreground,
++                                  decoration: done
++                                      ? TextDecoration.lineThrough
++                                      : null,
+                                 ),
+                               ),
+                               const SizedBox(height: 3),
+                               Text(
+                                 <String>[
+-                                  if (number != null) '${tr('chapter')} $number',
++                                  if (number != null)
++                                    '${tr('chapter')} $number',
+                                   if (scanlator.isNotEmpty) scanlator,
+-                                  if (_chapterDate(chapter['date_upload']) != null) _chapterDate(chapter['date_upload'])!,
++                                  if (_chapterDate(chapter['date_upload']) !=
++                                      null)
++                                    _chapterDate(chapter['date_upload'])!,
+                                 ].join(' · '),
+                                 maxLines: 1,
+                                 overflow: TextOverflow.ellipsis,
+-                                style: AppType.metadata.copyWith(color: palette.mutedText),
++                                style: AppType.metadata.copyWith(
++                                  color: palette.mutedText,
++                                ),
+                               ),
+-                              if (mark != null && !done && mark.totalPages > 0) ...<Widget>[
++                              if (mark != null &&
++                                  !done &&
++                                  mark.totalPages > 0) ...<Widget>[
+                                 const SizedBox(height: 6),
+                                 ClipRRect(
+                                   borderRadius: BorderRadius.circular(4),
+@@ -1259,7 +1375,11 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                         if (_downloadedChapters.contains(url))
+                           const Padding(
+                             padding: EdgeInsets.only(right: 4),
+-                            child: Icon(Icons.offline_pin_rounded, color: Colors.green, size: 19),
++                            child: Icon(
++                              Icons.offline_pin_rounded,
++                              color: Colors.green,
++                              size: 19,
++                            ),
+                           ),
+                         IconButton(
+                           tooltip: tr('more'),
+@@ -1309,13 +1429,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+         child: Column(
+           children: <Widget>[
+             Padding(
+-              padding: const EdgeInsets.fromLTRB(AppSpace.md, AppSpace.sm, AppSpace.sm, 0),
++              padding: const EdgeInsets.fromLTRB(
++                AppSpace.md,
++                AppSpace.sm,
++                AppSpace.sm,
++                0,
++              ),
+               child: Row(
+                 children: <Widget>[
+                   Expanded(
+                     child: Text(
+                       tr('manga_sources'),
+-                      style: AppType.sectionHeader.copyWith(color: palette.foreground),
++                      style: AppType.sectionHeader.copyWith(
++                        color: palette.foreground,
++                      ),
+                     ),
+                   ),
+                   IconButton(
+@@ -1336,13 +1463,15 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+ 
+   Widget _buildSourcesTab(BuildContext context) {
+     final palette = AppPalette.of(context);
+-    final filtered = _sources.where((source) {
+-      final query = _sourceFilterController.text.trim().toLowerCase();
+-      if (query.isEmpty) return true;
+-      return source.name.toLowerCase().contains(query) ||
+-          source.lang.toLowerCase().contains(query) ||
+-          source.packageName.toLowerCase().contains(query);
+-    }).toList(growable: false);
++    final filtered = _sources
++        .where((source) {
++          final query = _sourceFilterController.text.trim().toLowerCase();
++          if (query.isEmpty) return true;
++          return source.name.toLowerCase().contains(query) ||
++              source.lang.toLowerCase().contains(query) ||
++              source.packageName.toLowerCase().contains(query);
++        })
++        .toList(growable: false);
+     return ListView(
+       padding: EdgeInsets.fromLTRB(
+         AppSpace.gutter(context),
+@@ -1367,7 +1496,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                       Expanded(
+                         child: Text(
+                           _binding!.sourceName,
+-                          style: AppType.cardTitle.copyWith(color: palette.foreground),
++                          style: AppType.cardTitle.copyWith(
++                            color: palette.foreground,
++                          ),
+                         ),
+                       ),
+                       IconButton(
+@@ -1422,7 +1553,12 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   ),
+                   if (_boundError != null) ...<Widget>[
+                     const SizedBox(height: 8),
+-                    Text(_boundError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
++                    Text(
++                      _boundError!,
++                      style: TextStyle(
++                        color: Theme.of(context).colorScheme.error,
++                      ),
++                    ),
+                   ],
+                 ],
+               ),
+@@ -1441,9 +1577,17 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           child: FilledButton.icon(
+             onPressed: _searchingAll ? null : _findAcrossSources,
+             icon: _searchingAll
+-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
++                ? const SizedBox(
++                    width: 18,
++                    height: 18,
++                    child: CircularProgressIndicator(strokeWidth: 2),
++                  )
+                 : const Icon(Icons.travel_explore_rounded),
+-            label: Text(_searchingAll ? tr('manga_searching_sources') : tr('manga_search_all_sources')),
++            label: Text(
++              _searchingAll
++                  ? tr('manga_searching_sources')
++                  : tr('manga_search_all_sources'),
++            ),
+           ),
+         ),
+         if (_matches.isNotEmpty) ...<Widget>[
+@@ -1457,8 +1601,14 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   backgroundColor: palette.raisedSurface,
+                   child: const Icon(Icons.menu_book_rounded),
+                 ),
+-                title: Text(match.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+-                subtitle: Text('${match.source.name} · ${match.source.lang.toUpperCase()}'),
++                title: Text(
++                  match.title,
++                  maxLines: 2,
++                  overflow: TextOverflow.ellipsis,
++                ),
++                subtitle: Text(
++                  '${match.source.name} · ${match.source.lang.toUpperCase()}',
++                ),
+                 trailing: FilledButton(
+                   onPressed: () => _bindSourceMatch(match),
+                   child: Text(tr('use')),
+@@ -1468,14 +1618,21 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+         ],
+         if (_sourceError != null) ...<Widget>[
+           const SizedBox(height: AppSpace.sm),
+-          Text(_sourceError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
++          Text(
++            _sourceError!,
++            style: TextStyle(color: Theme.of(context).colorScheme.error),
++          ),
+         ],
+         const SizedBox(height: AppSpace.xl),
+         Row(
+           children: <Widget>[
+-            Expanded(child: _SectionHeading(title: tr('manga_installed_sources'))),
++            Expanded(
++              child: _SectionHeading(title: tr('manga_installed_sources')),
++            ),
+             IconButton(
+-              onPressed: _loadingSources ? null : () => _loadInstalledSources(reload: true),
++              onPressed: _loadingSources
++                  ? null
++                  : () => _loadInstalledSources(reload: true),
+               icon: const Icon(Icons.refresh_rounded),
+             ),
+           ],
+@@ -1513,14 +1670,21 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   backgroundColor: palette.raisedSurface,
+                   child: const Icon(Icons.extension_rounded),
+                 ),
+-                title: Text(source.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+-                subtitle: Text('${source.lang.toUpperCase()}${source.isNsfw ? ' · ${tr('explicit_content')}' : ''}'),
++                title: Text(
++                  source.name,
++                  maxLines: 1,
++                  overflow: TextOverflow.ellipsis,
++                ),
++                subtitle: Text(
++                  '${source.lang.toUpperCase()}${source.isNsfw ? ' · ${tr('explicit_content')}' : ''}',
++                ),
+                 trailing: Row(
+                   mainAxisSize: MainAxisSize.min,
+                   children: <Widget>[
+                     const Icon(Icons.search_rounded),
+                     PopupMenuButton<String>(
+-                      onSelected: (action) => _handleSourceAction(source, action),
++                      onSelected: (action) =>
++                          _handleSourceAction(source, action),
+                       itemBuilder: (context) => <PopupMenuEntry<String>>[
+                         PopupMenuItem<String>(
+                           value: 'settings',
+@@ -1575,7 +1739,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           _MangaPeopleGrid(people: staff),
+         ],
+         if (characters.isEmpty && staff.isNotEmpty)
+-          Text(tr('manga_no_characters_hint'), style: AppType.metadata.copyWith(color: palette.mutedText)),
++          Text(
++            tr('manga_no_characters_hint'),
++            style: AppType.metadata.copyWith(color: palette.mutedText),
++          ),
+       ],
+     );
+   }
+@@ -1643,17 +1810,17 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     );
+     Navigator.of(context).push<void>(
+       MaterialPageRoute<void>(
+-        builder: (_) => MangaWorkScreen(
+-          title: relatedTitle,
+-          service: widget.service,
+-        ),
++        builder: (_) =>
++            MangaWorkScreen(title: relatedTitle, service: widget.service),
+       ),
+     );
+   }
+ 
+   Widget _buildDetailsTab(BuildContext context) {
+     final palette = AppPalette.of(context);
+-    final synopsis = (_title.description ?? '').replaceAll(RegExp(r'<[^>]*>'), ' ').trim();
++    final synopsis = (_title.description ?? '')
++        .replaceAll(RegExp(r'<[^>]*>'), ' ')
++        .trim();
+     final dateRange = _dateRange(
+       _title.startDate,
+       _title.endDate,
+@@ -1674,7 +1841,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       ),
+       children: <Widget>[
+         if (_binding != null && _binding!.sourceName.trim().isNotEmpty)
+-          _InfoLine(label: tr('manga_info_source'), value: _binding!.sourceName),
++          _InfoLine(
++            label: tr('manga_info_source'),
++            value: _binding!.sourceName,
++          ),
+         if ((_title.status ?? '').isNotEmpty)
+           _InfoLine(label: tr('status'), value: _displayCode(_title.status!)),
+         if (year != null) _InfoLine(label: tr('year'), value: year),
+@@ -1688,17 +1858,32 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+             value: '${(_title.averageScore! / 10).toStringAsFixed(1)} / 10',
+           ),
+         if (_title.popularity != null)
+-          _InfoLine(label: tr('popularity'), value: _formatCount(_title.popularity!)),
++          _InfoLine(
++            label: tr('popularity'),
++            value: _formatCount(_title.popularity!),
++          ),
+         if (_title.favourites != null)
+-          _InfoLine(label: tr('manga_favourites'), value: _formatCount(_title.favourites!)),
++          _InfoLine(
++            label: tr('manga_favourites'),
++            value: _formatCount(_title.favourites!),
++          ),
+         if ((_title.sourceMaterial ?? '').isNotEmpty)
+-          _InfoLine(label: tr('manga_source_material'), value: _displayCode(_title.sourceMaterial!)),
++          _InfoLine(
++            label: tr('manga_source_material'),
++            value: _displayCode(_title.sourceMaterial!),
++          ),
+         if ((_title.countryOfOrigin ?? '').isNotEmpty)
+-          _InfoLine(label: tr('manga_country'), value: _countryLabel(_title.countryOfOrigin!)),
++          _InfoLine(
++            label: tr('manga_country'),
++            value: _countryLabel(_title.countryOfOrigin!),
++          ),
+         if (dateRange != null)
+           _InfoLine(label: tr('manga_aired'), value: dateRange),
+         if ((_title.nativeTitle ?? '').isNotEmpty)
+-          _InfoLine(label: tr('manga_native_title'), value: _title.nativeTitle!),
++          _InfoLine(
++            label: tr('manga_native_title'),
++            value: _title.nativeTitle!,
++          ),
+         if (_title.synonyms.isNotEmpty)
+           _InfoLine(
+             label: tr('manga_also_known_as'),
+@@ -1733,7 +1918,10 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+           const SizedBox(height: 8),
+           Text(
+             synopsis,
+-            style: AppType.body.copyWith(color: palette.secondaryText, height: 1.55),
++            style: AppType.body.copyWith(
++              color: palette.secondaryText,
++              height: 1.55,
++            ),
+           ),
+         ],
+       ],
+@@ -1748,14 +1936,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+       if (parts.length == 2) return '${parts[1]}/${parts[0]}';
+       return value;
+     }
+-    if (end != null && end.isNotEmpty) return '${display(start)} — ${display(end)}';
++
++    if (end != null && end.isNotEmpty)
++      return '${display(start)} — ${display(end)}';
+     return ongoing ? '${display(start)} —' : display(start);
+   }
+ 
+   String _displayCode(String value) => value
+       .toLowerCase()
+       .split('_')
+-      .map((part) => part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}')
++      .map(
++        (part) => part.isEmpty
++            ? part
++            : '${part[0].toUpperCase()}${part.substring(1)}',
++      )
+       .join(' ');
+ 
+   String _formatCount(int value) {
+@@ -1767,7 +1961,6 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+     }
+     return buffer.toString();
+   }
+-
+ }
+ 
+ class _MangaTags extends StatefulWidget {
+@@ -1784,8 +1977,12 @@ class _MangaTagsState extends State<_MangaTags> {
+   @override
+   Widget build(BuildContext context) {
+     final palette = AppPalette.of(context);
+-    final safe = widget.tags.where((tag) => !tag.isSpoiler).toList(growable: false);
+-    final spoilers = widget.tags.where((tag) => tag.isSpoiler).toList(growable: false);
++    final safe = widget.tags
++        .where((tag) => !tag.isSpoiler)
++        .toList(growable: false);
++    final spoilers = widget.tags
++        .where((tag) => tag.isSpoiler)
++        .toList(growable: false);
+     final visible = _showSpoilers ? widget.tags : safe;
+     return Column(
+       crossAxisAlignment: CrossAxisAlignment.start,
+@@ -1796,7 +1993,9 @@ class _MangaTagsState extends State<_MangaTags> {
+           children: <Widget>[
+             for (final tag in visible)
+               Chip(
+-                label: Text(tag.rank == null ? tag.name : '${tag.name} ${tag.rank}%'),
++                label: Text(
++                  tag.rank == null ? tag.name : '${tag.name} ${tag.rank}%',
++                ),
+                 backgroundColor: tag.isSpoiler
+                     ? Theme.of(context).colorScheme.errorContainer
+                     : palette.surface,
+@@ -1809,7 +2008,9 @@ class _MangaTagsState extends State<_MangaTags> {
+             alignment: AlignmentDirectional.centerStart,
+             child: TextButton(
+               onPressed: () => setState(() => _showSpoilers = true),
+-              child: Text(tr('manga_show_spoilers', args: ['${spoilers.length}'])),
++              child: Text(
++                tr('manga_show_spoilers', args: ['${spoilers.length}']),
++              ),
+             ),
+           ),
+       ],
+@@ -1848,14 +2049,20 @@ class _MangaPeopleGrid extends StatelessWidget {
+                     child: person.imageUrl == null
+                         ? ColoredBox(
+                             color: palette.raisedSurface,
+-                            child: const Icon(Icons.person_outline_rounded, size: 34),
++                            child: const Icon(
++                              Icons.person_outline_rounded,
++                              size: 34,
++                            ),
+                           )
+                         : CachedNetworkImage(
+                             imageUrl: person.imageUrl!,
+                             fit: BoxFit.cover,
+                             errorWidget: (_, __, ___) => ColoredBox(
+                               color: palette.raisedSurface,
+-                              child: const Icon(Icons.person_outline_rounded, size: 34),
++                              child: const Icon(
++                                Icons.person_outline_rounded,
++                                size: 34,
++                              ),
+                             ),
+                           ),
+                   ),
+@@ -1875,7 +2082,10 @@ class _MangaPeopleGrid extends StatelessWidget {
+                   maxLines: 1,
+                   overflow: TextOverflow.ellipsis,
+                   textAlign: TextAlign.center,
+-                  style: AppType.metadata.copyWith(color: palette.mutedText, fontSize: 10),
++                  style: AppType.metadata.copyWith(
++                    color: palette.mutedText,
++                    fontSize: 10,
++                  ),
+                 ),
+             ],
+           );
+@@ -1905,7 +2115,10 @@ class _MangaRelationCard extends StatelessWidget {
+               child: SizedBox(
+                 width: double.infinity,
+                 child: relation.coverUrl == null
+-                    ? ColoredBox(color: palette.raisedSurface, child: const Icon(Icons.menu_book_rounded))
++                    ? ColoredBox(
++                        color: palette.raisedSurface,
++                        child: const Icon(Icons.menu_book_rounded),
++                      )
+                     : CachedNetworkImage(
+                         imageUrl: relation.coverUrl!,
+                         fit: BoxFit.cover,
+@@ -1922,13 +2135,19 @@ class _MangaRelationCard extends StatelessWidget {
+             relation.title,
+             maxLines: 2,
+             overflow: TextOverflow.ellipsis,
+-            style: AppType.metadata.copyWith(color: palette.foreground, fontWeight: FontWeight.w600),
++            style: AppType.metadata.copyWith(
++              color: palette.foreground,
++              fontWeight: FontWeight.w600,
++            ),
+           ),
+           Text(
+             relation.relationType.replaceAll('_', ' ').toLowerCase(),
+             maxLines: 1,
+             overflow: TextOverflow.ellipsis,
+-            style: AppType.metadata.copyWith(color: palette.mutedText, fontSize: 10),
++            style: AppType.metadata.copyWith(
++              color: palette.mutedText,
++              fontSize: 10,
++            ),
+           ),
+         ],
+       ),
+@@ -2004,7 +2223,10 @@ class _MangaBatchChapterDownloadDialogState
+         if (mounted) setState(() {});
+       }
+       if (!mounted) return;
+-      Navigator.pop(context, !_cancelRequested && _completed == widget.chapters.length);
++      Navigator.pop(
++        context,
++        !_cancelRequested && _completed == widget.chapters.length,
++      );
+     } catch (error) {
+       if (!mounted) return;
+       setState(() {
+@@ -2032,9 +2254,15 @@ class _MangaBatchChapterDownloadDialogState
+         mainAxisSize: MainAxisSize.min,
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: <Widget>[
+-          Text(_activeTitle ?? tr('manga_preparing_download'), maxLines: 2, overflow: TextOverflow.ellipsis),
++          Text(
++            _activeTitle ?? tr('manga_preparing_download'),
++            maxLines: 2,
++            overflow: TextOverflow.ellipsis,
++          ),
+           const SizedBox(height: 12),
+-          LinearProgressIndicator(value: _error == null ? chapterFraction : null),
++          LinearProgressIndicator(
++            value: _error == null ? chapterFraction : null,
++          ),
+           const SizedBox(height: 8),
+           Text('${_completed} / $total ${tr('chapters').toLowerCase()}'),
+           if (_pageTotal > 0) ...<Widget>[
+@@ -2049,7 +2277,10 @@ class _MangaBatchChapterDownloadDialogState
+           ],
+           if (_error != null) ...<Widget>[
+             const SizedBox(height: 10),
+-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
++            Text(
++              _error!,
++              style: TextStyle(color: Theme.of(context).colorScheme.error),
++            ),
+           ],
+         ],
+       ),
+@@ -2140,13 +2371,20 @@ class _MangaChapterDownloadDialogState
+         Text('${widget.chapter['name'] ?? tr('chapter')}'),
+         const SizedBox(height: 12),
+         if (_error != null)
+-          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))
++          Text(
++            _error!,
++            style: TextStyle(color: Theme.of(context).colorScheme.error),
++          )
+         else ...<Widget>[
+           LinearProgressIndicator(
+             value: _total > 0 ? _completed / _total : null,
+           ),
+           const SizedBox(height: 8),
+-          Text(_total > 0 ? '$_completed / $_total' : tr('manga_preparing_download')),
++          Text(
++            _total > 0
++                ? '$_completed / $_total'
++                : tr('manga_preparing_download'),
++          ),
+         ],
+       ],
+     ),
+@@ -2154,7 +2392,10 @@ class _MangaChapterDownloadDialogState
+       if (_error != null)
+         TextButton(onPressed: _start, child: Text(tr('retry'))),
+       if (!_running || _error != null)
+-        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('cancel'))),
++        TextButton(
++          onPressed: () => Navigator.pop(context, false),
++          child: Text(tr('cancel')),
++        ),
+     ],
+   );
+ }
+@@ -2187,7 +2428,8 @@ class _MangaSourceSearchSheet extends StatefulWidget {
+   final double Function(String) scoreFor;
+ 
+   @override
+-  State<_MangaSourceSearchSheet> createState() => _MangaSourceSearchSheetState();
++  State<_MangaSourceSearchSheet> createState() =>
++      _MangaSourceSearchSheetState();
+ }
+ 
+ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+@@ -2256,18 +2498,23 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+       if (!mounted || request != _request) return;
+       final matches = values
+           .where((item) => '${item['url'] ?? ''}'.trim().isNotEmpty)
+-          .map((item) => _MangaSourceMatch(
+-                source: widget.source,
+-                item: item,
+-                score: widget.scoreFor('${item['title'] ?? ''}'),
+-              ))
++          .map(
++            (item) => _MangaSourceMatch(
++              source: widget.source,
++              item: item,
++              score: widget.scoreFor('${item['title'] ?? ''}'),
++            ),
++          )
+           .toList(growable: false);
+-      final combined = reset ? matches : <_MangaSourceMatch>[
+-        ..._results,
+-        ...matches.where((item) => !_results.any(
+-              (old) => old.item['url'] == item.item['url'],
+-            )),
+-      ];
++      final combined = reset
++          ? matches
++          : <_MangaSourceMatch>[
++              ..._results,
++              ...matches.where(
++                (item) =>
++                    !_results.any((old) => old.item['url'] == item.item['url']),
++              ),
++            ];
+       setState(() {
+         _results = combined;
+         _page = page;
+@@ -2352,7 +2599,9 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                 Expanded(
+                   child: Text(
+                     widget.source.name,
+-                    style: AppType.sectionHeader.copyWith(color: palette.foreground),
++                    style: AppType.sectionHeader.copyWith(
++                      color: palette.foreground,
++                    ),
+                   ),
+                 ),
+                 IconButton(
+@@ -2403,7 +2652,11 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                     tooltip: tr('mihon_filters'),
+                     onPressed: _loadingFilters ? null : _openFilters,
+                     icon: _loadingFilters
+-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
++                        ? const SizedBox(
++                            width: 18,
++                            height: 18,
++                            child: CircularProgressIndicator(strokeWidth: 2),
++                          )
+                         : const Icon(Icons.filter_list_rounded),
+                   ),
+                 ],
+@@ -2411,7 +2664,13 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+             if (_filterError != null)
+               Padding(
+                 padding: const EdgeInsets.only(top: 4),
+-                child: Text(_filterError!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
++                child: Text(
++                  _filterError!,
++                  style: TextStyle(
++                    color: Theme.of(context).colorScheme.error,
++                    fontSize: 12,
++                  ),
++                ),
+               ),
+             if (_filters.isNotEmpty && _mode == _MangaSourceMode.search)
+               Align(
+@@ -2430,42 +2689,57 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+               child: _loading && _results.isEmpty
+                   ? const Center(child: CircularProgressIndicator())
+                   : _error != null && _results.isEmpty
+-                      ? Center(child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)))
+-                      : _results.isEmpty
+-                          ? Center(child: Text(tr('no_results_found')))
+-                          : ListView.separated(
+-                              itemCount: _results.length,
+-                              separatorBuilder: (_, __) => const SizedBox(height: 6),
+-                              itemBuilder: (context, index) {
+-                                final result = _results[index];
+-                                final thumbnail = '${result.item['thumbnail_url'] ?? ''}';
+-                                return Card(
+-                                  color: palette.surface,
+-                                  child: ListTile(
+-                                    leading: thumbnail.isNotEmpty
+-                                        ? ClipRRect(
+-                                            borderRadius: BorderRadius.circular(6),
+-                                            child: CachedNetworkImage(
+-                                              imageUrl: thumbnail,
+-                                              width: 48,
+-                                              height: 64,
+-                                              fit: BoxFit.cover,
+-                                              errorWidget: (_, __, ___) => const Icon(Icons.menu_book_rounded),
+-                                            ),
+-                                          )
+-                                        : const Icon(Icons.menu_book_rounded),
+-                                    title: Text(result.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+-                                    subtitle: Text(
+-                                      _mode == _MangaSourceMode.search
+-                                          ? '${(result.score * 100).round()}% ${tr('manga_title_match')}'
+-                                          : '${widget.source.name} · ${tr(_mode == _MangaSourceMode.popular ? 'popular' : 'latest')}',
++                  ? Center(
++                      child: Text(
++                        _error!,
++                        style: TextStyle(
++                          color: Theme.of(context).colorScheme.error,
++                        ),
++                      ),
++                    )
++                  : _results.isEmpty
++                  ? Center(child: Text(tr('no_results_found')))
++                  : ListView.separated(
++                      itemCount: _results.length,
++                      separatorBuilder: (_, __) => const SizedBox(height: 6),
++                      itemBuilder: (context, index) {
++                        final result = _results[index];
++                        final thumbnail =
++                            '${result.item['thumbnail_url'] ?? ''}';
++                        return Card(
++                          color: palette.surface,
++                          child: ListTile(
++                            leading: thumbnail.isNotEmpty
++                                ? ClipRRect(
++                                    borderRadius: BorderRadius.circular(6),
++                                    child: CachedNetworkImage(
++                                      imageUrl: thumbnail,
++                                      width: 48,
++                                      height: 64,
++                                      fit: BoxFit.cover,
++                                      errorWidget: (_, __, ___) =>
++                                          const Icon(Icons.menu_book_rounded),
+                                     ),
+-                                    trailing: const Icon(Icons.add_circle_outline_rounded),
+-                                    onTap: () => Navigator.pop(context, result),
+-                                  ),
+-                                );
+-                              },
++                                  )
++                                : const Icon(Icons.menu_book_rounded),
++                            title: Text(
++                              result.title,
++                              maxLines: 2,
++                              overflow: TextOverflow.ellipsis,
++                            ),
++                            subtitle: Text(
++                              _mode == _MangaSourceMode.search
++                                  ? '${(result.score * 100).round()}% ${tr('manga_title_match')}'
++                                  : '${widget.source.name} · ${tr(_mode == _MangaSourceMode.popular ? 'popular' : 'latest')}',
++                            ),
++                            trailing: const Icon(
++                              Icons.add_circle_outline_rounded,
+                             ),
++                            onTap: () => Navigator.pop(context, result),
++                          ),
++                        );
++                      },
++                    ),
+             ),
+             if (_hasMore && _results.isNotEmpty)
+               SizedBox(
+@@ -2473,7 +2747,11 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                 child: OutlinedButton.icon(
+                   onPressed: _loadingMore ? null : () => _load(),
+                   icon: _loadingMore
+-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
++                      ? const SizedBox(
++                          width: 16,
++                          height: 16,
++                          child: CircularProgressIndicator(strokeWidth: 2),
++                        )
+                       : const Icon(Icons.expand_more_rounded),
+                   label: Text(_loadingMore ? tr('loading') : tr('load_more')),
+                 ),
+@@ -2490,7 +2768,8 @@ class _MangaSourceFiltersSheet extends StatefulWidget {
+   final List<Map<String, dynamic>> filters;
+ 
+   @override
+-  State<_MangaSourceFiltersSheet> createState() => _MangaSourceFiltersSheetState();
++  State<_MangaSourceFiltersSheet> createState() =>
++      _MangaSourceFiltersSheetState();
+ }
+ 
+ class _MangaSourceFiltersSheetState extends State<_MangaSourceFiltersSheet> {
+@@ -2500,7 +2779,10 @@ class _MangaSourceFiltersSheetState extends State<_MangaSourceFiltersSheet> {
+   void initState() {
+     super.initState();
+     _filters = widget.filters
+-        .map((filter) => Map<String, dynamic>.from(jsonDecode(jsonEncode(filter)) as Map))
++        .map(
++          (filter) =>
++              Map<String, dynamic>.from(jsonDecode(jsonEncode(filter)) as Map),
++        )
+         .toList(growable: true);
+   }
+ 
+@@ -2515,9 +2797,13 @@ class _MangaSourceFiltersSheetState extends State<_MangaSourceFiltersSheet> {
+       case 'separator':
+         return const Divider();
+       case 'select':
+-        final values = (filter['values'] as List? ?? const <dynamic>[]).map((v) => '$v').toList();
++        final values = (filter['values'] as List? ?? const <dynamic>[])
++            .map((v) => '$v')
++            .toList();
+         if (values.isEmpty) return const SizedBox.shrink();
+-        final selected = ((filter['state'] as num?)?.toInt() ?? 0).clamp(0, values.length - 1).toInt();
++        final selected = ((filter['state'] as num?)?.toInt() ?? 0)
++            .clamp(0, values.length - 1)
++            .toInt();
+         return DropdownButtonFormField<int>(
+           initialValue: selected,
+           decoration: InputDecoration(labelText: name),
+@@ -2541,7 +2827,9 @@ class _MangaSourceFiltersSheetState extends State<_MangaSourceFiltersSheet> {
+           onChanged: (value) => setState(() => filter['state'] = value),
+         );
+       case 'tristate':
+-        final current = ((filter['state'] as num?)?.toInt() ?? 0).clamp(0, 2).toInt();
++        final current = ((filter['state'] as num?)?.toInt() ?? 0)
++            .clamp(0, 2)
++            .toInt();
+         return DropdownButtonFormField<int>(
+           initialValue: current,
+           decoration: InputDecoration(labelText: name),
+@@ -2553,27 +2841,42 @@ class _MangaSourceFiltersSheetState extends State<_MangaSourceFiltersSheet> {
+           onChanged: (value) => setState(() => filter['state'] = value ?? 0),
+         );
+       case 'sort':
+-        final values = (filter['values'] as List? ?? const <dynamic>[]).map((v) => '$v').toList();
++        final values = (filter['values'] as List? ?? const <dynamic>[])
++            .map((v) => '$v')
++            .toList();
+         if (values.isEmpty) return const SizedBox.shrink();
+         final state = filter['state'] is Map
+             ? Map<String, dynamic>.from(filter['state'] as Map)
+             : <String, dynamic>{'index': 0, 'ascending': false};
+-        final index = ((state['index'] as num?)?.toInt() ?? 0).clamp(0, values.length - 1).toInt();
++        final index = ((state['index'] as num?)?.toInt() ?? 0)
++            .clamp(0, values.length - 1)
++            .toInt();
+         return Column(
+           children: <Widget>[
+             DropdownButtonFormField<int>(
+               initialValue: index,
+               decoration: InputDecoration(labelText: name),
+               items: <DropdownMenuItem<int>>[
+-                for (var i = 0; i < values.length; i++) DropdownMenuItem(value: i, child: Text(values[i])),
++                for (var i = 0; i < values.length; i++)
++                  DropdownMenuItem(value: i, child: Text(values[i])),
+               ],
+-              onChanged: (value) => setState(() => filter['state'] = <String, dynamic>{'index': value ?? 0, 'ascending': state['ascending'] == true}),
++              onChanged: (value) => setState(
++                () => filter['state'] = <String, dynamic>{
++                  'index': value ?? 0,
++                  'ascending': state['ascending'] == true,
++                },
++              ),
+             ),
+             SwitchListTile(
+               contentPadding: EdgeInsets.zero,
+               title: Text(tr('mihon_sort_ascending')),
+               value: state['ascending'] == true,
+-              onChanged: (value) => setState(() => filter['state'] = <String, dynamic>{'index': index, 'ascending': value}),
++              onChanged: (value) => setState(
++                () => filter['state'] = <String, dynamic>{
++                  'index': index,
++                  'ascending': value,
++                },
++              ),
+             ),
+           ],
+         );
+@@ -2607,7 +2910,13 @@ class _MangaSourceFiltersSheetState extends State<_MangaSourceFiltersSheet> {
+             children: <Widget>[
+               Text(tr('mihon_filters'), style: AppType.sectionHeader),
+               const SizedBox(height: AppSpace.md),
+-              Expanded(child: ListView(children: <Widget>[for (final item in _filters) _buildFilter(item)])),
++              Expanded(
++                child: ListView(
++                  children: <Widget>[
++                    for (final item in _filters) _buildFilter(item),
++                  ],
++                ),
++              ),
+               const SizedBox(height: AppSpace.md),
+               SizedBox(
+                 width: double.infinity,
+@@ -2654,9 +2963,17 @@ class _MangaTabEmpty extends StatelessWidget {
+           children: <Widget>[
+             Icon(icon, size: 42, color: palette.mutedText),
+             const SizedBox(height: 12),
+-            Text(title, style: AppType.sectionHeader.copyWith(color: palette.foreground), textAlign: TextAlign.center),
++            Text(
++              title,
++              style: AppType.sectionHeader.copyWith(color: palette.foreground),
++              textAlign: TextAlign.center,
++            ),
+             const SizedBox(height: 6),
+-            Text(message, style: AppType.body.copyWith(color: palette.mutedText), textAlign: TextAlign.center),
++            Text(
++              message,
++              style: AppType.body.copyWith(color: palette.mutedText),
++              textAlign: TextAlign.center,
++            ),
+             if (actionLabel != null && onAction != null) ...<Widget>[
+               const SizedBox(height: 16),
+               FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+@@ -2679,7 +2996,10 @@ class _SectionHeading extends StatelessWidget {
+     final palette = AppPalette.of(context);
+     return Padding(
+       padding: const EdgeInsets.only(bottom: 8),
+-      child: Text(title, style: AppType.sectionHeader.copyWith(color: palette.foreground)),
++      child: Text(
++        title,
++        style: AppType.sectionHeader.copyWith(color: palette.foreground),
++      ),
+     );
+   }
+ }
+@@ -2697,8 +3017,19 @@ class _InfoLine extends StatelessWidget {
+       child: Row(
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: <Widget>[
+-          SizedBox(width: 116, child: Text(label, style: AppType.metadata.copyWith(color: palette.mutedText))),
+-          Expanded(child: Text(value, style: AppType.body.copyWith(color: palette.secondaryText))),
++          SizedBox(
++            width: 116,
++            child: Text(
++              label,
++              style: AppType.metadata.copyWith(color: palette.mutedText),
++            ),
++          ),
++          Expanded(
++            child: Text(
++              value,
++              style: AppType.body.copyWith(color: palette.secondaryText),
++            ),
++          ),
+         ],
+       ),
+     );
+@@ -2718,7 +3049,10 @@ class _HeroTag extends StatelessWidget {
+     ),
+     child: Padding(
+       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+-      child: Text(label, style: AppType.metadata.copyWith(color: Colors.white, fontSize: 10)),
++      child: Text(
++        label,
++        style: AppType.metadata.copyWith(color: Colors.white, fontSize: 10),
++      ),
+     ),
+   );
+ }
+diff --git a/test/manga_detail_metadata_test.dart b/test/manga_detail_metadata_test.dart
+index 66516f8..b3afba1 100644
+--- a/test/manga_detail_metadata_test.dart
++++ b/test/manga_detail_metadata_test.dart
+@@ -14,7 +14,9 @@ void main() {
+               'node': <String, dynamic>{
+                 'id': 91,
+                 'name': <String, dynamic>{'full': 'Sung Jinwoo'},
+-                'image': <String, dynamic>{'large': 'https://img.example/jinwoo.jpg'},
++                'image': <String, dynamic>{
++                  'large': 'https://img.example/jinwoo.jpg',
++                },
+               },
+             },
+           ],
+@@ -26,7 +28,9 @@ void main() {
+               'node': <String, dynamic>{
+                 'id': 92,
+                 'name': <String, dynamic>{'full': 'DUBU'},
+-                'image': <String, dynamic>{'large': 'https://img.example/dubu.jpg'},
++                'image': <String, dynamic>{
++                  'large': 'https://img.example/dubu.jpg',
++                },
+               },
+             },
+           ],
+@@ -86,7 +90,10 @@ void main() {
+     test('parses AniList work metadata and spoiler-aware tags', () {
+       final title = MangaTitle.fromJson(<String, dynamic>{
+         'id': 77,
+-        'title': <String, dynamic>{'romaji': 'Metadata example', 'native': '作品'},
++        'title': <String, dynamic>{
++          'romaji': 'Metadata example',
++          'native': '作品',
++        },
+         'averageScore': 86,
+         'popularity': 12000,
+         'favourites': 850,
+@@ -96,8 +103,16 @@ void main() {
+         'endDate': <String, dynamic>{'year': 2022, 'month': 5, 'day': 6},
+         'synonyms': <String>['Alias one', 'Alias two'],
+         'tags': <dynamic>[
+-          <String, dynamic>{'name': 'Time Travel', 'rank': 88, 'isMediaSpoiler': false},
+-          <String, dynamic>{'name': 'Hidden Identity', 'rank': 67, 'isMediaSpoiler': true},
++          <String, dynamic>{
++            'name': 'Time Travel',
++            'rank': 88,
++            'isMediaSpoiler': false,
++          },
++          <String, dynamic>{
++            'name': 'Hidden Identity',
++            'rank': 67,
++            'isMediaSpoiler': true,
++          },
+         ],
+       });
+ 
+diff --git a/test/manga_reading_store_test.dart b/test/manga_reading_store_test.dart
+index 8e3556d..4e8b1e7 100644
+--- a/test/manga_reading_store_test.dart
++++ b/test/manga_reading_store_test.dart
+@@ -51,21 +51,24 @@ void main() {
+       expect(first?.isRead, isFalse);
+     });
+ 
+-    test('serializes concurrent progress writes without losing chapters', () async {
+-      await Future.wait<void>([
+-        for (var index = 0; index < 32; index++)
+-          store.saveProgress(
+-            anilistId: 101,
+-            sourceId: 9001,
+-            chapterUrl: '/chapter/$index',
+-            pageIndex: index,
+-            totalPages: 40,
+-          ),
+-      ]);
+-      final restored = await store.progressForWork(101, 9001);
+-      expect(restored, hasLength(32));
+-      expect(restored['/chapter/31']?.pageIndex, 31);
+-    });
++    test(
++      'serializes concurrent progress writes without losing chapters',
++      () async {
++        await Future.wait<void>([
++          for (var index = 0; index < 32; index++)
++            store.saveProgress(
++              anilistId: 101,
++              sourceId: 9001,
++              chapterUrl: '/chapter/$index',
++              pageIndex: index,
++              totalPages: 40,
++            ),
++        ]);
++        final restored = await store.progressForWork(101, 9001);
++        expect(restored, hasLength(32));
++        expect(restored['/chapter/31']?.pageIndex, 31);
++      },
++    );
+ 
+     test('persists Manga library membership and reading status', () async {
+       expect(await store.isSaved(101), isFalse);
+diff --git a/test/manga_source_matcher_test.dart b/test/manga_source_matcher_test.dart
+index f51a450..3a86cf8 100644
+--- a/test/manga_source_matcher_test.dart
++++ b/test/manga_source_matcher_test.dart
+@@ -4,7 +4,10 @@ import 'package:raven23/manga/ui/manga_source_matcher.dart';
+ void main() {
+   group('mangaTitleMatchScore', () {
+     test('ranks exact title first', () {
+-      expect(mangaTitleMatchScore(<String>['Solo Leveling'], 'Solo Leveling'), 1);
++      expect(
++        mangaTitleMatchScore(<String>['Solo Leveling'], 'Solo Leveling'),
++        1,
++      );
+     });
+ 
+     test('ignores punctuation and case', () {
+@@ -16,23 +19,21 @@ void main() {
+ 
+     test('uses alternate AniList titles', () {
+       expect(
+-        mangaTitleMatchScore(
+-          <String>['Solo Leveling', '나 혼자만 레벨업'],
++        mangaTitleMatchScore(<String>[
++          'Solo Leveling',
+           '나 혼자만 레벨업',
+-        ),
++        ], '나 혼자만 레벨업'),
+         1,
+       );
+     });
+ 
+     test('keeps unrelated source results below a strong match', () {
+-      final matching = mangaTitleMatchScore(
+-        <String>['Solo Leveling'],
+-        'Solo Leveling: Ragnarok',
+-      );
+-      final unrelated = mangaTitleMatchScore(
+-        <String>['Solo Leveling'],
+-        'The Beginning After the End',
+-      );
++      final matching = mangaTitleMatchScore(<String>[
++        'Solo Leveling',
++      ], 'Solo Leveling: Ragnarok');
++      final unrelated = mangaTitleMatchScore(<String>[
++        'Solo Leveling',
++      ], 'The Beginning After the End');
+       expect(matching, greaterThan(unrelated));
+     });
+   });

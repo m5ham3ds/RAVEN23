@@ -1,0 +1,672 @@
+{
+  "project": "RAVEN23",
+  "phase": 36,
+  "checkedDate": "2026-11-06",
+  "checkedTime": null,
+  "baseArchive": "RAVEN23-MASTER-IMPLEMENTATION-BLUEPRINT-PHASE36-51.zip",
+  "method": "Raw GitHub pages retrieved in web inspection; source files statically inspected; container outbound DNS unavailable.",
+  "limitations": {
+    "rawIndexBytesPersisted": false,
+    "rawIndexBytesReason": "The web retrieval surface exposes page content but does not create a local raw file; container urllib failed DNS resolution.",
+    "commitShaCaptured": false,
+    "commitShaReason": "GitHub API/raw commit SHA was not available through the inspected response; no commit hashes are guessed.",
+    "numericHttpStatusForSuccessfulIndexes": null,
+    "numericHttpStatusReason": "Raw page content was retrieved, but the web retrieval result did not expose the underlying numeric HTTP status. The incorrect index.ison URL explicitly returned 404.",
+    "runtimeTests": "not_run",
+    "playbackTests": "not_run",
+    "flutterAnalyze": "not_run_flutter_sdk_unavailable",
+    "flutterTest": "not_run_flutter_sdk_unavailable",
+    "releaseBuild": "not_run_flutter_sdk_unavailable"
+  },
+  "summary": {
+    "repositoryCount": 6,
+    "indexedRecordCount": 142,
+    "countsAreGloballyDeduplicated": false
+  },
+  "repositories": [
+    {
+      "order": 1,
+      "id": "openstream-official",
+      "name": "OpenStream Official",
+      "indexUrl": "https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json",
+      "format": "openstream-json",
+      "retrieved": true,
+      "totalLines": 604,
+      "recordCount": 30,
+      "httpStatus": null,
+      "commitHash": null,
+      "rawSnapshotPersisted": false,
+      "recordBreakdown": {
+        "vidking-direct": 9,
+        "anime-site": 5,
+        "stremio": 5,
+        "web-embed": 10,
+        "vidking-webview-fallback": 1
+      },
+      "sampleRecords": [
+        {
+          "id": "yoru",
+          "name": "Yoru",
+          "version": "1.1.0",
+          "engine": "vidking-direct",
+          "capabilities": [
+            "movie",
+            "series"
+          ],
+          "installedByDefault": true,
+          "updatedAt": "2026-08-29"
+        },
+        {
+          "id": "cypher",
+          "name": "Cypher",
+          "version": "1.1.0",
+          "engine": "vidking-direct",
+          "capabilities": [
+            "movie",
+            "series"
+          ],
+          "installedByDefault": true,
+          "updatedAt": "2026-08-29"
+        },
+        {
+          "id": "re-anime",
+          "name": "Re:Anime",
+          "engine": "anime-site",
+          "declaredStatus": "beta"
+        },
+        {
+          "id": "fouranimo",
+          "name": "FourAnimo",
+          "engine": "anime-site",
+          "declaredStatus": "beta"
+        },
+        {
+          "id": "yastream",
+          "name": "YaStream",
+          "engine": "stremio",
+          "version": "0.11.1"
+        },
+        {
+          "id": "jett",
+          "name": "Jett",
+          "engine": "web-embed"
+        },
+        {
+          "id": "vyse",
+          "name": "Vyse",
+          "engine": "vidking-direct",
+          "qualityFilter": "English"
+        },
+        {
+          "id": "fade",
+          "name": "Fade",
+          "engine": "vidking-direct",
+          "qualityFilter": "Hindi"
+        }
+      ],
+      "notes": [
+        "OpenStream local fixture also contains 30 extensions.",
+        "Index and fixture expose English/Hindi in qualityFilter; VidKing implementation later consumes that property as a language value too."
+      ]
+    },
+    {
+      "order": 2,
+      "id": "spyou-zangetsu-providers",
+      "name": "Spyou Zangetsu Providers",
+      "indexUrl": "https://raw.githubusercontent.com/Spyou/zangetsu-providers/main/index.json",
+      "format": "zangetsu-json",
+      "retrieved": true,
+      "totalLines": 96,
+      "recordCount": 9,
+      "httpStatus": null,
+      "commitHash": null,
+      "rawSnapshotPersisted": false,
+      "records": [
+        {
+          "id": "anikoto",
+          "name": "AniKoto",
+          "version": "1.0.8",
+          "type": "anime",
+          "lang": "en",
+          "file": "providers/anikoto.js"
+        },
+        {
+          "id": "fourkhdhub",
+          "name": "4K HDHub",
+          "version": "1.0.6",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/fourkhdhub.js"
+        },
+        {
+          "id": "uhdmovies",
+          "name": "UHD Movies",
+          "version": "1.0.3",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/uhdmovies.js"
+        },
+        {
+          "id": "hdhub4u",
+          "name": "HDHub4u",
+          "version": "1.2.4",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/hdhub4u.js"
+        },
+        {
+          "id": "hianime",
+          "name": "HiAnime",
+          "version": "1.2.2",
+          "type": "anime",
+          "lang": "en",
+          "file": "providers/hianime.js"
+        },
+        {
+          "id": "vegamovies",
+          "name": "VegaMovies",
+          "version": "1.0.4",
+          "type": "movie",
+          "lang": "hi",
+          "file": "providers/vegamovies.js"
+        },
+        {
+          "id": "multimovies",
+          "name": "MultiMovies",
+          "version": "1.0.3",
+          "type": "movie",
+          "lang": "hi",
+          "file": "providers/multimovies.js"
+        },
+        {
+          "id": "animecube",
+          "name": "AnimeCube",
+          "version": "1.0.5",
+          "type": "anime",
+          "lang": "zh",
+          "file": "providers/animecube.js"
+        },
+        {
+          "id": "torbox",
+          "name": "TorBox",
+          "version": "1.0.0",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/torbox.js"
+        }
+      ],
+      "notes": [
+        "Files resolve under the repository providers directory.",
+        "TorBox requires dedicated account/API review before activation."
+      ]
+    },
+    {
+      "order": 3,
+      "id": "serenity-mist-zangetsu",
+      "name": "Serenity-MIST Zangetsu Sources",
+      "indexUrl": "https://raw.githubusercontent.com/Serenity-MIST/zangetsu-sources/main/index.json",
+      "format": "zangetsu-json",
+      "retrieved": true,
+      "totalLines": 56,
+      "recordCount": 5,
+      "httpStatus": null,
+      "commitHash": null,
+      "rawSnapshotPersisted": false,
+      "records": [
+        {
+          "id": "serenity-anikoto",
+          "name": "Anikoto",
+          "version": "0.2.9",
+          "type": "anime",
+          "file": "serenity-anikoto.js"
+        },
+        {
+          "id": "serenity-animekai",
+          "name": "AnimeKai (Unoriginal)",
+          "version": "0.2.9",
+          "type": "anime",
+          "file": "serenity-animekai.js"
+        },
+        {
+          "id": "serenity-aniwave",
+          "name": "AniWave (Unoriginal)",
+          "version": "0.2.9",
+          "type": "anime",
+          "file": "serenity-aniwave.js"
+        },
+        {
+          "id": "serenity-streamplay",
+          "name": "StreamPlay",
+          "version": "0.2.9",
+          "type": "movie",
+          "file": "serenity-streamplay.js"
+        },
+        {
+          "id": "serenity-cinestream",
+          "name": "CineStream",
+          "version": "0.2.9",
+          "type": "movie",
+          "file": "serenity-cinestream.js"
+        }
+      ],
+      "notes": [
+        "Static JS inspection shows movie+series branches for StreamPlay and CineStream despite TYPE/getInfo movie; series is rejected by current QuickJS declared type gate."
+      ]
+    },
+    {
+      "order": 4,
+      "id": "spyhell-experiment",
+      "name": "Spyhell Experiment",
+      "indexUrl": "https://raw.githubusercontent.com/Spyhell/zangetsu-experiment-repo/main/index.json",
+      "format": "zangetsu-json",
+      "retrieved": true,
+      "totalLines": 807,
+      "recordCount": 89,
+      "httpStatus": null,
+      "commitHash": null,
+      "rawSnapshotPersisted": false,
+      "sampleRecords": [
+        {
+          "id": "nyaa",
+          "name": "Nyaa Anime",
+          "type": "anime",
+          "lang": "en",
+          "file": "providers/nyaa.js"
+        },
+        {
+          "id": "animesuge",
+          "name": "AnimeSuge",
+          "type": "anime",
+          "lang": "en",
+          "file": "providers/animesuge.js",
+          "version": "1.0.3"
+        },
+        {
+          "id": "animetosho",
+          "name": "AnimeTosho",
+          "type": "anime",
+          "lang": "en",
+          "file": "providers/animetosho.js"
+        },
+        {
+          "id": "animex",
+          "name": "AnimeX",
+          "type": "anime",
+          "lang": "en",
+          "file": "providers/animex.js",
+          "version": "1.0.1"
+        },
+        {
+          "id": "plutotv",
+          "name": "Pluto TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/plutotv.js"
+        },
+        {
+          "id": "artetv",
+          "name": "ARTE TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/artetv.js"
+        },
+        {
+          "id": "nhkworld",
+          "name": "NHK World",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/nhkworld.js"
+        },
+        {
+          "id": "worldlivetv",
+          "name": "World Live TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/worldlivetv.js"
+        },
+        {
+          "id": "newslivetv",
+          "name": "News Live TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/newslivetv.js"
+        },
+        {
+          "id": "documentarylivetv",
+          "name": "Documentary Live TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/documentarylivetv.js"
+        },
+        {
+          "id": "serieslivetv",
+          "name": "Series Live TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/serieslivetv.js"
+        },
+        {
+          "id": "animationlivetv",
+          "name": "Animation Live TV",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/animationlivetv.js"
+        },
+        {
+          "id": "nekosama",
+          "name": "NekoSama",
+          "type": "anime",
+          "lang": "fr",
+          "file": "providers/nekosama.js"
+        },
+        {
+          "id": "samehadaku",
+          "name": "Samehadaku",
+          "type": "anime",
+          "lang": "id",
+          "file": "providers/samehadaku.js"
+        },
+        {
+          "id": "aniworld",
+          "name": "AniWorld",
+          "type": "anime",
+          "lang": "de",
+          "file": "providers/aniworld.js"
+        }
+      ],
+      "nsfwFieldPresent": false,
+      "notes": [
+        "Count is the number of source objects in the current 807-line index; examples are sampled records, not an exhaustive copy of all 89 rows.",
+        "Multiple linear Live TV entries declare generic movie, so they must be dispatched by a live-channel capability/adapter rather than VOD mediaKind.",
+        "Index contains adult-oriented provider records without explicit nsfw metadata; do not auto-enable or silently label them safe."
+      ]
+    },
+    {
+      "order": 5,
+      "id": "spyou-additional-providers",
+      "name": "Spyou Additional Providers",
+      "indexUrl": "https://raw.githubusercontent.com/Spyou/Zangetsu-spyou-provider/main/index.json",
+      "format": "zangetsu-json",
+      "retrieved": true,
+      "totalLines": 11,
+      "recordCount": 5,
+      "httpStatus": null,
+      "commitHash": null,
+      "rawSnapshotPersisted": false,
+      "records": [
+        {
+          "id": "animelok",
+          "name": "AnimeLok",
+          "version": "1.0.0",
+          "type": "anime",
+          "lang": "hi",
+          "file": "providers/animelok.js"
+        },
+        {
+          "id": "animesalt",
+          "name": "AnimeSalt",
+          "version": "1.0.0",
+          "type": "anime",
+          "lang": "hi",
+          "file": "providers/animesalt.js"
+        },
+        {
+          "id": "animixstream",
+          "name": "AnimixStream",
+          "version": "1.0.0",
+          "type": "anime",
+          "lang": "hi",
+          "file": "providers/animixstream.js"
+        },
+        {
+          "id": "netprime",
+          "name": "NetPrime",
+          "version": "1.0.0",
+          "type": "movie",
+          "lang": "en",
+          "file": "providers/netprime.js"
+        },
+        {
+          "id": "animedrive",
+          "name": "AnimeDrive",
+          "version": "1.0.1",
+          "type": "anime",
+          "lang": "hi",
+          "file": "providers/animedrive.js"
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "id": "spyhell-latin",
+      "name": "Spyhell Latin Sources",
+      "indexUrl": "https://raw.githubusercontent.com/Spyhell/spyou-latin-zan/main/index.json",
+      "wrongIndexUrl": "https://raw.githubusercontent.com/Spyhell/spyou-latin-zan/main/index.ison",
+      "wrongIndexStatus": 404,
+      "format": "zangetsu-json",
+      "retrieved": true,
+      "totalLines": 42,
+      "recordCount": 4,
+      "httpStatus": null,
+      "commitHash": null,
+      "rawSnapshotPersisted": false,
+      "records": [
+        {
+          "id": "animeav1",
+          "name": "AnimeAV1",
+          "version": "1.0.0",
+          "type": "anime",
+          "lang": "es",
+          "file": "providers/animeav1.js"
+        },
+        {
+          "id": "animejl",
+          "name": "AnimeJL",
+          "version": "1.0.0",
+          "type": "anime",
+          "lang": "es",
+          "file": "providers/animejl.js"
+        },
+        {
+          "id": "jkanime",
+          "name": "Jkanime",
+          "version": "1.0.0",
+          "type": "anime",
+          "lang": "es",
+          "file": "providers/jkanime.js"
+        },
+        {
+          "id": "animeytx",
+          "name": "AnimeYTX",
+          "version": "1.0.1",
+          "type": "anime",
+          "lang": "es",
+          "file": "providers/animeytx.js"
+        }
+      ]
+    }
+  ],
+  "selectedScriptInspections": [
+    {
+      "repositoryId": "spyou-zangetsu-providers",
+      "sourceId": "hianime",
+      "scriptPath": "providers/hianime.js",
+      "inspection": "getInfo declares anime; search/detail/episode/server and subtitle/stream mapping statically present",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "spyou-zangetsu-providers",
+      "sourceId": "animecube",
+      "scriptPath": "providers/animecube.js",
+      "inspection": "getInfo declares anime; Chinese language catalog and HLS/embed paths statically present",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "spyou-zangetsu-providers",
+      "sourceId": "fourkhdhub",
+      "scriptPath": "providers/fourkhdhub.js",
+      "inspection": "getInfo declares movie; do not classify as series from index alone",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "serenity-mist-zangetsu",
+      "sourceId": "serenity-cinestream",
+      "scriptPath": "serenity-cinestream.js",
+      "inspection": "TYPE/getInfo=movie while code has movie/series catalog and episode paths",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "serenity-mist-zangetsu",
+      "sourceId": "serenity-streamplay",
+      "scriptPath": "serenity-streamplay.js",
+      "inspection": "TYPE/getInfo=movie while code has movie/series catalog and episode paths",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "spyhell-experiment",
+      "sourceId": "animesuge",
+      "scriptPath": "providers/animesuge.js",
+      "inspection": "getInfo declares anime; multi-server/extractor and stream metadata present",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "spyou-additional-providers",
+      "sourceId": "animesalt",
+      "scriptPath": "providers/animesalt.js",
+      "inspection": "getInfo declares anime; seasons/episode IDs and multi-audio HLS metadata present",
+      "runtime": "not_run",
+      "playback": "not_run"
+    },
+    {
+      "repositoryId": "spyhell-experiment",
+      "sourceId": "worldlivetv",
+      "scriptPath": "providers/worldlivetv.js",
+      "inspection": "getInfo declares movie; getHome returns channel groups; channel ids use worldtv://; getVideoSources resolves HLS",
+      "runtime": "not_run",
+      "playback": "not_run"
+    }
+  ],
+  "localAudit": {
+    "phaseDocuments": 54,
+    "sourceRepositoryManagerSeeds": [
+      "https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json"
+    ],
+    "sourceStableKeyFormat": "repositoryUrl::sourceId",
+    "repositoryCatalogCacheTtlMinutes": 5,
+    "existingParserTests": [
+      "source_repository_parser_test.dart",
+      "source_repository_client_test.dart",
+      "source_repository_manager_test.dart"
+    ],
+    "existingRuntimeRelatedTests": [
+      "quickjs_stream_mapper_test.dart",
+      "stremio_addon_provider_test.dart",
+      "vidking_payload_cipher_test.dart",
+      "live_tv_error_test.dart"
+    ],
+    "openstreamFixtureCount": 30,
+    "liveTvServices": [
+      "DaddyLiveService",
+      "EthioSportsService"
+    ],
+    "commentedProviderSelectionScreens": [
+      "lib/screens/common/live_tv_screen.dart",
+      "lib/tv/screens/tv_live_screen.dart"
+    ],
+    "flutterInstalled": false,
+    "dartInstalled": false,
+    "ci": {
+      "workflow": ".github/workflows/android-ci.yml",
+      "flutter": "3.35.7",
+      "java": "17",
+      "gradle": "8.7",
+      "defaultMode": "release",
+      "targetPlatform": "android-arm64",
+      "flavor": "prod"
+    }
+  },
+  "phase43OpenStreamLiveRecheck": {
+    "checkedDate": "2026-11-07",
+    "indexUrl": "https://raw.githubusercontent.com/Ivorisnoob/OpenStream/main/extensions/index.json",
+    "retrieved": true,
+    "recordCount": 30,
+    "engineBreakdown": {
+      "vidking-direct": 9,
+      "native-anime": 5,
+      "stremio": 5,
+      "web-embed": 10,
+      "vidking-webview": 1
+    },
+    "statusBreakdown": {
+      "status-1-ok": 9,
+      "status-2-slow": 1,
+      "status-3-beta": 20
+    },
+    "statusMeaning": "OpenStream format: 0=down, 1=ok, 2=slow, 3=beta",
+    "commitShaCaptured": false,
+    "commitShaReason": "The retrieved raw index response did not expose a pinned commit hash; no SHA was guessed.",
+    "localFixture": "test/fixtures/openstream_official_repo.json",
+    "contractTests": "prepared_not_executed_without_flutter_sdk",
+    "playbackTests": "not_run"
+  },
+  "phase52Review": {
+    "reviewDate": "2026-11-09",
+    "repositoryCount": 6,
+    "indexedRecordCount": 142,
+    "countsAreGloballyDeduplicated": false,
+    "method": "Current raw GitHub indexes rechecked; selected provider scripts inspected for declared language, media type, lifecycle status and HTTP(S)/magnet output. Series overrides are limited to two reviewed Serenity scripts and continue to require exact season+episode. Static catalog/source review only; not an uptime or live playback measurement.",
+    "priorityLanes": {
+      "movies": 13,
+      "series": 9,
+      "anime": 11
+    },
+    "autoActivationCapPerRepository": 15,
+    "expectedUniqueAutoActivationCandidatesByRepository": {
+      "openstream": 14,
+      "spyou-zangetsu": 5,
+      "serenity": 5,
+      "spyhell-experiment": 15,
+      "spyou-additional": 1,
+      "spyhell-latin": 0
+    },
+    "knownExclusions": [
+      "HDHub4u: index language English conflicts with source script Hindi declaration",
+      "AniLibria: English index declaration conflicts with Russian voice-over source description",
+      "SubsPlease and other torrent/magnet-only entries: unsupported by current HTTP(S)-only playback mapper",
+      "NetPrime: backup-only due browser-signed and IP-bound embed limitations",
+      "OpenStream HDHub/YaStream and five Anime adapters: upstream status Beta, retained as backup candidates rather than first-pass priority",
+      "Live-TV adapters are excluded from VOD priority and automatic activation",
+      "Spanish-only Spyhell Latin entries are excluded by requested language policy",
+      "TheNkiri and Dramacool are not promoted to Series until their episode contracts satisfy exact season and episode identity"
+    ],
+    "limitations": [
+      "Upstream status is metadata, not measured uptime",
+      "No live playback probe was run across all 142 records",
+      "Multi is a declared multilingual capability and does not guarantee English audio on every result",
+      "The curated lane is static compatibility-based priority, not a measured uptime ranking",
+      "Two Serenity Movie-declared scripts receive a narrow Series exception; runtime still requires exact season and episode matching",
+      "Phase52 Flutter Analyze/tests/Android Release require the updated GitHub Actions run"
+    ],
+    "betaMovedToBackup": [
+      "openstream:hdhub",
+      "openstream:yastream",
+      "openstream:anikoto",
+      "openstream:reanime",
+      "openstream:animepahe",
+      "openstream:fouranimo",
+      "openstream:animegg"
+    ],
+    "serenitySeriesCapabilityOverrides": {
+      "serenity-streamplay": "Index/getInfo declares Movie; reviewed script exposes getDetail/getEpisodes and getVideoSources episode path. Exact season+episode matching remains mandatory.",
+      "serenity-cinestream": "Index/getInfo declares Movie; reviewed script exposes getDetail/getEpisodes and getVideoSources episode path. Exact season+episode matching remains mandatory."
+    },
+    "backupOrdering": "After user priority lanes are exhausted, direct backups are ordered by declared upstream status (Listed OK, Slow, Beta, Unrated), then existing engine priority and measured local health. Upstream status is not an uptime measurement.",
+    "manualActivationCap": "Manual additions are constrained to 15 unique active source records per repository; the same multi-category source is counted once."
+  }
+}

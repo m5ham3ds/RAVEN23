@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# RAVEN23 PHASE63 and cross-cutting interaction formatter. Includes Manga/Home/Anime, source
+# management, synchronization, reader/translation, offline recovery, stable navigation and the
+# shared lightweight press response applied to interactive controls across the app.
+mode="${1:---check}"
+files=(
+  lib/catalog/media_item.dart
+  lib/catalog/catalog_controller.dart
+  lib/catalog/continue_watching.dart
+  lib/catalog/home_feed_controller.dart
+  lib/core/cache/cache_interceptor.dart
+  lib/core/cache/http_cache.dart
+  lib/core/network/interceptors/single_flight_interceptor.dart
+  lib/data/repositories/tmdb_repository.dart
+  lib/functions/network.dart
+  lib/functions/video_utils.dart
+  lib/data/sources/tmdb_api.dart
+  lib/catalog/home_rows.dart
+  lib/catalog/up_next.dart
+  lib/controllers/recently_watched_database_controller.dart
+  lib/mobile/collections.dart
+  lib/mobile/my_list.dart
+  lib/mobile/widgets/genre_sheet.dart
+  lib/models/recently_watched.dart
+  lib/screens/common/player/player_data_management.dart
+  lib/screens/common/source_repositories_screen.dart
+  lib/screens/common/server_status_screen.dart
+  lib/screens/common/source_health_probe_service.dart
+  lib/screens/common/source_health_session_controller.dart
+  lib/screens/common/source_health_priority_ranker.dart
+  lib/screens/common/sync_screen.dart
+  lib/screens/common/settings.dart
+  lib/mobile/screens/home_screen.dart
+  lib/mobile/app/mobile_shell.dart
+  lib/mobile/screens/discover_screen.dart
+  lib/mobile/screens/manga_screen.dart
+  lib/mobile/app/mobile_nav_bar.dart
+  lib/mobile/widgets/home_header.dart
+  lib/mobile/widgets/home_optional_row.dart
+  lib/mobile/widgets/page_kit.dart
+  lib/mobile/widgets/hero_card.dart
+  lib/mobile/widgets/media_art.dart
+  lib/mobile/widgets/media_rows.dart
+  lib/mobile/widgets/poster_card.dart
+  lib/manga/anilist/anilist_catalogue_cache.dart
+  lib/manga/anilist/anilist_manga_service.dart
+  lib/manga/mihon/mihon_runtime.dart
+  lib/manga/mihon/mihon_default_extension_installer.dart
+  lib/manga/mihon/mihon_source_browser_screen.dart
+  lib/manga/ui/manga_chapter_download_store.dart
+  lib/manga/ui/manga_reader_screen.dart
+  lib/manga/ui/manga_reader_crop.dart
+  lib/manga/ui/manga_reading_store.dart
+  lib/manga/ui/manga_source_matcher.dart
+  lib/manga/ui/manga_work_screen.dart
+  lib/manga/translation/manga_translation_models.dart
+  lib/manga/translation/manga_translation_platform.dart
+  lib/manga/translation/manga_page_translation_service.dart
+  lib/manga/translation/manga_translation_overlay.dart
+  lib/video_providers/provider_loader.dart
+  lib/video_providers/unified/source_priority_policy.dart
+  lib/video_providers/unified/source_priority_manager.dart
+  lib/video_providers/unified/source_repository_manager.dart
+  lib/video_providers/unified/source_catalog_safety_policy.dart
+  lib/video_providers/unified/stream_host_priority_manager.dart
+  lib/video_providers/unified/unified_source_service.dart
+  lib/tv/screens/tv_settings_screen.dart
+  lib/raven23_main.dart
+  lib/services/app_network_state.dart
+  lib/services/minimum_loading_visibility.dart
+  lib/translations/codegen_loader.g.dart
+  lib/translations/locale_keys.g.dart
+  test/manga/anilist_catalogue_cache_test.dart
+  test/manga/phase55_manga_catalogue_test.dart
+  test/manga/phase55_mihon_pb_index_test.dart
+  test/manga/mihon_source_browser_screen_test.dart
+  test/manga/mihon_default_extension_installer_test.dart
+  test/manga/phase56_manga_regression_test.dart
+  test/manga/phase57_manga_home_parity_test.dart
+  test/manga_detail_metadata_test.dart
+  test/manga_reading_store_test.dart
+  test/manga_source_matcher_test.dart
+  test/search_screen_test.dart
+  test/data/tmdb_network_test.dart
+  test/app_press_feedback_test.dart
+  test/mobile/mobile_nav_bar_test.dart
+  test/pill_button_test.dart
+  test/playback_action_test.dart
+  test/quality_catalog_test.dart
+  test/video_providers/legacy_provider_adapter_test.dart
+  test/video_utils_download_format_test.dart
+  test/adaptive_quality_scanner_test.dart
+  test/discover_screen_test.dart
+  test/anime_media_classification_test.dart
+  test/home_catalog_test.dart
+  test/home_screen_test.dart
+  test/provider_background_scan_test.dart
+  test/video_providers/unified_source_service_execution_test.dart
+  test/video_providers/source_priority_manager_test.dart
+  test/video_providers/source_priority_policy_test.dart
+  test/video_providers/source_catalog_safety_policy_test.dart
+  test/screens/common/source_health_probe_service_test.dart
+  test/screens/common/source_health_priority_ranker_test.dart
+  test/video_providers/stream_host_priority_manager_test.dart
+  test/video_providers/offline_stream_identity_test.dart
+  lib/design/app_press_feedback.dart
+  lib/mobile/playlists.dart
+  lib/mobile/screens/credits_screen.dart
+  lib/mobile/screens/episode_screen.dart
+  lib/mobile/screens/flix_ai_screen.dart
+  lib/mobile/screens/my_raven23_screen.dart
+  lib/mobile/screens/person_screen.dart
+  lib/mobile/screens/playlist_import_screen.dart
+  lib/mobile/screens/playlist_screen.dart
+  lib/mobile/screens/playlists_screen.dart
+  lib/mobile/screens/plus_payment_screen.dart
+  lib/mobile/screens/plus_screen.dart
+  lib/mobile/screens/search_screen.dart
+  lib/mobile/screens/season_screen.dart
+  lib/mobile/screens/shared_playlist_screen.dart
+  lib/mobile/screens/title_details_screen.dart
+  lib/mobile/widgets/account_form.dart
+  lib/mobile/widgets/continue_sheet.dart
+  lib/mobile/widgets/details_header.dart
+  lib/mobile/widgets/details_parts.dart
+  lib/mobile/widgets/device_limit_sheet.dart
+  lib/mobile/widgets/episode_row.dart
+  lib/mobile/widgets/episodes_section.dart
+  lib/mobile/widgets/filter_chips.dart
+  lib/mobile/widgets/pill_button.dart
+  lib/mobile/widgets/plus_card.dart
+  lib/mobile/widgets/plus_sheets.dart
+  lib/mobile/widgets/section_header.dart
+  lib/mobile/widgets/telegram_channel_prompt.dart
+  lib/screens/common/about.dart
+  lib/screens/common/bookmark_screen.dart
+  lib/screens/common/download_selection_sheets.dart
+  lib/screens/common/downloads_screen.dart
+  lib/screens/common/embedded_web_playback_screen.dart
+  lib/screens/common/iptv_playlist_manager_dialog.dart
+  lib/screens/common/live_tv_screen.dart
+  lib/screens/common/player.dart
+  lib/screens/movie/movie_video_loader.dart
+  lib/screens/tv/tv_video_loader.dart
+  lib/video_providers/common.dart
+  lib/video_providers/quality_catalog.dart
+  lib/video_providers/unified/legacy_provider_adapter.dart
+  lib/screens/common/player/player_episode_selection.dart
+  lib/screens/common/player/player_external_subtitles.dart
+  lib/screens/common/player/player_feedback_ui.dart
+  lib/screens/common/player/player_local_subtitles.dart
+  lib/screens/common/player/player_movie_recommendations.dart
+  lib/screens/common/player/player_sheet_ui.dart
+  lib/screens/common/player/player_subtitle_timing_sheet.dart
+  lib/screens/common/player/player_watch_page.dart
+  lib/screens/common/player/stream_feedback_prompt.dart
+  lib/screens/common/player/tv_subtitle_timing_panel.dart
+  lib/screens/common/player_settings.dart
+  lib/screens/common/provider_choose.dart
+  lib/screens/common/quickjs_source_settings_dialog.dart
+  lib/screens/common/update_screen.dart
+  lib/screens/movie/collection_detail.dart
+  lib/screens/user/edit_profile.dart
+  lib/screens/user/login_screen.dart
+  lib/screens/user/password_change.dart
+  lib/screens/user/signup_screen.dart
+  lib/screens/wellness/wellness_screen.dart
+  lib/screens/wellness/widgets/insights_dashboard.dart
+  lib/services/globle_method.dart
+  lib/tv/focus/tv_focusable.dart
+  lib/ui_components/in_app_message_dialog.dart
+  lib/widgets/ad_block_playback_guard.dart
+  lib/widgets/adsterra_playback_ad_screen.dart
+  lib/widgets/common_widgets.dart
+  lib/widgets/network_banner_widget.dart
+  lib/widgets/playback_loading_screen.dart
+  lib/widgets/vast_ad_overlay.dart
+)
+
+for file in "${files[@]}"; do
+  if [[ ! -f "$file" ]]; then
+    printf 'Manga/PHASE63 Dart format target is missing: %s\n' "$file" >&2
+    exit 2
+  fi
+done
+
+case "$mode" in
+  --fix) dart format "${files[@]}" ;;
+  --check) dart format --output=none --set-exit-if-changed "${files[@]}" ;;
+  --help|-h) printf 'Usage: %s [--fix|--check]\n' "$0" ;;
+  *) printf 'Unsupported mode: %s (expected --fix or --check)\n' "$mode" >&2; exit 2 ;;
+esac

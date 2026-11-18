@@ -1,0 +1,11 @@
+PHASE63.22 static validation
+
+- Base archive: PHASE63.21.
+- CI run: 43738500315; commit: 50aa4620d798492dceeedca453b4976dfd5b7d2f.
+- Flutter analyze: success (40 info diagnostics; exit code 0).
+- Focused pre-build tests: 142 passed, 2 failed.
+- Failure causes: secondary dock test incorrectly required tree removal despite AnimatedSize zero-height collapse; Movies/Series test reused HomeScreen State across two initialFilter values.
+- Corrections: assert zero-height/non-hit-testable dock after close and 54dp/tappable after reopen; add ValueKey<HomeFilter>(filter) for independent HomeScreen test State.
+- Supplied formatter patch applied to five Dart files.
+- No production runtime code changed.
+- Flutter tests and APK build not run locally; CI confirmation pending.

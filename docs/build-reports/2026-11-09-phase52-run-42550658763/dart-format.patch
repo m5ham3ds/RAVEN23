@@ -1,0 +1,22 @@
+diff --git a/test/video_providers/source_repository_parser_test.dart b/test/video_providers/source_repository_parser_test.dart
+index 48c4f39..72fdf80 100644
+--- a/test/video_providers/source_repository_parser_test.dart
++++ b/test/video_providers/source_repository_parser_test.dart
+@@ -122,13 +122,10 @@ void main() {
+       expect(source.language, 'Hindi');
+       expect(source.engine.audioLanguage, 'Arabic');
+       expect(source.engine.qualityFilter, '1080p');
+-      expect(
+-        source.engine.config,
+-        <String, dynamic>{
+-          'languageDeclared': true,
+-          'statusDeclared': false,
+-        },
+-      );
++      expect(source.engine.config, <String, dynamic>{
++        'languageDeclared': true,
++        'statusDeclared': false,
++      });
+       expect(source.engine.config, isNot(contains('audioLanguage')));
+       expect(source.engine.config, isNot(contains('qualityFilter')));
+     });

@@ -1,0 +1,584 @@
+diff --git a/lib/manga/mihon/mihon_source_browser_screen.dart b/lib/manga/mihon/mihon_source_browser_screen.dart
+index 0e490da..8dc97cc 100644
+--- a/lib/manga/mihon/mihon_source_browser_screen.dart
++++ b/lib/manga/mihon/mihon_source_browser_screen.dart
+@@ -1861,9 +1861,9 @@ class _MihonFiltersSheetState extends State<_MihonFiltersSheet> {
+             items: <DropdownMenuItem<int>>[
+               for (var i = 0; i < values.length; i++)
+                 DropdownMenuItem<int>(
+-                    value: i,
+-                    child: AppPressFeedback(child: Text(values[i])),
+-                  ),
++                  value: i,
++                  child: AppPressFeedback(child: Text(values[i])),
++                ),
+             ],
+             onChanged: (value) => setState(() => filter['state'] = value ?? 0),
+           ),
+@@ -1896,17 +1896,21 @@ class _MihonFiltersSheetState extends State<_MihonFiltersSheet> {
+             decoration: InputDecoration(labelText: name),
+             items: <DropdownMenuItem<int>>[
+               DropdownMenuItem(
+-                  value: 0,
+-                  child: AppPressFeedback(child: Text(tr('mihon_filter_ignore'))),
+-                ),
++                value: 0,
++                child: AppPressFeedback(child: Text(tr('mihon_filter_ignore'))),
++              ),
+               DropdownMenuItem(
+-                  value: 1,
+-                  child: AppPressFeedback(child: Text(tr('mihon_filter_include'))),
++                value: 1,
++                child: AppPressFeedback(
++                  child: Text(tr('mihon_filter_include')),
+                 ),
++              ),
+               DropdownMenuItem(
+-                  value: 2,
+-                  child: AppPressFeedback(child: Text(tr('mihon_filter_exclude'))),
++                value: 2,
++                child: AppPressFeedback(
++                  child: Text(tr('mihon_filter_exclude')),
+                 ),
++              ),
+             ],
+             onChanged: (value) => setState(() => filter['state'] = value ?? 0),
+           ),
+@@ -1930,9 +1934,9 @@ class _MihonFiltersSheetState extends State<_MihonFiltersSheet> {
+               items: <DropdownMenuItem<int>>[
+                 for (var i = 0; i < values.length; i++)
+                   DropdownMenuItem<int>(
+-                      value: i,
+-                      child: AppPressFeedback(child: Text(values[i])),
+-                    ),
++                    value: i,
++                    child: AppPressFeedback(child: Text(values[i])),
++                  ),
+               ],
+               onChanged: (value) => setState(
+                 () => filter['state'] = <String, dynamic>{
+diff --git a/lib/manga/ui/manga_reader_screen.dart b/lib/manga/ui/manga_reader_screen.dart
+index 965b2c7..63bd7a2 100644
+--- a/lib/manga/ui/manga_reader_screen.dart
++++ b/lib/manga/ui/manga_reader_screen.dart
+@@ -1549,11 +1549,13 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                             items: <DropdownMenuItem<String>>[
+                               for (final code in currentSources)
+                                 DropdownMenuItem<String>(
+-                                    value: code,
+-                                    child: AppPressFeedback(child: Text(
++                                  value: code,
++                                  child: AppPressFeedback(
++                                    child: Text(
+                                       mangaOcrLanguages[code] ?? code,
+-                                    )),
++                                    ),
+                                   ),
++                                ),
+                             ],
+                             onChanged: currentSources.isEmpty
+                                 ? null
+@@ -1578,11 +1580,13 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                             items: <DropdownMenuItem<String>>[
+                               for (final code in targets)
+                                 DropdownMenuItem<String>(
+-                                    value: code,
+-                                    child: AppPressFeedback(child: Text(
++                                  value: code,
++                                  child: AppPressFeedback(
++                                    child: Text(
+                                       mangaTranslationLanguages[code] ?? code,
+-                                    )),
++                                    ),
+                                   ),
++                                ),
+                             ],
+                             onChanged: targets.isEmpty
+                                 ? null
+@@ -1797,30 +1801,37 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+       items: <PopupMenuEntry<String>>[
+         if (uri != null) ...<PopupMenuEntry<String>>[
+           PopupMenuItem<String>(
+-              value: 'webview',
+-              child: AppPressFeedback(child: _menuRow(
++            value: 'webview',
++            child: AppPressFeedback(
++              child: _menuRow(
+                 Icons.public_rounded,
+                 tr('manga_reader_open_webview'),
+-              )),
++              ),
+             ),
++          ),
+           PopupMenuItem<String>(
+-              value: 'browser',
+-              child: AppPressFeedback(child: _menuRow(
++            value: 'browser',
++            child: AppPressFeedback(
++              child: _menuRow(
+                 Icons.open_in_new_rounded,
+                 tr('manga_reader_open_browser'),
+-              )),
++              ),
+             ),
++          ),
+         ],
+         PopupMenuItem<String>(
+-            value: 'translate',
+-            child: AppPressFeedback(child: _menuRow(
++          value: 'translate',
++          child: AppPressFeedback(
++            child: _menuRow(
+               Icons.translate_rounded,
+               tr('manga_translate_chapter'),
+-            )),
++            ),
+           ),
++        ),
+         PopupMenuItem<String>(
+-            value: 'read',
+-            child: AppPressFeedback(child: _menuRow(
++          value: 'read',
++          child: AppPressFeedback(
++            child: _menuRow(
+               _isChapterRead
+                   ? Icons.remove_done_rounded
+                   : Icons.check_circle_outline_rounded,
+@@ -1829,12 +1840,15 @@ class _MangaReaderScreenState extends State<MangaReaderScreen>
+                     ? 'manga_reader_mark_unread'
+                     : 'manga_reader_mark_read',
+               ),
+-            )),
++            ),
+           ),
++        ),
+         PopupMenuItem<String>(
+-            value: 'settings',
+-            child: AppPressFeedback(child: _menuRow(Icons.tune_rounded, tr('manga_reader_settings'))),
++          value: 'settings',
++          child: AppPressFeedback(
++            child: _menuRow(Icons.tune_rounded, tr('manga_reader_settings')),
+           ),
++        ),
+       ],
+     );
+     if (!mounted || selected == null) return;
+diff --git a/lib/manga/ui/manga_work_screen.dart b/lib/manga/ui/manga_work_screen.dart
+index 31bc0dc..f6fade0 100644
+--- a/lib/manga/ui/manga_work_screen.dart
++++ b/lib/manga/ui/manga_work_screen.dart
+@@ -1060,65 +1060,59 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                             ),
+                                           FutureBuilder<bool>(
+                                             future: _settingsAvailable(source),
+-                                            builder: (context, snapshot) =>
+-                                                PopupMenuButton<String>(
+-                                                  tooltip: tr('more'),
+-                                                  icon: Icon(
+-                                                    Icons.more_vert_rounded,
+-                                                    color: palette.mutedText,
+-                                                  ),
+-                                                  onSelected: (action) =>
+-                                                      unawaited(
+-                                                        _handleSourceAction(
+-                                                          source,
+-                                                          action,
++                                            builder: (context, snapshot) => PopupMenuButton<String>(
++                                              tooltip: tr('more'),
++                                              icon: Icon(
++                                                Icons.more_vert_rounded,
++                                                color: palette.mutedText,
++                                              ),
++                                              onSelected: (action) => unawaited(
++                                                _handleSourceAction(
++                                                  source,
++                                                  action,
++                                                ),
++                                              ),
++                                              itemBuilder: (context) =>
++                                                  <PopupMenuEntry<String>>[
++                                                    if (source
++                                                        .baseUrl
++                                                        .isNotEmpty)
++                                                      PopupMenuItem<String>(
++                                                        value: 'solve',
++                                                        child: AppPressFeedback(
++                                                          child: Text(
++                                                            tr(
++                                                              'manga_source_solve_cloudflare',
++                                                            ),
++                                                          ),
+                                                         ),
+                                                       ),
+-                                                  itemBuilder: (context) =>
+-                                                      <PopupMenuEntry<String>>[
+-                                                        if (source
+-                                                            .baseUrl
+-                                                            .isNotEmpty)
+-                                                          PopupMenuItem<
+-                                                                  String
+-                                                                >(
+-                                                                  value:
+-                                                                      'solve',
+-                                                                  child: AppPressFeedback(child: Text(
+-                                                                    tr(
+-                                                                      'manga_source_solve_cloudflare',
+-                                                                    ),
+-                                                                  )),
+-                                                                ),
+-                                                        if (source
+-                                                            .baseUrl
+-                                                            .isNotEmpty)
+-                                                          PopupMenuItem<
+-                                                                  String
+-                                                                >(
+-                                                                  value:
+-                                                                      'signin',
+-                                                                  child: AppPressFeedback(child: Text(
+-                                                                    tr(
+-                                                                      'manga_source_sign_in',
+-                                                                    ),
+-                                                                  )),
+-                                                                ),
+-                                                        if (snapshot.data ==
+-                                                            true)
+-                                                          PopupMenuItem<
+-                                                                  String
+-                                                                >(
+-                                                                  value:
+-                                                                      'settings',
+-                                                                  child: AppPressFeedback(child: Text(
+-                                                                    tr(
+-                                                                      'manga_source_settings',
+-                                                                    ),
+-                                                                  )),
+-                                                                ),
+-                                                      ],
+-                                                ),
++                                                    if (source
++                                                        .baseUrl
++                                                        .isNotEmpty)
++                                                      PopupMenuItem<String>(
++                                                        value: 'signin',
++                                                        child: AppPressFeedback(
++                                                          child: Text(
++                                                            tr(
++                                                              'manga_source_sign_in',
++                                                            ),
++                                                          ),
++                                                        ),
++                                                      ),
++                                                    if (snapshot.data == true)
++                                                      PopupMenuItem<String>(
++                                                        value: 'settings',
++                                                        child: AppPressFeedback(
++                                                          child: Text(
++                                                            tr(
++                                                              'manga_source_settings',
++                                                            ),
++                                                          ),
++                                                        ),
++                                                      ),
++                                                  ],
++                                            ),
+                                           ),
+                                         ],
+                                       ),
+@@ -1339,19 +1333,25 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     itemBuilder: (context) => <PopupMenuEntry<String>>[
+                       if (source.baseUrl.isNotEmpty)
+                         PopupMenuItem<String>(
+-                            value: 'solve',
+-                            child: AppPressFeedback(child: Text(tr('manga_source_solve_cloudflare'))),
++                          value: 'solve',
++                          child: AppPressFeedback(
++                            child: Text(tr('manga_source_solve_cloudflare')),
+                           ),
++                        ),
+                       if (source.baseUrl.isNotEmpty)
+                         PopupMenuItem<String>(
+-                            value: 'signin',
+-                            child: AppPressFeedback(child: Text(tr('manga_source_sign_in'))),
++                          value: 'signin',
++                          child: AppPressFeedback(
++                            child: Text(tr('manga_source_sign_in')),
+                           ),
++                        ),
+                       if (snapshot.data == true)
+                         PopupMenuItem<String>(
+-                            value: 'settings',
+-                            child: AppPressFeedback(child: Text(tr('manga_source_settings'))),
++                          value: 'settings',
++                          child: AppPressFeedback(
++                            child: Text(tr('manga_source_settings')),
+                           ),
++                        ),
+                     ],
+                   ),
+                 )
+@@ -1856,13 +1856,15 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   items: <DropdownMenuItem<int>>[
+                     for (var index = 0; index < visible.length; index++)
+                       DropdownMenuItem<int>(
+-                          value: index,
+-                          child: AppPressFeedback(child: Text(
++                        value: index,
++                        child: AppPressFeedback(
++                          child: Text(
+                             '${visible[index]['name'] ?? '${tr('chapter')} ${index + 1}'}',
+                             maxLines: 1,
+                             overflow: TextOverflow.ellipsis,
+-                          )),
++                          ),
+                         ),
++                      ),
+                   ],
+                   onChanged: (value) {
+                     if (value == null) return;
+@@ -1885,13 +1887,15 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                   items: <DropdownMenuItem<int>>[
+                     for (var index = 0; index < visible.length; index++)
+                       DropdownMenuItem<int>(
+-                          value: index,
+-                          child: AppPressFeedback(child: Text(
++                        value: index,
++                        child: AppPressFeedback(
++                          child: Text(
+                             '${visible[index]['name'] ?? '${tr('chapter')} ${index + 1}'}',
+                             maxLines: 1,
+                             overflow: TextOverflow.ellipsis,
+-                          )),
++                          ),
+                         ),
++                      ),
+                   ],
+                   onChanged: (value) {
+                     if (value == null) return;
+@@ -2630,17 +2634,20 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                     },
+                     itemBuilder: (context) => <PopupMenuEntry<String>>[
+                       PopupMenuItem<String>(
+-                          value: 'refresh',
+-                          child: AppPressFeedback(child: ListTile(
++                        value: 'refresh',
++                        child: AppPressFeedback(
++                          child: ListTile(
+                             dense: true,
+                             contentPadding: EdgeInsets.zero,
+                             leading: const Icon(Icons.refresh_rounded),
+                             title: Text(tr('manga_refresh_chapters')),
+-                          )),
++                          ),
+                         ),
++                      ),
+                       PopupMenuItem<String>(
+-                          value: 'reverse',
+-                          child: AppPressFeedback(child: ListTile(
++                        value: 'reverse',
++                        child: AppPressFeedback(
++                          child: ListTile(
+                             dense: true,
+                             contentPadding: EdgeInsets.zero,
+                             leading: const Icon(Icons.swap_vert_rounded),
+@@ -2649,8 +2656,9 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                                   ? tr('manga_reverse_chapters')
+                                   : tr('manga_sort_ascending'),
+                             ),
+-                          )),
++                          ),
+                         ),
++                      ),
+                     ],
+                   ),
+                 ],
+@@ -3104,13 +3112,17 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                               _handleSourceAction(_boundSource!, action),
+                           itemBuilder: (context) => <PopupMenuEntry<String>>[
+                             PopupMenuItem<String>(
+-                                value: 'settings',
+-                                child: AppPressFeedback(child: Text(tr('manga_source_settings'))),
++                              value: 'settings',
++                              child: AppPressFeedback(
++                                child: Text(tr('manga_source_settings')),
+                               ),
++                            ),
+                             PopupMenuItem<String>(
+-                                value: 'web',
+-                                child: AppPressFeedback(child: Text(tr('manga_open_source_website'))),
++                              value: 'web',
++                              child: AppPressFeedback(
++                                child: Text(tr('manga_open_source_website')),
+                               ),
++                            ),
+                           ],
+                         ),
+                     ],
+@@ -3291,13 +3303,17 @@ class _MangaWorkScreenState extends State<MangaWorkScreen>
+                             _handleSourceAction(source, action),
+                         itemBuilder: (context) => <PopupMenuEntry<String>>[
+                           PopupMenuItem<String>(
+-                              value: 'settings',
+-                              child: AppPressFeedback(child: Text(tr('manga_source_settings'))),
++                            value: 'settings',
++                            child: AppPressFeedback(
++                              child: Text(tr('manga_source_settings')),
+                             ),
++                          ),
+                           PopupMenuItem<String>(
+-                              value: 'web',
+-                              child: AppPressFeedback(child: Text(tr('manga_open_source_website'))),
++                            value: 'web',
++                            child: AppPressFeedback(
++                              child: Text(tr('manga_open_source_website')),
+                             ),
++                          ),
+                         ],
+                       ),
+                     ],
+@@ -4171,8 +4187,9 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+     itemBuilder: (context) => <PopupMenuEntry<int>>[
+       for (final source in widget.sources)
+         PopupMenuItem<int>(
+-            value: source.id,
+-            child: AppPressFeedback(child: Row(
++          value: source.id,
++          child: AppPressFeedback(
++            child: Row(
+               children: <Widget>[
+                 _SourceMenuIcon(source: source),
+                 const SizedBox(width: 10),
+@@ -4188,8 +4205,9 @@ class _MangaSourceSearchSheetState extends State<_MangaSourceSearchSheet> {
+                   const Icon(Icons.check_rounded, size: 18),
+                 ],
+               ],
+-            )),
++            ),
+           ),
++        ),
+     ],
+     child: Container(
+       constraints: const BoxConstraints(maxWidth: 190),
+diff --git a/lib/screens/common/quickjs_source_settings_dialog.dart b/lib/screens/common/quickjs_source_settings_dialog.dart
+index 6aa63cd..bf57f9f 100644
+--- a/lib/screens/common/quickjs_source_settings_dialog.dart
++++ b/lib/screens/common/quickjs_source_settings_dialog.dart
+@@ -245,13 +245,15 @@ class _QuickJsSourceSettingsDialogState
+           items: <DropdownMenuItem<Object>>[
+             for (final option in field.options)
+               DropdownMenuItem<Object>(
+-                  value: option.value,
+-                  child: AppPressFeedback(child: Text(
++                value: option.value,
++                child: AppPressFeedback(
++                  child: Text(
+                     option.label,
+                     maxLines: 2,
+                     overflow: TextOverflow.ellipsis,
+-                  )),
++                  ),
+                 ),
++              ),
+           ],
+           validator: (value) => field.required && field.coerce(value) == null
+               ? 'quickjs_setting_invalid'.tr()
+diff --git a/lib/screens/common/source_repositories_screen.dart b/lib/screens/common/source_repositories_screen.dart
+index 330ab7f..c440364 100644
+--- a/lib/screens/common/source_repositories_screen.dart
++++ b/lib/screens/common/source_repositories_screen.dart
+@@ -1420,17 +1420,17 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+     },
+     itemBuilder: (_) => <PopupMenuEntry<String>>[
+       PopupMenuItem(
+-          value: 'export',
+-          child: AppPressFeedback(child: Text(tr('export_configuration'))),
+-        ),
++        value: 'export',
++        child: AppPressFeedback(child: Text(tr('export_configuration'))),
++      ),
+       PopupMenuItem(
+-          value: 'import',
+-          child: AppPressFeedback(child: Text(tr('import_configuration'))),
+-        ),
++        value: 'import',
++        child: AppPressFeedback(child: Text(tr('import_configuration'))),
++      ),
+       PopupMenuItem(
+-          value: 'duplicates',
+-          child: AppPressFeedback(child: Text(tr('repository_duplicate_review'))),
+-        ),
++        value: 'duplicates',
++        child: AppPressFeedback(child: Text(tr('repository_duplicate_review'))),
++      ),
+     ],
+   );
+ 
+@@ -2432,29 +2432,37 @@ class _RepositoryTile extends StatelessWidget {
+             },
+             itemBuilder: (context) => <PopupMenuEntry<String>>[
+               PopupMenuItem(
+-                  value: 'preview',
+-                  child: AppPressFeedback(child: Text(tr('repository_preview_update'))),
++                value: 'preview',
++                child: AppPressFeedback(
++                  child: Text(tr('repository_preview_update')),
+                 ),
++              ),
+               if (revisionCount > 1)
+                 PopupMenuItem(
+-                    value: 'rollback',
+-                    child: AppPressFeedback(child: Text(tr('repository_rollback'))),
++                  value: 'rollback',
++                  child: AppPressFeedback(
++                    child: Text(tr('repository_rollback')),
+                   ),
++                ),
+               if (isGitHubRaw && pinnedCommit == null)
+                 PopupMenuItem(
+-                    value: 'pin',
+-                    child: AppPressFeedback(child: Text(tr('repository_pin_commit'))),
++                  value: 'pin',
++                  child: AppPressFeedback(
++                    child: Text(tr('repository_pin_commit')),
+                   ),
++                ),
+               if (pinnedCommit != null)
+                 PopupMenuItem(
+-                    value: 'clear_pin',
+-                    child: AppPressFeedback(child: Text(tr('repository_clear_pin'))),
++                  value: 'clear_pin',
++                  child: AppPressFeedback(
++                    child: Text(tr('repository_clear_pin')),
+                   ),
++                ),
+               const PopupMenuDivider(),
+               PopupMenuItem(
+-                  value: 'remove',
+-                  child: AppPressFeedback(child: Text(tr('remove_repository'))),
+-                ),
++                value: 'remove',
++                child: AppPressFeedback(child: Text(tr('remove_repository'))),
++              ),
+             ],
+           ),
+         ),
+@@ -2512,13 +2520,15 @@ class _MangaRepositoryTile extends StatelessWidget {
+             },
+             itemBuilder: (_) => <PopupMenuEntry<String>>[
+               PopupMenuItem(
+-                  value: 'edit',
+-                  child: AppPressFeedback(child: Text(tr('manga_repository_edit'))),
++                value: 'edit',
++                child: AppPressFeedback(
++                  child: Text(tr('manga_repository_edit')),
+                 ),
++              ),
+               PopupMenuItem(
+-                  value: 'remove',
+-                  child: AppPressFeedback(child: Text(tr('remove_repository'))),
+-                ),
++                value: 'remove',
++                child: AppPressFeedback(child: Text(tr('remove_repository'))),
++              ),
+             ],
+           ),
+         ),

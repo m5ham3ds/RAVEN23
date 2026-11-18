@@ -1,0 +1,970 @@
+diff --git a/lib/functions/video_utils.dart b/lib/functions/video_utils.dart
+index ac1a5ff..72e0f39 100644
+--- a/lib/functions/video_utils.dart
++++ b/lib/functions/video_utils.dart
+@@ -286,8 +286,9 @@ class VideoUtils {
+         .first
+         .replaceFirst(RegExp(r'\s+\(\d+\)$'), '')
+         .trim();
+-    return RegExp(r'^(?:auto(?:matic)?|adaptive|master)(?:\b|$)')
+-        .hasMatch(label);
++    return RegExp(
++      r'^(?:auto(?:matic)?|adaptive|master)(?:\b|$)',
++    ).hasMatch(label);
+   }
+ 
+   /// Media3 download format for a selected stream. HLS/DASH declarations take
+diff --git a/lib/screens/common/download_selection_sheets.dart b/lib/screens/common/download_selection_sheets.dart
+index 1f6b431..ae9ab32 100644
+--- a/lib/screens/common/download_selection_sheets.dart
++++ b/lib/screens/common/download_selection_sheets.dart
+@@ -65,8 +65,7 @@ abstract final class DownloadSelectionSheets {
+   }) {
+     final concreteEntries = entries
+         .where(
+-          (entry) =>
+-              !entry.isAdaptive || entry.adaptiveTargetHeight != null,
++          (entry) => !entry.isAdaptive || entry.adaptiveTargetHeight != null,
+         )
+         .where((entry) => !_isProviderAutoLabel(entry.qualityLabel))
+         .toList(growable: false);
+@@ -150,8 +149,9 @@ abstract final class DownloadSelectionSheets {
+         .first
+         .replaceFirst(RegExp(r'\s+\(\d+\)$'), '')
+         .trim();
+-    return RegExp(r'^(?:auto(?:matic)?|adaptive|master)(?:\b|$)')
+-        .hasMatch(label);
++    return RegExp(
++      r'^(?:auto(?:matic)?|adaptive|master)(?:\b|$)',
++    ).hasMatch(label);
+   }
+ 
+   static String _resolutionDescription(String resolution) {
+diff --git a/lib/screens/common/player.dart b/lib/screens/common/player.dart
+index 4c43dc8..6487a87 100644
+--- a/lib/screens/common/player.dart
++++ b/lib/screens/common/player.dart
+@@ -2034,9 +2034,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+     _ => 'video/mp4',
+   };
+ 
+-  void _applyPreferredAdaptiveQuality({
+-    bool allowAppAutomaticQuality = true,
+-  }) {
++  void _applyPreferredAdaptiveQuality({bool allowAppAutomaticQuality = true}) {
+     final preferredHeight = widget.settings.defaultVideoResolution;
+     if (preferredHeight > 0) {
+       _appAutomaticQualityPending = false;
+@@ -2130,8 +2128,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+               1;
+     }
+     final link = _activeRawVideoLink();
+-    return link?.isAdaptive == true ||
+-        (link?.availableHeights.length ?? 0) > 1;
++    return link?.isAdaptive == true || (link?.availableHeights.length ?? 0) > 1;
+   }
+ 
+   List<QualityCatalogEntry> _appAutomaticQualityEntries() {
+@@ -2139,10 +2136,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+     if (providerCode == null) return const <QualityCatalogEntry>[];
+     final activeLink = _activeRawVideoLink();
+     final activeServer = activeLink?.server?.trim().toLowerCase();
+-    final concreteEntries = _qualityCatalogEntries.where((entry) {
+-      final height = entry.height ?? entry.adaptiveTargetHeight;
+-      return height != null && height > 0;
+-    }).toList(growable: false);
++    final concreteEntries = _qualityCatalogEntries
++        .where((entry) {
++          final height = entry.height ?? entry.adaptiveTargetHeight;
++          return height != null && height > 0;
++        })
++        .toList(growable: false);
+ 
+     if (activeServer?.isNotEmpty == true) {
+       final sameServer = concreteEntries
+@@ -2227,13 +2226,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+         .where((track) => (track.height ?? 0) > 0)
+         .toList(growable: false);
+     final entries = _appAutomaticQualityEntries();
+-    final hasMultipleTrackHeights = tracks
+-            .map((track) => track.height)
+-            .whereType<int>()
+-            .toSet()
+-            .length >
+-        1;
+-    final hasCatalogChoices = entries
++    final hasMultipleTrackHeights =
++        tracks.map((track) => track.height).whereType<int>().toSet().length > 1;
++    final hasCatalogChoices =
++        entries
+             .map((entry) => entry.height ?? entry.adaptiveTargetHeight)
+             .whereType<int>()
+             .toSet()
+@@ -2277,11 +2273,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+     try {
+       if (generation != _appAutomaticQualityGeneration || !mounted) return;
+       final activeAdaptiveMaster = _activeSourceIsAdaptiveMaster();
+-      final hasMultipleTrackHeights = tracks
+-              .map((track) => track.height)
+-              .whereType<int>()
+-              .toSet()
+-              .length >
++      final hasMultipleTrackHeights =
++          tracks.map((track) => track.height).whereType<int>().toSet().length >
+           1;
+       if (activeAdaptiveMaster && hasMultipleTrackHeights) {
+         final height = PlaybackAutoQualityPolicy.chooseHeight(
+@@ -2313,12 +2306,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+         return;
+       }
+ 
+-      final usableEntries = entries.where((entry) {
+-        if (entry.isAdaptive && entry.adaptiveTargetHeight == null) {
+-          return false;
+-        }
+-        return (entry.height ?? entry.adaptiveTargetHeight ?? 0) > 0;
+-      }).toList(growable: false);
++      final usableEntries = entries
++          .where((entry) {
++            if (entry.isAdaptive && entry.adaptiveTargetHeight == null) {
++              return false;
++            }
++            return (entry.height ?? entry.adaptiveTargetHeight ?? 0) > 0;
++          })
++          .toList(growable: false);
+       final selectedHeight = PlaybackAutoQualityPolicy.chooseHeight(
+         renditions: usableEntries.map(
+           (entry) => PlaybackQualityRendition(
+@@ -2355,10 +2350,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+             selectedEntry.sourceProviderCode,
+             selectedEntry.link,
+             requestedSourceKey: selectedEntry.sourceKey,
+-            resumeAt: _betterPlayerController
+-                .videoPlayerController
+-                ?.value
+-                .position,
++            resumeAt:
++                _betterPlayerController.videoPlayerController?.value.position,
+             resumePlayback: true,
+             refreshMenu: () {},
+             closeMenu: () {},
+@@ -2377,10 +2370,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+           selectedEntry.sourceProviderCode,
+           selectedEntry.link,
+           requestedSourceKey: selectedEntry.sourceKey,
+-          resumeAt: _betterPlayerController
+-              .videoPlayerController
+-              ?.value
+-              .position,
++          resumeAt:
++              _betterPlayerController.videoPlayerController?.value.position,
+           resumePlayback: true,
+           refreshMenu: () {},
+           closeMenu: () {},
+@@ -3987,8 +3978,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+           final entries = allEntries
+               .where(
+                 (entry) =>
+-                    (!entry.isAdaptive ||
+-                        entry.adaptiveTargetHeight != null) &&
++                    (!entry.isAdaptive || entry.adaptiveTargetHeight != null) &&
+                     !(_isActiveQualitySource(entry) &&
+                         adaptiveTrackHeights.contains(
+                           entry.height ?? entry.adaptiveTargetHeight,
+@@ -4025,9 +4015,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+                           final entry = entries[index];
+                           final selected = _isQualityEntrySelected(entry);
+                           return PlayerChoiceCard(
+-                            kicker: selected
+-                                ? tr('player_now_playing')
+-                                : null,
++                            kicker: selected ? tr('player_now_playing') : null,
+                             title: entry.qualityLabel,
+                             selected: selected,
+                             subtitle: _qualityEntrySubtitle(entry),
+@@ -4071,9 +4059,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+                             ? '${height}p'
+                             : '${track.width}×$height';
+                         return PlayerChoiceCard(
+-                          kicker: selected
+-                              ? tr('player_now_playing')
+-                              : null,
++                          kicker: selected ? tr('player_now_playing') : null,
+                           title: '${height}p',
+                           selected: selected,
+                           subtitle: dimensions,
+diff --git a/lib/screens/common/server_status_screen.dart b/lib/screens/common/server_status_screen.dart
+index 419a565..7383acb 100644
+--- a/lib/screens/common/server_status_screen.dart
++++ b/lib/screens/common/server_status_screen.dart
+@@ -909,11 +909,14 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     );
+   }
+ 
+-  String _statusLabel(SourceHealthCheckResult result) => switch (result.status) {
++  String _statusLabel(
++    SourceHealthCheckResult result,
++  ) => switch (result.status) {
+     SourceHealthStatus.checking => _isArabic ? 'جاري' : 'Checking',
+-    SourceHealthStatus.healthy => result.extractedStreamCount > 0
+-        ? (_isArabic ? 'روابط مستخرجة' : 'Streams extracted')
+-        : (_isArabic ? 'استجاب البحث' : 'Search responds'),
++    SourceHealthStatus.healthy =>
++      result.extractedStreamCount > 0
++          ? (_isArabic ? 'روابط مستخرجة' : 'Streams extracted')
++          : (_isArabic ? 'استجاب البحث' : 'Search responds'),
+     SourceHealthStatus.reachable =>
+       _isArabic ? 'العنوان متاح' : 'Endpoint reachable',
+     SourceHealthStatus.attention => _isArabic ? 'يحتاج معالجة' : 'Attention',
+@@ -1230,7 +1233,9 @@ class _FailedSourcesSheetState extends State<_FailedSourcesSheet> {
+         arabic ? 'محرك غير مدعوم' : 'Unsupported engine',
+       SourceHealthReason.unknown => arabic ? 'خطأ غير معروف' : 'Unknown error',
+       SourceHealthReason.searchResponded =>
+-        arabic ? 'استجاب البحث دون استخراج رابط' : 'Search responded; no stream tested',
++        arabic
++            ? 'استجاب البحث دون استخراج رابط'
++            : 'Search responded; no stream tested',
+       SourceHealthReason.streamsExtracted =>
+         arabic ? 'استُخرجت روابط تشغيل' : 'Streams extracted',
+       SourceHealthReason.streamExtractionFailed =>
+diff --git a/lib/screens/common/source_health_priority_ranker.dart b/lib/screens/common/source_health_priority_ranker.dart
+index 7cb1007..074367e 100644
+--- a/lib/screens/common/source_health_priority_ranker.dart
++++ b/lib/screens/common/source_health_priority_ranker.dart
+@@ -7,12 +7,11 @@ import 'source_health_probe_service.dart';
+ class SourceHealthPriorityRanker {
+   SourceHealthPriorityRanker._();
+ 
+-  static int fixedPrefixLength(SourcePriorityCategory category) => switch (
+-    category
+-  ) {
+-    SourcePriorityCategory.movies || SourcePriorityCategory.series => 12,
+-    SourcePriorityCategory.anime => 14,
+-  };
++  static int fixedPrefixLength(SourcePriorityCategory category) =>
++      switch (category) {
++        SourcePriorityCategory.movies || SourcePriorityCategory.series => 12,
++        SourcePriorityCategory.anime => 14,
++      };
+ 
+   static List<String> rankPrimaryKeys({
+     required SourcePriorityCategory category,
+diff --git a/lib/screens/common/source_health_probe_service.dart b/lib/screens/common/source_health_probe_service.dart
+index 541b66e..cc2c062 100644
+--- a/lib/screens/common/source_health_probe_service.dart
++++ b/lib/screens/common/source_health_probe_service.dart
+@@ -91,8 +91,7 @@ class SourceHealthCategoryEvidence {
+         qualityLabels: _stringList(json['qualityLabels']),
+         containerLabels: _stringList(json['containerLabels']),
+         audioKinds: _stringList(json['audioKinds']),
+-        subtitleTrackCount:
+-            (json['subtitleTrackCount'] as num?)?.toInt() ?? 0,
++        subtitleTrackCount: (json['subtitleTrackCount'] as num?)?.toInt() ?? 0,
+       );
+ }
+ 
+@@ -199,10 +198,10 @@ class SourceHealthCheckResult {
+     if (rawEvidence is Map) {
+       for (final entry in rawEvidence.entries) {
+         if (entry.value is Map) {
+-          evidence[entry.key.toString()] =
+-              SourceHealthCategoryEvidence.fromJson(
+-                Map<String, dynamic>.from(entry.value as Map),
+-              );
++          evidence[entry.key
++              .toString()] = SourceHealthCategoryEvidence.fromJson(
++            Map<String, dynamic>.from(entry.value as Map),
++          );
+         }
+       }
+     }
+@@ -230,8 +229,7 @@ class SourceHealthCheckResult {
+       qualityLabels: _stringList(json['qualityLabels']),
+       containerLabels: _stringList(json['containerLabels']),
+       audioKinds: _stringList(json['audioKinds']),
+-      subtitleTrackCount:
+-          (json['subtitleTrackCount'] as num?)?.toInt() ?? 0,
++      subtitleTrackCount: (json['subtitleTrackCount'] as num?)?.toInt() ?? 0,
+       categoryEvidence: Map<String, SourceHealthCategoryEvidence>.unmodifiable(
+         evidence,
+       ),
+@@ -505,16 +503,11 @@ class SourceHealthProbeService {
+     for (final providerCategory in _quickJsSearchCategories(source)) {
+       final categoryWatch = Stopwatch()..start();
+       try {
+-        final response = await _quickJsRuntime.call(
+-          source,
+-          'search',
+-          <Object?>[
+-            'M',
+-            1,
+-            <String, dynamic>{'category': providerCategory},
+-          ],
+-          timeout: const Duration(seconds: 20),
+-        );
++        final response = await _quickJsRuntime.call(source, 'search', <Object?>[
++          'M',
++          1,
++          <String, dynamic>{'category': providerCategory},
++        ], timeout: const Duration(seconds: 20));
+         if (response is! List) {
+           lastSearchError = const FormatException(
+             'Provider search() did not return a list.',
+@@ -535,8 +528,12 @@ class SourceHealthProbeService {
+             .map((stream) => stream.quality?.trim() ?? '')
+             .where((value) => value.isNotEmpty)
+             .toSet();
+-        final containers = streams.map((stream) => stream.container.name).toSet();
+-        final audioKinds = streams.map((stream) => stream.audioKind.name).toSet();
++        final containers = streams
++            .map((stream) => stream.container.name)
++            .toSet();
++        final audioKinds = streams
++            .map((stream) => stream.audioKind.name)
++            .toSet();
+         final subtitleCount = streams.fold<int>(
+           0,
+           (total, stream) => total + stream.subtitles.length,
+@@ -548,10 +545,7 @@ class SourceHealthProbeService {
+         allContainers.addAll(containers);
+         allAudioKinds.addAll(audioKinds);
+ 
+-        final categoryNames = _priorityCategoryNames(
+-          source,
+-          providerCategory,
+-        );
++        final categoryNames = _priorityCategoryNames(source, providerCategory);
+         for (final categoryName in categoryNames) {
+           evidence[categoryName] = SourceHealthCategoryEvidence(
+             category: categoryName,
+@@ -624,8 +618,8 @@ class SourceHealthProbeService {
+       ]);
+       var targetUrl = listingUrl;
+       if (providerCategory == 'sub') {
+-        targetUrl = await _firstQuickJsEpisodeUrl(source, listingUrl) ??
+-            listingUrl;
++        targetUrl =
++            await _firstQuickJsEpisodeUrl(source, listingUrl) ?? listingUrl;
+       }
+ 
+       try {
+@@ -651,12 +645,9 @@ class SourceHealthProbeService {
+   ) async {
+     List<dynamic> episodes = const <dynamic>[];
+     try {
+-      final detail = await _quickJsRuntime.call(
+-        source,
+-        'getDetail',
+-        <Object?>[seriesUrl],
+-        timeout: const Duration(seconds: 12),
+-      );
++      final detail = await _quickJsRuntime.call(source, 'getDetail', <Object?>[
++        seriesUrl,
++      ], timeout: const Duration(seconds: 12));
+       if (detail is Map && detail['episodes'] is List) {
+         episodes = detail['episodes'] as List<dynamic>;
+       }
+diff --git a/lib/screens/movie/movie_video_loader.dart b/lib/screens/movie/movie_video_loader.dart
+index 630e30e..bbd7412 100644
+--- a/lib/screens/movie/movie_video_loader.dart
++++ b/lib/screens/movie/movie_video_loader.dart
+@@ -924,8 +924,11 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+         break;
+       }
+     }
+-    final providerCode = downloadProvider?.codeName ??
+-        (inferredProviderCode.isNotEmpty ? inferredProviderCode : 'download:movie');
++    final providerCode =
++        downloadProvider?.codeName ??
++        (inferredProviderCode.isNotEmpty
++            ? inferredProviderCode
++            : 'download:movie');
+     final entries = await PlaybackQualityCatalog.collectWithAdaptiveDiscovery(
+       linksByProvider: <String, List<RegularVideoLinks>>{
+         providerCode: downloadLinks,
+@@ -962,7 +965,8 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+       return;
+     }
+     final format = VideoUtils.downloadFormat(url: url, link: selected.link);
+-    final headers = selected.link.headers ??
++    final headers =
++        selected.link.headers ??
+         VideoUtils.inferVideoHeaders(url) ??
+         const <String, String>{};
+     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
+@@ -1052,7 +1056,6 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+     }
+   }
+ 
+-
+   RegularSubtitleLinks? _preferredSubtitle(
+     List<RegularSubtitleLinks>? subtitles,
+   ) {
+diff --git a/lib/screens/tv/tv_video_loader.dart b/lib/screens/tv/tv_video_loader.dart
+index 9308491..ca6df69 100644
+--- a/lib/screens/tv/tv_video_loader.dart
++++ b/lib/screens/tv/tv_video_loader.dart
+@@ -919,8 +919,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+         break;
+       }
+     }
+-    final providerCode = downloadProvider?.codeName ??
+-        (inferredProviderCode.isNotEmpty ? inferredProviderCode : 'download:tv');
++    final providerCode =
++        downloadProvider?.codeName ??
++        (inferredProviderCode.isNotEmpty
++            ? inferredProviderCode
++            : 'download:tv');
+     final entries = await PlaybackQualityCatalog.collectWithAdaptiveDiscovery(
+       linksByProvider: <String, List<RegularVideoLinks>>{
+         providerCode: downloadLinks,
+@@ -957,7 +960,8 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+       return;
+     }
+     final format = VideoUtils.downloadFormat(url: url, link: selected.link);
+-    final headers = selected.link.headers ??
++    final headers =
++        selected.link.headers ??
+         VideoUtils.inferVideoHeaders(url) ??
+         const <String, String>{};
+     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
+@@ -1053,7 +1057,6 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+     }
+   }
+ 
+-
+   RegularSubtitleLinks? _preferredSubtitle(
+     List<RegularSubtitleLinks>? subtitles,
+   ) {
+diff --git a/lib/video_providers/quality_catalog.dart b/lib/video_providers/quality_catalog.dart
+index cac74cb..ebb9068 100644
+--- a/lib/video_providers/quality_catalog.dart
++++ b/lib/video_providers/quality_catalog.dart
+@@ -100,10 +100,11 @@ abstract final class PlaybackQualityCatalog {
+         if (!AdaptiveQualityScanner.isCandidate(link)) continue;
+         final url = link.url?.trim() ?? '';
+         if (url.isEmpty) continue;
+-        final headers = (link.headers ?? const <String, String>{}).entries
+-            .map((entry) => '${entry.key.toLowerCase()}:${entry.value}')
+-            .toList()
+-          ..sort();
++        final headers =
++            (link.headers ?? const <String, String>{}).entries
++                .map((entry) => '${entry.key.toLowerCase()}:${entry.value}')
++                .toList()
++              ..sort();
+         final signature = '$url|${headers.join('|')}';
+         if (seenCandidates.add(signature)) candidates.add(link);
+       }
+@@ -478,43 +479,52 @@ abstract final class PlaybackAutoQualityPolicy {
+         measuredBandwidthBitsPerSecond > 0) {
+       final safeBudget =
+           measuredBandwidthBitsPerSecond * safetyFactor.clamp(0.1, 0.95);
+-      final affordable = candidates.where((rendition) {
+-        final required = rendition.bitrateBitsPerSecond != null &&
+-                rendition.bitrateBitsPerSecond! > 0
+-            ? rendition.bitrateBitsPerSecond!
+-            : _estimatedBitrate(rendition.height);
+-        return required <= safeBudget;
+-      }).toList(growable: false);
++      final affordable = candidates
++          .where((rendition) {
++            final required =
++                rendition.bitrateBitsPerSecond != null &&
++                    rendition.bitrateBitsPerSecond! > 0
++                ? rendition.bitrateBitsPerSecond!
++                : _estimatedBitrate(rendition.height);
++            return required <= safeBudget;
++          })
++          .toList(growable: false);
+       if (affordable.isNotEmpty) {
+-        return affordable.reduce(
+-          (best, rendition) => rendition.height > best.height
+-              ? rendition
+-              : best,
+-        ).height;
++        return affordable
++            .reduce(
++              (best, rendition) =>
++                  rendition.height > best.height ? rendition : best,
++            )
++            .height;
+       }
+       // Even when every advertised rendition exceeds the conservative bitrate
+       // budget, prefer the smallest available one rather than falling back to
+       // 720p and making an already-slow connection worse.
+-      return candidates.reduce(
+-        (best, rendition) => rendition.height < best.height
+-            ? rendition
+-            : best,
+-      ).height;
++      return candidates
++          .reduce(
++            (best, rendition) =>
++                rendition.height < best.height ? rendition : best,
++          )
++          .height;
+     }
+ 
+     final atOrBelowFallback = candidates
+         .where((rendition) => rendition.height <= fallbackHeight)
+         .toList(growable: false);
+     if (atOrBelowFallback.isNotEmpty) {
+-      return atOrBelowFallback.reduce(
+-        (best, rendition) => rendition.height > best.height
+-            ? rendition
+-            : best,
+-      ).height;
++      return atOrBelowFallback
++          .reduce(
++            (best, rendition) =>
++                rendition.height > best.height ? rendition : best,
++          )
++          .height;
+     }
+-    return candidates.reduce(
+-      (best, rendition) => rendition.height < best.height ? rendition : best,
+-    ).height;
++    return candidates
++        .reduce(
++          (best, rendition) =>
++              rendition.height < best.height ? rendition : best,
++        )
++        .height;
+   }
+ 
+   static int _estimatedBitrate(int height) {
+diff --git a/lib/video_providers/unified/source_catalog_safety_policy.dart b/lib/video_providers/unified/source_catalog_safety_policy.dart
+index 0330bfb..cb1a2eb 100644
+--- a/lib/video_providers/unified/source_catalog_safety_policy.dart
++++ b/lib/video_providers/unified/source_catalog_safety_policy.dart
+@@ -65,18 +65,18 @@ class SourceCatalogSafetyPolicy {
+         !normalized.contains('هنتاي')) {
+       return false;
+     }
+-    if (RegExp(r'\b(no|not|without|exclude[sd]?|does not)\b[^.]{0,40}\bhentai\b')
+-        .hasMatch(normalized)) {
++    if (RegExp(
++      r'\b(no|not|without|exclude[sd]?|does not)\b[^.]{0,40}\bhentai\b',
++    ).hasMatch(normalized)) {
+       return false;
+     }
+-    return RegExp(r'\b(stream|streaming|provider|anime|content|site|catalog)\b')
+-        .hasMatch(normalized);
++    return RegExp(
++      r'\b(stream|streaming|provider|anime|content|site|catalog)\b',
++    ).hasMatch(normalized);
+   }
+ 
+-  static String _normalize(String value) => value
+-      .trim()
+-      .toLowerCase()
+-      .replaceAll(RegExp(r'[^a-z0-9]+'), '');
++  static String _normalize(String value) =>
++      value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '');
+ 
+   static String _flattenConfig(Map<String, dynamic> config) {
+     try {
+diff --git a/test/quality_catalog_test.dart b/test/quality_catalog_test.dart
+index d819e02..2da687b 100644
+--- a/test/quality_catalog_test.dart
++++ b/test/quality_catalog_test.dart
+@@ -6,54 +6,57 @@ import 'package:raven23/video_providers/quality_catalog.dart';
+ void main() {
+   final now = DateTime.utc(2026, 11, 3, 12);
+ 
+-  test('keeps same-height server choices and honors returned host priority', () {
+-    final catalog = PlaybackQualityCatalog.collect(
+-      linksByProvider: <String, List<RegularVideoLinks>>{
+-        'jett': <RegularVideoLinks>[
+-          RegularVideoLinks(
+-            url: 'https://jett.example/1080.mp4',
+-            quality: '1080p',
+-            server: 'Jett',
+-            providerCode: 'jett',
+-          ),
+-        ],
+-        'vixsrc': <RegularVideoLinks>[
+-          RegularVideoLinks(
+-            url: 'https://vixsrc.example/1080.mp4',
+-            quality: '1080p',
+-            server: 'VixSrc',
+-            providerCode: 'vixsrc',
+-          ),
+-        ],
+-      },
+-      preferredServerOrder: const <String>['VixSrc', 'Jett'],
+-    );
+-    expect(catalog, hasLength(2));
+-    expect(
+-      catalog.map((entry) => entry.link.url),
+-      <String?>[
++  test(
++    'keeps same-height server choices and honors returned host priority',
++    () {
++      final catalog = PlaybackQualityCatalog.collect(
++        linksByProvider: <String, List<RegularVideoLinks>>{
++          'jett': <RegularVideoLinks>[
++            RegularVideoLinks(
++              url: 'https://jett.example/1080.mp4',
++              quality: '1080p',
++              server: 'Jett',
++              providerCode: 'jett',
++            ),
++          ],
++          'vixsrc': <RegularVideoLinks>[
++            RegularVideoLinks(
++              url: 'https://vixsrc.example/1080.mp4',
++              quality: '1080p',
++              server: 'VixSrc',
++              providerCode: 'vixsrc',
++            ),
++          ],
++        },
++        preferredServerOrder: const <String>['VixSrc', 'Jett'],
++      );
++      expect(catalog, hasLength(2));
++      expect(catalog.map((entry) => entry.link.url), <String?>[
+         'https://vixsrc.example/1080.mp4',
+         'https://jett.example/1080.mp4',
+-      ],
+-    );
+-  });
++      ]);
++    },
++  );
+ 
+-  test('does not expose provider Auto without concrete manifest renditions', () {
+-    final catalog = PlaybackQualityCatalog.collect(
+-      linksByProvider: <String, List<RegularVideoLinks>>{
+-        'jett': <RegularVideoLinks>[
+-          RegularVideoLinks(
+-            url: 'https://jett.example/master',
+-            quality: 'Auto · Jett',
+-            server: 'Jett',
+-          ),
+-        ],
+-      },
+-      now: now,
+-    );
++  test(
++    'does not expose provider Auto without concrete manifest renditions',
++    () {
++      final catalog = PlaybackQualityCatalog.collect(
++        linksByProvider: <String, List<RegularVideoLinks>>{
++          'jett': <RegularVideoLinks>[
++            RegularVideoLinks(
++              url: 'https://jett.example/master',
++              quality: 'Auto · Jett',
++              server: 'Jett',
++            ),
++          ],
++        },
++        now: now,
++      );
+ 
+-    expect(catalog, isEmpty);
+-  });
++      expect(catalog, isEmpty);
++    },
++  );
+ 
+   test(
+     'collects every quality from every provider, including nonstandard heights',
+@@ -188,8 +191,10 @@ void main() {
+       final phoenixEntries = catalog
+           .where((entry) => entry.link.server == 'Phoenix')
+           .toList(growable: false);
+-      expect(phoenixEntries.map((entry) => entry.qualityLabel),
+-          <String>['540p', '360p']);
++      expect(phoenixEntries.map((entry) => entry.qualityLabel), <String>[
++        '540p',
++        '360p',
++      ]);
+     },
+   );
+ 
+@@ -214,14 +219,7 @@ void main() {
+ 
+       expect(
+         catalog.map((entry) => entry.qualityLabel),
+-        containsAll(<String>[
+-          '1080p',
+-          '720p',
+-          '480p',
+-          '360p',
+-          '270p',
+-          '180p',
+-        ]),
++        containsAll(<String>['1080p', '720p', '480p', '360p', '270p', '180p']),
+       );
+       expect(
+         catalog.where((entry) => entry.adaptiveTargetHeight != null),
+@@ -522,22 +520,25 @@ void main() {
+     },
+   );
+ 
+-  test('legacy download quality keys keep server alternatives and remove Auto', () {
+-    expect(
+-      VideoUtils.uniqueQualityKeys(<String>[
+-        'Auto · VixSrc Direct',
+-        '1080p · HdHub',
+-        '1080p · PeerTube Films',
+-        '720p · VixSrc Direct',
+-        'Adaptive · Phoenix',
+-      ]),
+-      <String>[
+-        '1080p · HdHub',
+-        '1080p · PeerTube Films',
+-        '720p · VixSrc Direct',
+-      ],
+-    );
+-  });
++  test(
++    'legacy download quality keys keep server alternatives and remove Auto',
++    () {
++      expect(
++        VideoUtils.uniqueQualityKeys(<String>[
++          'Auto · VixSrc Direct',
++          '1080p · HdHub',
++          '1080p · PeerTube Films',
++          '720p · VixSrc Direct',
++          'Adaptive · Phoenix',
++        ]),
++        <String>[
++          '1080p · HdHub',
++          '1080p · PeerTube Films',
++          '720p · VixSrc Direct',
++        ],
++      );
++    },
++  );
+ 
+   test('automatic policy chooses the best rendition within safe bandwidth', () {
+     final selected = PlaybackAutoQualityPolicy.chooseHeight(
+@@ -553,19 +554,22 @@ void main() {
+     expect(selected, 720);
+   });
+ 
+-  test('automatic policy chooses the lowest option when bandwidth is too low', () {
+-    expect(
+-      PlaybackAutoQualityPolicy.chooseHeight(
+-        renditions: const <PlaybackQualityRendition>[
+-          PlaybackQualityRendition(height: 480),
+-          PlaybackQualityRendition(height: 720),
+-          PlaybackQualityRendition(height: 1080),
+-        ],
+-        measuredBandwidthBitsPerSecond: 1_000_000,
+-      ),
+-      480,
+-    );
+-  });
++  test(
++    'automatic policy chooses the lowest option when bandwidth is too low',
++    () {
++      expect(
++        PlaybackAutoQualityPolicy.chooseHeight(
++          renditions: const <PlaybackQualityRendition>[
++            PlaybackQualityRendition(height: 480),
++            PlaybackQualityRendition(height: 720),
++            PlaybackQualityRendition(height: 1080),
++          ],
++          measuredBandwidthBitsPerSecond: 1_000_000,
++        ),
++        480,
++      );
++    },
++  );
+ 
+   test('automatic policy falls back to 720p or the best lower rendition', () {
+     expect(
+diff --git a/test/screens/common/source_health_priority_ranker_test.dart b/test/screens/common/source_health_priority_ranker_test.dart
+index c62eb91..c6e578b 100644
+--- a/test/screens/common/source_health_priority_ranker_test.dart
++++ b/test/screens/common/source_health_priority_ranker_test.dart
+@@ -164,14 +164,17 @@ void main() {
+     expect(ranked, <String>['fixed', _key('primary-candidate')]);
+   });
+ 
+-  test('does not erase an existing safe tail when no stream evidence exists', () {
+-    final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
+-      category: SourcePriorityCategory.movies,
+-      currentPrimaryKeys: const <String>['first', 'safe-tail', 'hentai-old'],
+-      backupKeys: const <String>[],
+-      results: const <SourceHealthCheckResult>[],
+-    );
++  test(
++    'does not erase an existing safe tail when no stream evidence exists',
++    () {
++      final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
++        category: SourcePriorityCategory.movies,
++        currentPrimaryKeys: const <String>['first', 'safe-tail', 'hentai-old'],
++        backupKeys: const <String>[],
++        results: const <SourceHealthCheckResult>[],
++      );
+ 
+-    expect(ranked, <String>['first', 'safe-tail']);
+-  });
++      expect(ranked, <String>['first', 'safe-tail']);
++    },
++  );
+ }
+diff --git a/test/screens/common/source_health_probe_service_test.dart b/test/screens/common/source_health_probe_service_test.dart
+index 016b04a..7160c9b 100644
+--- a/test/screens/common/source_health_probe_service_test.dart
++++ b/test/screens/common/source_health_probe_service_test.dart
+@@ -32,9 +32,7 @@ class _FakeQuickJsProviderRuntime extends QuickJsProviderRuntime {
+       case 'getDetail':
+         return <String, Object?>{
+           'episodes': <Map<String, Object?>>[
+-            <String, Object?>{
+-              'url': 'https://listing.example.test/episode-1',
+-            },
++            <String, Object?>{'url': 'https://listing.example.test/episode-1'},
+           ],
+         };
+       case 'getVideoSources':
+@@ -69,74 +67,80 @@ class _FakeQuickJsProviderRuntime extends QuickJsProviderRuntime {
+ }
+ 
+ void main() {
+-  test('probes both movie and sub categories and captures stream diversity', () async {
+-    final runtime = _FakeQuickJsProviderRuntime();
+-    final service = SourceHealthProbeService(quickJsRuntime: runtime);
+-    const source = SourceManifest(
+-      id: 'mixed-provider',
+-      name: 'Mixed Provider',
+-      repositoryUrl: 'https://example.com/index.json',
+-      tags: <String>['movies', 'series'],
+-      engine: SourceEngineDescriptor(
+-        rawType: 'javascript',
+-        kind: SourceEngineKind.javascript,
+-        endpoint: 'https://example.com/provider.js',
+-      ),
+-    );
++  test(
++    'probes both movie and sub categories and captures stream diversity',
++    () async {
++      final runtime = _FakeQuickJsProviderRuntime();
++      final service = SourceHealthProbeService(quickJsRuntime: runtime);
++      const source = SourceManifest(
++        id: 'mixed-provider',
++        name: 'Mixed Provider',
++        repositoryUrl: 'https://example.com/index.json',
++        tags: <String>['movies', 'series'],
++        engine: SourceEngineDescriptor(
++          rawType: 'javascript',
++          kind: SourceEngineKind.javascript,
++          endpoint: 'https://example.com/provider.js',
++        ),
++      );
+ 
+-    try {
+-      final result = await service.checkVideoSource(source);
++      try {
++        final result = await service.checkVideoSource(source);
+ 
+-      expect(runtime.searchedCategories, <String>['movie', 'sub']);
+-      expect(result.status, SourceHealthStatus.healthy);
+-      expect(result.reason, SourceHealthReason.streamsExtracted);
+-      expect(result.extractedStreamCount, 4);
+-      expect(result.qualityLabels, <String>['1080p', '720p']);
+-      expect(result.containerLabels, <String>['hls', 'mp4']);
+-      expect(result.audioKinds, <String>['dub', 'sub']);
+-      expect(result.subtitleTrackCount, 2);
+-      expect(result.categoryEvidence.keys, <String>['movies', 'series']);
+-      expect(result.categoryEvidence['movies']?.streamCount, 2);
+-      expect(result.categoryEvidence['series']?.streamCount, 2);
+-      expect(
+-        runtime.requestedStreamUrls,
+-        contains('https://listing.example.test/episode-1'),
+-      );
++        expect(runtime.searchedCategories, <String>['movie', 'sub']);
++        expect(result.status, SourceHealthStatus.healthy);
++        expect(result.reason, SourceHealthReason.streamsExtracted);
++        expect(result.extractedStreamCount, 4);
++        expect(result.qualityLabels, <String>['1080p', '720p']);
++        expect(result.containerLabels, <String>['hls', 'mp4']);
++        expect(result.audioKinds, <String>['dub', 'sub']);
++        expect(result.subtitleTrackCount, 2);
++        expect(result.categoryEvidence.keys, <String>['movies', 'series']);
++        expect(result.categoryEvidence['movies']?.streamCount, 2);
++        expect(result.categoryEvidence['series']?.streamCount, 2);
++        expect(
++          runtime.requestedStreamUrls,
++          contains('https://listing.example.test/episode-1'),
++        );
+ 
+-      final restored = SourceHealthCheckResult.fromJson(result.toJson());
+-      expect(restored.extractedStreamCount, result.extractedStreamCount);
+-      expect(restored.categoryEvidence['movies']?.qualityLabels, <String>[
+-        '1080p',
+-        '720p',
+-      ]);
+-    } finally {
+-      service.dispose();
+-    }
+-  });
++        final restored = SourceHealthCheckResult.fromJson(result.toJson());
++        expect(restored.extractedStreamCount, result.extractedStreamCount);
++        expect(restored.categoryEvidence['movies']?.qualityLabels, <String>[
++          '1080p',
++          '720p',
++        ]);
++      } finally {
++        service.dispose();
++      }
++    },
++  );
+ 
+-  test('marks search-only matches for review when stream extraction fails', () async {
+-    const source = SourceManifest(
+-      id: 'series-provider',
+-      name: 'Series Provider',
+-      repositoryUrl: 'https://example.com/index.json',
+-      tags: <String>['series'],
+-      engine: SourceEngineDescriptor(
+-        rawType: 'javascript',
+-        kind: SourceEngineKind.javascript,
+-        endpoint: 'https://example.com/provider.js',
+-      ),
+-    );
++  test(
++    'marks search-only matches for review when stream extraction fails',
++    () async {
++      const source = SourceManifest(
++        id: 'series-provider',
++        name: 'Series Provider',
++        repositoryUrl: 'https://example.com/index.json',
++        tags: <String>['series'],
++        engine: SourceEngineDescriptor(
++          rawType: 'javascript',
++          kind: SourceEngineKind.javascript,
++          endpoint: 'https://example.com/provider.js',
++        ),
++      );
+ 
+-    final failingRuntime = _SearchOnlyQuickJsProviderRuntime();
+-    final failingService = SourceHealthProbeService(
+-      quickJsRuntime: failingRuntime,
+-    );
+-    final result = await failingService.checkVideoSource(source);
+-    expect(result.status, SourceHealthStatus.attention);
+-    expect(result.reason, SourceHealthReason.streamExtractionFailed);
+-    expect(result.extractedStreamCount, 0);
+-    failingService.dispose();
+-  });
++      final failingRuntime = _SearchOnlyQuickJsProviderRuntime();
++      final failingService = SourceHealthProbeService(
++        quickJsRuntime: failingRuntime,
++      );
++      final result = await failingService.checkVideoSource(source);
++      expect(result.status, SourceHealthStatus.attention);
++      expect(result.reason, SourceHealthReason.streamExtractionFailed);
++      expect(result.extractedStreamCount, 0);
++      failingService.dispose();
++    },
++  );
+ }
+ 
+ class _SearchOnlyQuickJsProviderRuntime extends QuickJsProviderRuntime {

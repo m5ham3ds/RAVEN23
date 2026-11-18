@@ -1,0 +1,10 @@
+CI run 43762857162 (commit c55cdbbb07aa1cc95565b2119b25b753051c03fc)
+- dependency resolution: success
+- Dart format: success; uploaded patch is empty (0 bytes)
+- Flutter analyze: success
+- focused Flutter tests: one actual failure in mobile_nav_bar_test.dart line 125
+- failure cause: direct equality on Phosphor IconData wrapper objects despite identical glyph U+0E740
+- repair: compare codePoint, fontFamily, fontPackage and matchTextDirection
+- production code: unchanged
+- Mihon ABI test and APK build: not reached in the supplied CI run
+- corrected tests/build: not run locally; require GitHub Actions confirmation

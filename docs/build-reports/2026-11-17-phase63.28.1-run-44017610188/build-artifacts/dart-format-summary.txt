@@ -1,0 +1,14 @@
+ lib/design/app_press_feedback.dart                 |  7 ++-
+ lib/screens/common/download_selection_sheets.dart  |  4 +-
+ lib/screens/common/player.dart                     | 52 ++++++++++++++--------
+ lib/screens/common/server_status_screen.dart       |  6 ++-
+ lib/screens/common/settings.dart                   |  4 +-
+ lib/screens/common/source_repositories_screen.dart |  5 +--
+ lib/screens/movie/movie_video_loader.dart          | 23 ++++++----
+ lib/screens/tv/tv_video_loader.dart                | 22 +++++----
+ lib/video_providers/quality_catalog.dart           | 45 ++++++++++---------
+ .../unified/stream_host_priority_manager.dart      | 16 +++----
+ test/app_press_feedback_test.dart                  |  3 --
+ test/provider_background_scan_test.dart            | 52 +++++++++++++---------
+ test/quality_catalog_test.dart                     | 51 ++++++++++++---------
+ 13 files changed, 165 insertions(+), 125 deletions(-)

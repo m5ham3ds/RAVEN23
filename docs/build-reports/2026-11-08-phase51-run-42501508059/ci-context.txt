@@ -1,0 +1,9 @@
+Workflow: RAVEN23 Local Android APK Build
+Run ID: 42501508059
+Run attempt: 1
+Event: push
+Actor: m5ham3ds
+Repository: m5ham3ds/RAVEN23
+Ref: refs/heads/main
+Commit: 8fab95f764c9b541d2e74e5845bab30488e738a6
+Build mode: release

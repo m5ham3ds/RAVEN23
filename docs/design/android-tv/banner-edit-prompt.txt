@@ -1,0 +1,8 @@
+Use case: create a precise Android TV launcher banner using the supplied RAVEN23 master logo.
+Asset type: Android TV launcher banner, wide 16:9 composition.
+Use the supplied RAVEN23 artwork exactly as the brand source: black background, crimson full moon,
+black raven with red feather accents, and the silver/red RAVEN23 wordmark. Preserve the raven,
+moon, feathers, typography, colors, spelling, relative scale, and visual treatment. Place the square
+master logo centered within a 16:9 black canvas, keeping the complete wordmark visible and leaving
+balanced negative space on both sides. Do not invent a new emblem, substitute typography, recolor,
+crop the wordmark, add borders, add shadows, or add any new text.

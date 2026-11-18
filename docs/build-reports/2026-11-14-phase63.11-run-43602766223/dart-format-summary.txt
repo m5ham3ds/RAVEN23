@@ -1,0 +1,12 @@
+ lib/catalog/catalog_controller.dart                |  18 +-
+ lib/catalog/home_feed_controller.dart              |  84 ++--
+ lib/core/cache/cache_interceptor.dart              | 128 +++---
+ lib/core/cache/http_cache.dart                     | 134 +++---
+ .../interceptors/single_flight_interceptor.dart    |  31 +-
+ lib/data/repositories/tmdb_repository.dart         |  21 +-
+ lib/functions/network.dart                         | 136 ++++--
+ lib/manga/anilist/anilist_catalogue_cache.dart     |  13 +-
+ test/data/tmdb_network_test.dart                   | 469 +++++++++++----------
+ test/home_screen_test.dart                         | 312 +++++++-------
+ test/manga/anilist_catalogue_cache_test.dart       | 340 ++++++++-------
+ 11 files changed, 942 insertions(+), 744 deletions(-)

@@ -1,0 +1,6 @@
+ lib/manga/mihon/mihon_source_browser_screen.dart   |  30 ++--
+ lib/manga/ui/manga_reader_screen.dart              |  54 +++---
+ lib/manga/ui/manga_work_screen.dart                | 190 +++++++++++----------
+ .../common/quickjs_source_settings_dialog.dart     |   8 +-
+ lib/screens/common/source_repositories_screen.dart |  60 ++++---
+ 5 files changed, 195 insertions(+), 147 deletions(-)

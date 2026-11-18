@@ -1,0 +1,591 @@
+diff --git a/lib/design/app_press_feedback.dart b/lib/design/app_press_feedback.dart
+index 9ab387d..dc9fc7f 100644
+--- a/lib/design/app_press_feedback.dart
++++ b/lib/design/app_press_feedback.dart
+@@ -73,9 +73,7 @@ class _AppPressFeedbackState extends State<AppPressFeedback> {
+     _downPosition = null;
+     final shouldCompleteTap = _activePointerStartedEnabled;
+     _activePointerStartedEnabled = false;
+-    if (event is PointerUpEvent &&
+-        !_movedBeyondTapSlop &&
+-        shouldCompleteTap) {
++    if (event is PointerUpEvent && !_movedBeyondTapSlop && shouldCompleteTap) {
+       // Keep the pressed state briefly after a tap. Fast taps often release
+       // before a normal scale animation can reach a visible frame; the short
+       // tail makes feedback perceptible without delaying the tap callback.
+@@ -128,7 +126,8 @@ class _AppPressFeedbackState extends State<AppPressFeedback> {
+   @override
+   Widget build(BuildContext context) {
+     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+-    final pressed = _pressed &&
++    final pressed =
++        _pressed &&
+         (widget.enabled ||
+             (_activePointer != null && _activePointerStartedEnabled) ||
+             _releaseTimer != null);
+diff --git a/lib/screens/common/download_selection_sheets.dart b/lib/screens/common/download_selection_sheets.dart
+index 27675ec..bf6bd69 100644
+--- a/lib/screens/common/download_selection_sheets.dart
++++ b/lib/screens/common/download_selection_sheets.dart
+@@ -87,9 +87,7 @@ abstract final class DownloadSelectionSheets {
+               kicker: entry.isAdaptive ? 'ADAPTIVE' : null,
+               title: entry.qualityLabel,
+               subtitle: entry.selectionSubtitle,
+-              description: entry.isAdaptive
+-                  ? tr('quality_adaptive')
+-                  : null,
++              description: entry.isAdaptive ? tr('quality_adaptive') : null,
+               onTap: () => Navigator.pop(sheetContext, entry),
+             );
+           },
+diff --git a/lib/screens/common/player.dart b/lib/screens/common/player.dart
+index 1a48a7e..4c3e2a7 100644
+--- a/lib/screens/common/player.dart
++++ b/lib/screens/common/player.dart
+@@ -964,22 +964,27 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+     if (startedAt == null || _preRollActive) return;
+     _startupPlaybackWatchStartedAt = null;
+     _startupTimeoutLogged = false;
+-    final observedHost = (_startupPlaybackHostName ??
+-            _activeStreamServerName ??
+-            _currentProviderName())
+-        .trim();
++    final observedHost =
++        (_startupPlaybackHostName ??
++                _activeStreamServerName ??
++                _currentProviderName())
++            .trim();
+     _startupPlaybackHostName = null;
+     if (observedHost.isEmpty) return;
+     if (succeeded) {
+       final startupMs = DateTime.now().difference(startedAt).inMilliseconds;
+-      unawaited(StreamHostPriorityManager.instance.recordPlaybackSuccess(
+-        server: observedHost,
+-        startupMs: startupMs,
+-      ));
++      unawaited(
++        StreamHostPriorityManager.instance.recordPlaybackSuccess(
++          server: observedHost,
++          startupMs: startupMs,
++        ),
++      );
+     } else {
+-      unawaited(StreamHostPriorityManager.instance.recordPlaybackFailure(
+-        server: observedHost,
+-      ));
++      unawaited(
++        StreamHostPriorityManager.instance.recordPlaybackFailure(
++          server: observedHost,
++        ),
++      );
+     }
+   }
+ 
+@@ -5584,7 +5589,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+     final entries = _qualityCatalogEntries;
+     if (entries.isEmpty) {
+       ScaffoldMessenger.of(context).showSnackBar(
+-        const SnackBar(content: Text('No direct downloadable qualities are available.')),
++        const SnackBar(
++          content: Text('No direct downloadable qualities are available.'),
++        ),
+       );
+       return;
+     }
+@@ -5599,18 +5606,21 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+     final resolution = selected.qualityLabel;
+     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
+     final format = VideoUtils.downloadFormat(url: url, link: selected.link);
+-    final downloadHeaders = selected.link.headers ??
++    final downloadHeaders =
++        selected.link.headers ??
+         VideoUtils.inferVideoHeaders(url) ??
+         const <String, String>{};
+     final sourceProviderCode = selected.sourceProviderCode;
+     final owningProviderCode = selected.providerCode;
+-    final downloadProvider = (widget.availableProviders ?? const <VideoProvider>[])
+-        .where((provider) => provider.codeName == sourceProviderCode)
+-        .firstOrNull ??
++    final downloadProvider =
++        (widget.availableProviders ?? const <VideoProvider>[])
++            .where((provider) => provider.codeName == sourceProviderCode)
++            .firstOrNull ??
+         (widget.availableProviders ?? const <VideoProvider>[])
+             .where((provider) => provider.codeName == owningProviderCode)
+             .firstOrNull;
+-    final rawDownloadLinks = _rawVideoLinksByProvider[sourceProviderCode] ??
++    final rawDownloadLinks =
++        _rawVideoLinksByProvider[sourceProviderCode] ??
+         _rawVideoLinksByProvider[owningProviderCode] ??
+         <RegularVideoLinks>[selected.link];
+     final providerName = selected.link.server?.trim().isNotEmpty == true
+@@ -5696,7 +5706,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+       );
+       if (!mounted) return;
+       ScaffoldMessenger.of(context).showSnackBar(
+-        SnackBar(content: Text('$resolution download added from $providerName')),
++        SnackBar(
++          content: Text('$resolution download added from $providerName'),
++        ),
+       );
+     } catch (error) {
+       settings.analytics.trackDownload(
+@@ -5713,7 +5725,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
+           content: Text(
+             offlineEnqueueErrorMessage(
+               error,
+-              title: isMovie ? movie?.movieName ?? 'This movie' : 'This episode',
++              title: isMovie
++                  ? movie?.movieName ?? 'This movie'
++                  : 'This episode',
+             ),
+           ),
+         ),
+diff --git a/lib/screens/common/server_status_screen.dart b/lib/screens/common/server_status_screen.dart
+index f992be0..b4d9a3a 100644
+--- a/lib/screens/common/server_status_screen.dart
++++ b/lib/screens/common/server_status_screen.dart
+@@ -889,8 +889,10 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+ 
+   String _statusLabel(SourceHealthStatus status) => switch (status) {
+     SourceHealthStatus.checking => _isArabic ? 'جاري' : 'Checking',
+-    SourceHealthStatus.healthy => _isArabic ? 'استجاب البحث' : 'Search responds',
+-    SourceHealthStatus.reachable => _isArabic ? 'العنوان متاح' : 'Endpoint reachable',
++    SourceHealthStatus.healthy =>
++      _isArabic ? 'استجاب البحث' : 'Search responds',
++    SourceHealthStatus.reachable =>
++      _isArabic ? 'العنوان متاح' : 'Endpoint reachable',
+     SourceHealthStatus.attention => _isArabic ? 'يحتاج معالجة' : 'Attention',
+     SourceHealthStatus.failed => _isArabic ? 'فشل' : 'Failed',
+     SourceHealthStatus.unsupported => _isArabic ? 'غير مدعوم' : 'Unsupported',
+diff --git a/lib/screens/common/settings.dart b/lib/screens/common/settings.dart
+index 29eb11e..c53075e 100644
+--- a/lib/screens/common/settings.dart
++++ b/lib/screens/common/settings.dart
+@@ -63,13 +63,13 @@ class _SettingsState extends State<Settings> {
+     super.initState();
+   }
+ 
+-
+   Future<void> _testLocalNotifications() async {
+     if (_testingNotifications) return;
+     setState(() => _testingNotifications = true);
+     try {
+       final service = MangaNotificationService.instance;
+-      final enabled = await service.areNotificationsEnabled ||
++      final enabled =
++          await service.areNotificationsEnabled ||
+           await service.requestPermission();
+       if (!mounted) return;
+       if (!enabled) {
+diff --git a/lib/screens/common/source_repositories_screen.dart b/lib/screens/common/source_repositories_screen.dart
+index c5e17dc..e0bd0cf 100644
+--- a/lib/screens/common/source_repositories_screen.dart
++++ b/lib/screens/common/source_repositories_screen.dart
+@@ -2123,6 +2123,7 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+       ],
+     );
+   }
++
+   Widget _buildStreamHostPriorityPanel(AppPalette palette, bool arabic) {
+     final manager = StreamHostPriorityManager.instance;
+     final configured = List<String>.of(_streamHostOrder);
+@@ -2156,8 +2157,7 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+               final metrics = manager.metricsFor(name);
+               final successes = (metrics?['successes'] as num?)?.toInt() ?? 0;
+               final failures = (metrics?['failures'] as num?)?.toInt() ?? 0;
+-              final average =
+-                  (metrics?['averageStartupMs'] as num?)?.round();
++              final average = (metrics?['averageStartupMs'] as num?)?.round();
+               final hasObservation = successes + failures > 0;
+               final isPinned = i < configured.length;
+               final performanceText = !hasObservation
+@@ -2219,7 +2219,6 @@ class _SourceRepositoriesScreenState extends State<SourceRepositoriesScreen> {
+       ],
+     );
+   }
+-
+ }
+ 
+ bool _isArabic(BuildContext context) =>
+diff --git a/lib/screens/movie/movie_video_loader.dart b/lib/screens/movie/movie_video_loader.dart
+index a68862f..89ff849 100644
+--- a/lib/screens/movie/movie_video_loader.dart
++++ b/lib/screens/movie/movie_video_loader.dart
+@@ -803,11 +803,9 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+       _showErrorSheet('The selected quality returned an empty video URL.');
+       return;
+     }
+-    final format = VideoUtils.downloadFormat(
+-      url: url,
+-      link: selected.link,
+-    );
+-    final headers = selected.link.headers ??
++    final format = VideoUtils.downloadFormat(url: url, link: selected.link);
++    final headers =
++        selected.link.headers ??
+         VideoUtils.inferVideoHeaders(url) ??
+         const <String, String>{};
+     final sourceProvider = videoProviders.cast<VideoProvider?>().firstWhere(
+@@ -817,9 +815,11 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+         orElse: () => null,
+       ),
+     );
+-    final sourceResult = resultsByProvider[selected.sourceProviderCode] ??
++    final sourceResult =
++        resultsByProvider[selected.sourceProviderCode] ??
+         resultsByProvider[selected.providerCode];
+-    final sourceLinks = sourceResult?.videoLinks ?? <RegularVideoLinks>[selected.link];
++    final sourceLinks =
++        sourceResult?.videoLinks ?? <RegularVideoLinks>[selected.link];
+     final subtitles = sourceResult?.subtitleLinks;
+     final subtitleTrack = _preferredSubtitle(subtitles);
+     final posterPath = _metadata.posterPath;
+@@ -848,7 +848,9 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+           url: url,
+           format: format,
+           title: _metadata.movieName ?? 'Movie',
+-          subtitle: sourceProvider?.displayName == null ? null : 'From ${sourceProvider!.displayName}',
++          subtitle: sourceProvider?.displayName == null
++              ? null
++              : 'From ${sourceProvider!.displayName}',
+           mediaType: 'movie',
+           quality: quality,
+           posterUrl: posterPath == null
+@@ -903,7 +905,10 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+           content: Text(
+-            offlineEnqueueErrorMessage(error, title: _metadata.movieName ?? 'This movie'),
++            offlineEnqueueErrorMessage(
++              error,
++              title: _metadata.movieName ?? 'This movie',
++            ),
+           ),
+         ),
+       );
+diff --git a/lib/screens/tv/tv_video_loader.dart b/lib/screens/tv/tv_video_loader.dart
+index 48dd241..a9d486c 100644
+--- a/lib/screens/tv/tv_video_loader.dart
++++ b/lib/screens/tv/tv_video_loader.dart
+@@ -795,11 +795,9 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+       _showErrorSheet('The selected quality returned an empty video URL.');
+       return;
+     }
+-    final format = VideoUtils.downloadFormat(
+-      url: url,
+-      link: selected.link,
+-    );
+-    final headers = selected.link.headers ??
++    final format = VideoUtils.downloadFormat(url: url, link: selected.link);
++    final headers =
++        selected.link.headers ??
+         VideoUtils.inferVideoHeaders(url) ??
+         const <String, String>{};
+     final sourceProvider = videoProviders.cast<VideoProvider?>().firstWhere(
+@@ -809,9 +807,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+         orElse: () => null,
+       ),
+     );
+-    final sourceResult = resultsByProvider[selected.sourceProviderCode] ??
++    final sourceResult =
++        resultsByProvider[selected.sourceProviderCode] ??
+         resultsByProvider[selected.providerCode];
+-    final sourceLinks = sourceResult?.videoLinks ?? <RegularVideoLinks>[selected.link];
++    final sourceLinks =
++        sourceResult?.videoLinks ?? <RegularVideoLinks>[selected.link];
+     final subtitles = sourceResult?.subtitleLinks;
+     final subtitleTrack = _preferredSubtitle(subtitles);
+     final posterPath = widget.metadata.posterPath;
+@@ -840,7 +840,8 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+           url: url,
+           format: format,
+           title: widget.metadata.seriesName ?? 'TV episode',
+-          subtitle: 'S${season.toString().padLeft(2, '0')} • E${episode.toString().padLeft(2, '0')} ${widget.metadata.episodeName ?? ''}',
++          subtitle:
++              'S${season.toString().padLeft(2, '0')} • E${episode.toString().padLeft(2, '0')} ${widget.metadata.episodeName ?? ''}',
+           mediaType: 'episode',
+           quality: quality,
+           posterUrl: posterPath == null
+@@ -897,7 +898,10 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
+       ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(
+           content: Text(
+-            offlineEnqueueErrorMessage(error, title: widget.metadata.seriesName ?? 'This episode'),
++            offlineEnqueueErrorMessage(
++              error,
++              title: widget.metadata.seriesName ?? 'This episode',
++            ),
+           ),
+         ),
+       );
+diff --git a/lib/video_providers/quality_catalog.dart b/lib/video_providers/quality_catalog.dart
+index 999457b..0cd21d1 100644
+--- a/lib/video_providers/quality_catalog.dart
++++ b/lib/video_providers/quality_catalog.dart
+@@ -53,16 +53,14 @@ class QualityCatalogEntry {
+     return code;
+   }
+ 
+-  String get formatLabel => switch (VideoUtils.downloadFormat(
+-    url: link.url ?? '',
+-    link: link,
+-  )) {
+-    'hls' => 'HLS',
+-    'dash' => 'DASH',
+-    'mp4' => 'MP4',
+-    'webm' => 'WebM',
+-    _ => 'Progressive',
+-  };
++  String get formatLabel =>
++      switch (VideoUtils.downloadFormat(url: link.url ?? '', link: link)) {
++        'hls' => 'HLS',
++        'dash' => 'DASH',
++        'mp4' => 'MP4',
++        'webm' => 'WebM',
++        _ => 'Progressive',
++      };
+ 
+   String get technicalSubtitle => <String>[
+     formatLabel,
+@@ -90,8 +88,8 @@ abstract final class PlaybackQualityCatalog {
+     List<String>? preferredServerOrder,
+   }) {
+     final checkedAt = now ?? DateTime.now();
+-    final hostOrder = preferredServerOrder ??
+-        StreamHostPriorityManager.instance.currentOrder;
++    final hostOrder =
++        preferredServerOrder ?? StreamHostPriorityManager.instance.currentOrder;
+     final result = <QualityCatalogEntry>[];
+     final seen = <String>{};
+     final sourceKeysByProvider = <String, List<String>>{
+@@ -238,12 +236,14 @@ abstract final class PlaybackQualityCatalog {
+         sourceKey: activeSourceKey,
+         streamUrl: activeStreamUrl,
+       );
+-      final previousIsActive = previous != null && _isActiveSource(
+-        previous,
+-        providerCode: activeProviderCode,
+-        sourceKey: activeSourceKey,
+-        streamUrl: activeStreamUrl,
+-      );
++      final previousIsActive =
++          previous != null &&
++          _isActiveSource(
++            previous,
++            providerCode: activeProviderCode,
++            sourceKey: activeSourceKey,
++            streamUrl: activeStreamUrl,
++          );
+       final entryRank = _rankHost(entry.link.server, hostOrder);
+       final previousRank = previous == null
+           ? 1 << 30
+@@ -275,9 +275,12 @@ abstract final class PlaybackQualityCatalog {
+     final normalized = (server ?? '').trim().toLowerCase();
+     for (var i = 0; i < order.length; i++) {
+       final candidate = order[i].trim().toLowerCase();
+-      if (normalized == candidate || normalized.startsWith('$candidate ') ||
+-          normalized.startsWith('$candidate-') || normalized.startsWith('${candidate}_') ||
+-          normalized.startsWith('$candidate/')) return i;
++      if (normalized == candidate ||
++          normalized.startsWith('$candidate ') ||
++          normalized.startsWith('$candidate-') ||
++          normalized.startsWith('${candidate}_') ||
++          normalized.startsWith('$candidate/'))
++        return i;
+     }
+     return managerRank;
+   }
+diff --git a/lib/video_providers/unified/stream_host_priority_manager.dart b/lib/video_providers/unified/stream_host_priority_manager.dart
+index a63f11b..5466eb0 100644
+--- a/lib/video_providers/unified/stream_host_priority_manager.dart
++++ b/lib/video_providers/unified/stream_host_priority_manager.dart
+@@ -176,6 +176,7 @@ class StreamHostPriorityManager {
+       final total = successCount + failureCount;
+       return total == 0 ? 1 : failureCount / total;
+     }
++
+     double averageStart(MapEntry<String, Map<String, Object?>> entry) =>
+         (entry.value['averageStartupMs'] as num?)?.toDouble() ?? 120000;
+ 
+@@ -205,11 +206,11 @@ class StreamHostPriorityManager {
+     final entries = _performance.entries.where((entry) {
+       final successes = (entry.value['successes'] as num?)?.toInt() ?? 0;
+       return successes > 0;
+-    }).toList()
+-      ..sort(_compareObservedHosts);
++    }).toList()..sort(_compareObservedHosts);
+     return List<String>.unmodifiable(
+       entries.map(
+-        (entry) => (entry.value['displayName'] as String?)?.trim().isNotEmpty == true
++        (entry) =>
++            (entry.value['displayName'] as String?)?.trim().isNotEmpty == true
+             ? (entry.value['displayName'] as String).trim()
+             : entry.key,
+       ),
+@@ -247,7 +248,8 @@ class StreamHostPriorityManager {
+     final failureRatio = failures / (successes + failures);
+     // Failure ratio dominates latency; latency breaks ties among similarly
+     // reliable unpinned hosts. Unobserved hosts remain behind known-good ones.
+-    return _order.length + (failureRatio * 1000000000).round() +
++    return _order.length +
++        (failureRatio * 1000000000).round() +
+         average.clamp(0, 120000).round();
+   }
+ 
+@@ -266,8 +268,6 @@ class StreamHostPriorityManager {
+     );
+   }
+ 
+-  static String _normalizeHost(String? value) => (value ?? '')
+-      .trim()
+-      .toLowerCase()
+-      .replaceAll(RegExp(r'\s+'), ' ');
++  static String _normalizeHost(String? value) =>
++      (value ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+ }
+diff --git a/test/app_press_feedback_test.dart b/test/app_press_feedback_test.dart
+index 9c992f1..45002c5 100644
+--- a/test/app_press_feedback_test.dart
++++ b/test/app_press_feedback_test.dart
+@@ -156,8 +156,6 @@ void main() {
+     expect(taps, 1);
+   });
+ 
+-
+-
+   testWidgets('tap feedback survives the action entering a busy state', (
+     tester,
+   ) async {
+@@ -196,5 +194,4 @@ void main() {
+     await tester.pump(const Duration(milliseconds: 150));
+     expect(tester.widget<AnimatedScale>(scale).scale, 1);
+   });
+-
+ }
+diff --git a/test/provider_background_scan_test.dart b/test/provider_background_scan_test.dart
+index e1b9ff7..7fc24c7 100644
+--- a/test/provider_background_scan_test.dart
++++ b/test/provider_background_scan_test.dart
+@@ -101,26 +101,38 @@ void main() {
+     expect(session.isCompleted, isTrue);
+   });
+ 
+-  test('download scan keeps testing providers after standard quality targets', () async {
+-    final providers = List<VideoProvider>.generate(
+-      4,
+-      (index) => VideoProvider.scraper(id: 'download-$index', name: 'Provider $index'),
+-    );
+-    final started = <String>[];
+-    final session = ProviderLoader.startScan(
+-      providers: providers,
+-      unifiedMediaIdentity: movieIdentity,
+-      maxConcurrency: 1,
+-      stopAfterStandardQualities: false,
+-      load: (provider) async {
+-        started.add(provider.apiId!);
+-        return _links(started.length == 1 ? '1080p' : started.length == 2 ? '720p' : '480p');
+-      },
+-    );
+-    await session.firstPlayable;
+-    await session.completed;
+-    expect(started, hasLength(4));
+-  });
++  test(
++    'download scan keeps testing providers after standard quality targets',
++    () async {
++      final providers = List<VideoProvider>.generate(
++        4,
++        (index) => VideoProvider.scraper(
++          id: 'download-$index',
++          name: 'Provider $index',
++        ),
++      );
++      final started = <String>[];
++      final session = ProviderLoader.startScan(
++        providers: providers,
++        unifiedMediaIdentity: movieIdentity,
++        maxConcurrency: 1,
++        stopAfterStandardQualities: false,
++        load: (provider) async {
++          started.add(provider.apiId!);
++          return _links(
++            started.length == 1
++                ? '1080p'
++                : started.length == 2
++                ? '720p'
++                : '480p',
++          );
++        },
++      );
++      await session.firstPlayable;
++      await session.completed;
++      expect(started, hasLength(4));
++    },
++  );
+ 
+   test(
+     'stops scheduling new sources once 480p 720p and 1080p are found',
+diff --git a/test/quality_catalog_test.dart b/test/quality_catalog_test.dart
+index bd04d2b..398228f 100644
+--- a/test/quality_catalog_test.dart
++++ b/test/quality_catalog_test.dart
+@@ -445,29 +445,36 @@ void main() {
+     },
+   );
+ 
++  test(
++    'exposes the same source and container details for the download menu',
++    () {
++      final catalog = PlaybackQualityCatalog.collect(
++        linksByProvider: <String, List<RegularVideoLinks>>{
++          'unified:sources': <RegularVideoLinks>[
++            RegularVideoLinks(
++              url: 'https://cdn.example/opaque?token=abc',
++              quality: '1080p',
++              server: 'Jett',
++              providerCode: 'unified:sources',
++              streamContainer: 'mp4',
++              headers: const <String, String>{
++                'Referer': 'https://source.test/',
++              },
++            ),
++          ],
++        },
++        now: now,
++      );
+ 
+-  test('exposes the same source and container details for the download menu', () {
+-    final catalog = PlaybackQualityCatalog.collect(
+-      linksByProvider: <String, List<RegularVideoLinks>>{
+-        'unified:sources': <RegularVideoLinks>[
+-          RegularVideoLinks(
+-            url: 'https://cdn.example/opaque?token=abc',
+-            quality: '1080p',
+-            server: 'Jett',
+-            providerCode: 'unified:sources',
+-            streamContainer: 'mp4',
+-            headers: const <String, String>{'Referer': 'https://source.test/'},
+-          ),
+-        ],
+-      },
+-      now: now,
+-    );
+-
+-    expect(catalog, hasLength(1));
+-    expect(catalog.single.sourceDisplayName, 'Jett');
+-    expect(catalog.single.formatLabel, 'MP4');
+-    expect(catalog.single.selectionSubtitle, 'Jett · MP4  •  Request headers');
+-  });
++      expect(catalog, hasLength(1));
++      expect(catalog.single.sourceDisplayName, 'Jett');
++      expect(catalog.single.formatLabel, 'MP4');
++      expect(
++        catalog.single.selectionSubtitle,
++        'Jett · MP4  •  Request headers',
++      );
++    },
++  );
+ 
+   test('keeps embedded pages out of the quality list', () {
+     final catalog = PlaybackQualityCatalog.collect(

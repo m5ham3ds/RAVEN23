@@ -1,0 +1,14 @@
+ lib/functions/video_utils.dart                     |   5 +-
+ lib/screens/common/download_selection_sheets.dart  |   8 +-
+ lib/screens/common/player.dart                     |  72 ++++-----
+ lib/screens/common/server_status_screen.dart       |  15 +-
+ .../common/source_health_priority_ranker.dart      |  11 +-
+ .../common/source_health_probe_service.dart        |  55 +++----
+ lib/screens/movie/movie_video_loader.dart          |  11 +-
+ lib/screens/tv/tv_video_loader.dart                |  11 +-
+ lib/video_providers/quality_catalog.dart           |  68 +++++----
+ .../unified/source_catalog_safety_policy.dart      |  16 +-
+ test/quality_catalog_test.dart                     | 170 +++++++++++----------
+ .../common/source_health_priority_ranker_test.dart |  21 +--
+ .../common/source_health_probe_service_test.dart   | 136 +++++++++--------
+ 13 files changed, 304 insertions(+), 295 deletions(-)

@@ -1,0 +1,11 @@
+# Native splash resource-generation settings.
+# This file is intentionally kept outside the app dependency graph.
+# Existing generated Android resources are committed. See PHASE57.5 for the optional regeneration procedure.
+flutter_native_splash:
+  color: "#000000"
+  color_dark: "#000000"
+  image: assets/images/splash_logo.png
+  android_12:
+    image: assets/images/splash_logo.png
+    color: "#000000"
+    color_dark: "#000000"

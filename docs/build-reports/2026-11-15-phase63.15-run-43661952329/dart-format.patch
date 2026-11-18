@@ -1,0 +1,1012 @@
+diff --git a/lib/screens/common/server_status_screen.dart b/lib/screens/common/server_status_screen.dart
+index 2d7b095..769d198 100644
+--- a/lib/screens/common/server_status_screen.dart
++++ b/lib/screens/common/server_status_screen.dart
+@@ -110,9 +110,11 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+       });
+     } catch (_) {
+       if (!mounted) return;
+-      setState(() => _videoError = _isArabic
+-          ? 'تعذر تحميل قائمة السيرفرات المثبتة من مستودعات المصادر.'
+-          : 'Could not load installed providers from the source repositories.');
++      setState(
++        () => _videoError = _isArabic
++            ? 'تعذر تحميل قائمة السيرفرات المثبتة من مستودعات المصادر.'
++            : 'Could not load installed providers from the source repositories.',
++      );
+     } finally {
+       if (mounted) setState(() => _checkingVideo = false);
+     }
+@@ -153,10 +155,11 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+ 
+   bool get _isArabic => Localizations.localeOf(context).languageCode == 'ar';
+ 
+-  List<SourceHealthCheckResult> get _problemResults => <SourceHealthCheckResult>[
+-    ..._videoResults.where((result) => result.needsAttention),
+-    ..._mihonResults.where((result) => result.needsAttention),
+-  ];
++  List<SourceHealthCheckResult> get _problemResults =>
++      <SourceHealthCheckResult>[
++        ..._videoResults.where((result) => result.needsAttention),
++        ..._mihonResults.where((result) => result.needsAttention),
++      ];
+ 
+   Future<void> _openFailedSources() async {
+     final failed = _problemResults;
+@@ -204,7 +207,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+           final open = await showDialog<bool>(
+             context: context,
+             builder: (dialogContext) => AlertDialog(
+-              title: Text(_isArabic ? 'إعداد ${source.name}' : 'Configure ${source.name}'),
++              title: Text(
++                _isArabic ? 'إعداد ${source.name}' : 'Configure ${source.name}',
++              ),
+               content: Text(
+                 _isArabic
+                     ? 'سيتم فتح صفحة إعدادات الإضافة في المتصفح. احفظ التغييرات هناك ثم ارجع إلى RAVEN23 وأعد الفحص.'
+@@ -263,15 +268,33 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+       context: context,
+       builder: (dialogContext) {
+         final details = <Widget>[
+-          _SourceInfoLine(label: _isArabic ? 'نوع المحرك' : 'Engine', value: source.engine.rawType),
+-          _SourceInfoLine(label: _isArabic ? 'معرّف المصدر' : 'Source ID', value: source.id),
+-          _SourceInfoLine(label: _isArabic ? 'اللغة' : 'Language', value: source.language),
++          _SourceInfoLine(
++            label: _isArabic ? 'نوع المحرك' : 'Engine',
++            value: source.engine.rawType,
++          ),
++          _SourceInfoLine(
++            label: _isArabic ? 'معرّف المصدر' : 'Source ID',
++            value: source.id,
++          ),
++          _SourceInfoLine(
++            label: _isArabic ? 'اللغة' : 'Language',
++            value: source.language,
++          ),
+           if (source.engine.endpoint.isNotEmpty)
+-            _SourceInfoLine(label: _isArabic ? 'نقطة الاتصال' : 'Endpoint', value: source.engine.endpoint),
++            _SourceInfoLine(
++              label: _isArabic ? 'نقطة الاتصال' : 'Endpoint',
++              value: source.engine.endpoint,
++            ),
+           if (source.homepage?.isNotEmpty == true)
+-            _SourceInfoLine(label: _isArabic ? 'الموقع' : 'Homepage', value: source.homepage!),
++            _SourceInfoLine(
++              label: _isArabic ? 'الموقع' : 'Homepage',
++              value: source.homepage!,
++            ),
+           if (source.repositoryUrl?.isNotEmpty == true)
+-            _SourceInfoLine(label: _isArabic ? 'المستودع' : 'Repository', value: source.repositoryUrl!),
++            _SourceInfoLine(
++              label: _isArabic ? 'المستودع' : 'Repository',
++              value: source.repositoryUrl!,
++            ),
+         ];
+         return AlertDialog(
+           title: Text(source.name),
+@@ -325,7 +348,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     final confirmed = await showDialog<bool>(
+       context: context,
+       builder: (dialogContext) => AlertDialog(
+-        title: Text(_isArabic ? 'تأكيد إزالة العناصر المحددة' : 'Confirm removal'),
++        title: Text(
++          _isArabic ? 'تأكيد إزالة العناصر المحددة' : 'Confirm removal',
++        ),
+         content: Text(
+           _isArabic
+               ? 'سيتم إلغاء تثبيت ${videoSources.length} من سيرفرات الفيديو، وإزالة ${packageNames.length} من إضافات Mihon. إزالة إضافة Mihon تحذف جميع مصادر اللغات التابعة لحزمة الإضافة نفسها. هل تريد المتابعة؟'
+@@ -396,16 +421,21 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+ 
+   String _reasonFromError(Object error) {
+     final message = error.toString().toLowerCase();
+-    if (message.contains('missingplugin') || message.contains('notimplemented')) {
++    if (message.contains('missingplugin') ||
++        message.contains('notimplemented')) {
+       return _isArabic
+           ? 'جسر Mihon غير متاح على هذا الجهاز أو لم يتم تحميله.'
+           : 'The Mihon bridge is unavailable on this device or has not loaded.';
+     }
+     if (message.contains('unknownhost') || message.contains('host lookup')) {
+-      return _isArabic ? 'تعذر الوصول إلى DNS أو اسم المضيف.' : 'DNS or host lookup failed.';
++      return _isArabic
++          ? 'تعذر الوصول إلى DNS أو اسم المضيف.'
++          : 'DNS or host lookup failed.';
+     }
+     if (message.contains('timeout') || message.contains('timed out')) {
+-      return _isArabic ? 'انتهت مهلة الاتصال أثناء الفحص.' : 'The health check timed out.';
++      return _isArabic
++          ? 'انتهت مهلة الاتصال أثناء الفحص.'
++          : 'The health check timed out.';
+     }
+     return _isArabic
+         ? 'تعذر تحميل مصادر Mihon المثبتة.'
+@@ -435,7 +465,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+           actions: <Widget>[
+             IconButton(
+               onPressed: checking || _removing ? null : _checkAllSources,
+-              tooltip: _isArabic ? 'فحص المصادر المثبتة' : 'Check installed sources',
++              tooltip: _isArabic
++                  ? 'فحص المصادر المثبتة'
++                  : 'Check installed sources',
+               icon: Icon(PhosphorIcons.arrowsClockwise()),
+             ),
+           ],
+@@ -502,12 +534,19 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                       ),
+                       trailing: Text(
+                         '${_videoResults.length}',
+-                        style: AppType.metadata.copyWith(color: palette.mutedText),
++                        style: AppType.metadata.copyWith(
++                          color: palette.mutedText,
++                        ),
+                       ),
+                     ),
+                     if (_repositoryWarning != null)
+                       Padding(
+-                        padding: EdgeInsets.fromLTRB(gutter, AppSpace.xs, gutter, 0),
++                        padding: EdgeInsets.fromLTRB(
++                          gutter,
++                          AppSpace.xs,
++                          gutter,
++                          0,
++                        ),
+                         child: DetailsMessage(message: _repositoryWarning!),
+                       ),
+                     if (_videoError != null)
+@@ -517,7 +556,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                       )
+                     else if (_checkingVideo && _videoResults.isEmpty)
+                       _buildProgressPanel(
+-                        label: _isArabic ? 'فحص سيرفرات الفيديو المثبتة…' : 'Checking installed video providers…',
++                        label: _isArabic
++                            ? 'فحص سيرفرات الفيديو المثبتة…'
++                            : 'Checking installed video providers…',
+                         completed: _videoProgress,
+                         total: _videoProgressTotal,
+                       )
+@@ -535,10 +576,13 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                         padding: EdgeInsets.symmetric(horizontal: gutter),
+                         child: _buildSummary(_videoResults),
+                       ),
+-                      for (final result in _videoResults) _buildSourceRow(result),
++                      for (final result in _videoResults)
++                        _buildSourceRow(result),
+                       if (_checkingVideo)
+                         _buildProgressPanel(
+-                          label: _isArabic ? 'يتم فحص بقية السيرفرات…' : 'Checking remaining providers…',
++                          label: _isArabic
++                              ? 'يتم فحص بقية السيرفرات…'
++                              : 'Checking remaining providers…',
+                           completed: _videoProgress,
+                           total: _videoProgressTotal,
+                         ),
+@@ -553,7 +597,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                       ),
+                       trailing: Text(
+                         '${_mihonResults.length}',
+-                        style: AppType.metadata.copyWith(color: palette.mutedText),
++                        style: AppType.metadata.copyWith(
++                          color: palette.mutedText,
++                        ),
+                       ),
+                     ),
+                     Padding(
+@@ -562,17 +608,26 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                         _isArabic
+                             ? 'يتم اختبار كل مصدر Mihon مثبت عبر بحث فعلي بالحرف M، من دون ربط الاختبار بمانغا أو مانهوا محددة.'
+                             : 'Each installed Mihon source is tested with a real search for the letter M, without depending on a specific manga or manhwa title.',
+-                        style: AppType.metadata.copyWith(color: palette.mutedText),
++                        style: AppType.metadata.copyWith(
++                          color: palette.mutedText,
++                        ),
+                       ),
+                     ),
+                     if (_mihonError != null)
+                       Padding(
+-                        padding: EdgeInsets.fromLTRB(gutter, AppSpace.sm, gutter, 0),
++                        padding: EdgeInsets.fromLTRB(
++                          gutter,
++                          AppSpace.sm,
++                          gutter,
++                          0,
++                        ),
+                         child: DetailsMessage(message: _mihonError!),
+                       )
+                     else if (_checkingMihon && _mihonResults.isEmpty)
+                       _buildProgressPanel(
+-                        label: _isArabic ? 'فحص مصادر Mihon المثبتة…' : 'Checking installed Mihon sources…',
++                        label: _isArabic
++                            ? 'فحص مصادر Mihon المثبتة…'
++                            : 'Checking installed Mihon sources…',
+                         completed: _mihonProgress,
+                         total: _mihonProgressTotal,
+                       )
+@@ -595,10 +650,13 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                         ),
+                         child: _buildSummary(_mihonResults),
+                       ),
+-                      for (final result in _mihonResults) _buildSourceRow(result),
++                      for (final result in _mihonResults)
++                        _buildSourceRow(result),
+                       if (_checkingMihon)
+                         _buildProgressPanel(
+-                          label: _isArabic ? 'يتم فحص بقية مصادر Mihon…' : 'Checking remaining Mihon sources…',
++                          label: _isArabic
++                              ? 'يتم فحص بقية مصادر Mihon…'
++                              : 'Checking remaining Mihon sources…',
+                           completed: _mihonProgress,
+                           total: _mihonProgressTotal,
+                         ),
+@@ -663,10 +721,16 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     final error = Theme.of(context).colorScheme.error;
+     final allResponding = attention == 0 && tested > 0;
+     final status = tested == 0
+-        ? (_isArabic ? 'لا توجد اختبارات مدعومة لهذا النوع' : 'No supported checks ran')
++        ? (_isArabic
++              ? 'لا توجد اختبارات مدعومة لهذا النوع'
++              : 'No supported checks ran')
+         : allResponding
+-        ? (_isArabic ? 'جميع المصادر المختبرة تستجيب' : 'All tested sources are responding')
+-        : (_isArabic ? 'بعض المصادر تحتاج إلى معالجة' : 'Some sources need attention');
++        ? (_isArabic
++              ? 'جميع المصادر المختبرة تستجيب'
++              : 'All tested sources are responding')
++        : (_isArabic
++              ? 'بعض المصادر تحتاج إلى معالجة'
++              : 'Some sources need attention');
+     return Container(
+       padding: const EdgeInsets.all(AppSpace.lg),
+       decoration: BoxDecoration(
+@@ -695,7 +759,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                     ),
+                     Text(
+                       '$percent%',
+-                      style: AppType.cardTitle.copyWith(color: palette.foreground),
++                      style: AppType.cardTitle.copyWith(
++                        color: palette.foreground,
++                      ),
+                     ),
+                   ],
+                 ),
+@@ -716,7 +782,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                       _isArabic
+                           ? '$online يستجيب · $attention يحتاج إلى معالجة · $unsupported غير مدعوم · ${results.length} إجماليًا'
+                           : '$online responding · $attention need attention · $unsupported unsupported · ${results.length} total',
+-                      style: AppType.metadata.copyWith(color: palette.mutedText),
++                      style: AppType.metadata.copyWith(
++                        color: palette.mutedText,
++                      ),
+                     ),
+                   ],
+                 ),
+@@ -767,7 +835,9 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+           Text(
+             '$value',
+             style: AppType.sectionHeader.copyWith(
+-              color: warn ? Theme.of(context).colorScheme.error : palette.foreground,
++              color: warn
++                  ? Theme.of(context).colorScheme.error
++                  : palette.foreground,
+             ),
+           ),
+           const SizedBox(height: 2),
+@@ -810,7 +880,10 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+           border: Border(bottom: BorderSide(color: palette.hairline)),
+         ),
+         child: ListTile(
+-          contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
++          contentPadding: const EdgeInsets.symmetric(
++            horizontal: 2,
++            vertical: 2,
++          ),
+           leading: Icon(
+             isGood
+                 ? PhosphorIcons.checkCircle()
+@@ -821,14 +894,20 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+                 : PhosphorIcons.xCircle(),
+             color: color,
+           ),
+-          title: Text(result.name, style: AppType.body.copyWith(fontWeight: FontWeight.w600)),
++          title: Text(
++            result.name,
++            style: AppType.body.copyWith(fontWeight: FontWeight.w600),
++          ),
+           subtitle: Text(
+             subtitleParts.join(' · '),
+             style: AppType.metadata.copyWith(color: palette.mutedText),
+           ),
+           trailing: Text(
+             _statusLabel(result.status),
+-            style: AppType.metadata.copyWith(color: color, fontWeight: FontWeight.w600),
++            style: AppType.metadata.copyWith(
++              color: color,
++              fontWeight: FontWeight.w600,
++            ),
+           ),
+           isThreeLine: true,
+         ),
+@@ -848,66 +927,86 @@ class _ServerStatusScreenState extends State<ServerStatusScreen> {
+     final count = result.resultCount ?? 0;
+     final code = result.httpStatusCode;
+     return switch (result.reason) {
+-      SourceHealthReason.searchResponded => _isArabic
+-          ? 'نجح البحث بالحرف M وأعاد $count نتيجة'
+-          : 'M search responded with $count results',
+-      SourceHealthReason.endpointResponded => _isArabic
+-          ? 'استجاب عنوان الخدمة؛ لم يتم اختبار استخراج الفيديو'
+-          : 'Endpoint responded; stream extraction was not tested',
+-      SourceHealthReason.apiRequiresMedia => _isArabic
+-          ? 'واجهة API تستجيب لكنها تتطلب بيانات عمل لاختبار الاستخراج'
+-          : 'API responded; a media ID is required to test extraction',
+-      SourceHealthReason.cloudflare => _isArabic
+-          ? 'تتطلب الخدمة اجتياز تحقق Cloudflare'
+-          : 'Cloudflare verification is required',
+-      SourceHealthReason.configurationRequired => _isArabic
+-          ? 'يجب إكمال إعدادات المصدر أولًا'
+-          : 'Provider configuration is required',
+-      SourceHealthReason.networkUnavailable => _isArabic
+-          ? 'تعذر الاتصال بالشبكة أو بالخادم'
+-          : 'Network connection to the server failed',
+-      SourceHealthReason.dnsFailure => _isArabic
+-          ? 'تعذر العثور على عنوان الخادم عبر DNS'
+-          : 'DNS could not resolve the server host',
+-      SourceHealthReason.timeout => _isArabic
+-          ? 'انتهت مهلة الاتصال أو استجابة الخادم'
+-          : 'Connection or server response timed out',
+-      SourceHealthReason.tlsFailure => _isArabic
+-          ? 'فشل التحقق من شهادة TLS/SSL'
+-          : 'TLS/SSL certificate validation failed',
+-      SourceHealthReason.unauthorized => _isArabic
+-          ? 'الخادم يطلب بيانات مصادقة (HTTP ${code ?? 401})'
+-          : 'Server requires authentication (HTTP ${code ?? 401})',
+-      SourceHealthReason.forbidden => _isArabic
+-          ? 'الخادم رفض الطلب أو حظره (HTTP ${code ?? 403})'
+-          : 'Server rejected or blocked the request (HTTP ${code ?? 403})',
+-      SourceHealthReason.rateLimited => _isArabic
+-          ? 'الخادم فرض حدًا مؤقتًا للطلبات (HTTP ${code ?? 429})'
+-          : 'Server rate-limited the request (HTTP ${code ?? 429})',
+-      SourceHealthReason.pathNotFound => _isArabic
+-          ? 'المسار غير موجود أو تغيّر (HTTP ${code ?? 404})'
+-          : 'Endpoint path was not found or has changed (HTTP ${code ?? 404})',
+-      SourceHealthReason.serverError => _isArabic
+-          ? 'حدث خطأ داخلي في الخادم (HTTP ${code ?? '5xx'})'
+-          : 'The remote server returned an internal error (HTTP ${code ?? '5xx'})',
+-      SourceHealthReason.invalidResponse => _isArabic
+-          ? 'استجابة الخادم غير صالحة أو لا تطابق صيغة المحرك'
+-          : 'Server response is invalid or does not match the engine contract',
+-      SourceHealthReason.invalidEndpoint => _isArabic
+-          ? 'عنوان الخدمة أو مسارها غير صالح'
+-          : 'The service URL or endpoint path is invalid',
+-      SourceHealthReason.sourceMissing => _isArabic
+-          ? 'المصدر غير موجود داخل الإضافة المحملة'
+-          : 'The source is no longer registered in the loaded extension',
+-      SourceHealthReason.extensionFailure => _isArabic
+-          ? 'الإضافة لا تدعم عملية البحث المطلوبة أو فشل تحميلها'
+-          : 'The extension does not support the required search operation or failed to load',
+-      SourceHealthReason.unsupportedEngine => _isArabic
+-          ? 'نوع المحرك غير مدعوم أو ليس من مصادر الفيديو'
+-          : 'This engine is unsupported or is not a video source',
+-      SourceHealthReason.unknown => _isArabic
+-          ? 'حدث خطأ غير مصنف؛ لم يتم افتراض أن المصدر متوقف بسبب ذلك وحده'
+-          : 'An unclassified error occurred; the source was not assumed offline for a known reason',
++      SourceHealthReason.searchResponded =>
++        _isArabic
++            ? 'نجح البحث بالحرف M وأعاد $count نتيجة'
++            : 'M search responded with $count results',
++      SourceHealthReason.endpointResponded =>
++        _isArabic
++            ? 'استجاب عنوان الخدمة؛ لم يتم اختبار استخراج الفيديو'
++            : 'Endpoint responded; stream extraction was not tested',
++      SourceHealthReason.apiRequiresMedia =>
++        _isArabic
++            ? 'واجهة API تستجيب لكنها تتطلب بيانات عمل لاختبار الاستخراج'
++            : 'API responded; a media ID is required to test extraction',
++      SourceHealthReason.cloudflare =>
++        _isArabic
++            ? 'تتطلب الخدمة اجتياز تحقق Cloudflare'
++            : 'Cloudflare verification is required',
++      SourceHealthReason.configurationRequired =>
++        _isArabic
++            ? 'يجب إكمال إعدادات المصدر أولًا'
++            : 'Provider configuration is required',
++      SourceHealthReason.networkUnavailable =>
++        _isArabic
++            ? 'تعذر الاتصال بالشبكة أو بالخادم'
++            : 'Network connection to the server failed',
++      SourceHealthReason.dnsFailure =>
++        _isArabic
++            ? 'تعذر العثور على عنوان الخادم عبر DNS'
++            : 'DNS could not resolve the server host',
++      SourceHealthReason.timeout =>
++        _isArabic
++            ? 'انتهت مهلة الاتصال أو استجابة الخادم'
++            : 'Connection or server response timed out',
++      SourceHealthReason.tlsFailure =>
++        _isArabic
++            ? 'فشل التحقق من شهادة TLS/SSL'
++            : 'TLS/SSL certificate validation failed',
++      SourceHealthReason.unauthorized =>
++        _isArabic
++            ? 'الخادم يطلب بيانات مصادقة (HTTP ${code ?? 401})'
++            : 'Server requires authentication (HTTP ${code ?? 401})',
++      SourceHealthReason.forbidden =>
++        _isArabic
++            ? 'الخادم رفض الطلب أو حظره (HTTP ${code ?? 403})'
++            : 'Server rejected or blocked the request (HTTP ${code ?? 403})',
++      SourceHealthReason.rateLimited =>
++        _isArabic
++            ? 'الخادم فرض حدًا مؤقتًا للطلبات (HTTP ${code ?? 429})'
++            : 'Server rate-limited the request (HTTP ${code ?? 429})',
++      SourceHealthReason.pathNotFound =>
++        _isArabic
++            ? 'المسار غير موجود أو تغيّر (HTTP ${code ?? 404})'
++            : 'Endpoint path was not found or has changed (HTTP ${code ?? 404})',
++      SourceHealthReason.serverError =>
++        _isArabic
++            ? 'حدث خطأ داخلي في الخادم (HTTP ${code ?? '5xx'})'
++            : 'The remote server returned an internal error (HTTP ${code ?? '5xx'})',
++      SourceHealthReason.invalidResponse =>
++        _isArabic
++            ? 'استجابة الخادم غير صالحة أو لا تطابق صيغة المحرك'
++            : 'Server response is invalid or does not match the engine contract',
++      SourceHealthReason.invalidEndpoint =>
++        _isArabic
++            ? 'عنوان الخدمة أو مسارها غير صالح'
++            : 'The service URL or endpoint path is invalid',
++      SourceHealthReason.sourceMissing =>
++        _isArabic
++            ? 'المصدر غير موجود داخل الإضافة المحملة'
++            : 'The source is no longer registered in the loaded extension',
++      SourceHealthReason.extensionFailure =>
++        _isArabic
++            ? 'الإضافة لا تدعم عملية البحث المطلوبة أو فشل تحميلها'
++            : 'The extension does not support the required search operation or failed to load',
++      SourceHealthReason.unsupportedEngine =>
++        _isArabic
++            ? 'نوع المحرك غير مدعوم أو ليس من مصادر الفيديو'
++            : 'This engine is unsupported or is not a video source',
++      SourceHealthReason.unknown =>
++        _isArabic
++            ? 'حدث خطأ غير مصنف؛ لم يتم افتراض أن المصدر متوقف بسبب ذلك وحده'
++            : 'An unclassified error occurred; the source was not assumed offline for a known reason',
+     };
+   }
+ }
+@@ -926,7 +1025,10 @@ class _SourceInfoLine extends StatelessWidget {
+       child: Column(
+         crossAxisAlignment: CrossAxisAlignment.start,
+         children: <Widget>[
+-          Text(label, style: AppType.metadata.copyWith(color: palette.mutedText)),
++          Text(
++            label,
++            style: AppType.metadata.copyWith(color: palette.mutedText),
++          ),
+           SelectableText(value, style: AppType.body),
+         ],
+       ),
+@@ -967,7 +1069,12 @@ class _FailedSourcesSheetState extends State<_FailedSourcesSheet> {
+         child: Column(
+           children: <Widget>[
+             Padding(
+-              padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.lg, AppSpace.lg, AppSpace.md),
++              padding: const EdgeInsets.fromLTRB(
++                AppSpace.lg,
++                AppSpace.lg,
++                AppSpace.lg,
++                AppSpace.md,
++              ),
+               child: Row(
+                 children: <Widget>[
+                   Expanded(
+@@ -989,10 +1096,13 @@ class _FailedSourcesSheetState extends State<_FailedSourcesSheet> {
+               child: ListView.separated(
+                 padding: const EdgeInsets.symmetric(horizontal: AppSpace.lg),
+                 itemCount: widget.results.length,
+-                separatorBuilder: (_, __) => Divider(height: 1, color: palette.hairline),
++                separatorBuilder: (_, __) =>
++                    Divider(height: 1, color: palette.hairline),
+                 itemBuilder: (context, index) {
+                   final result = widget.results[index];
+-                  final isSelected = _selectedKeys.contains(result.selectionKey);
++                  final isSelected = _selectedKeys.contains(
++                    result.selectionKey,
++                  );
+                   return ListTile(
+                     onTap: _working ? null : () => widget.onOpen(result),
+                     contentPadding: EdgeInsets.zero,
+@@ -1011,7 +1121,9 @@ class _FailedSourcesSheetState extends State<_FailedSourcesSheet> {
+                     title: Text(result.name, style: AppType.body),
+                     subtitle: Text(
+                       '${result.engineLabel} · ${_sheetReason(context, result)}',
+-                      style: AppType.metadata.copyWith(color: palette.mutedText),
++                      style: AppType.metadata.copyWith(
++                        color: palette.mutedText,
++                      ),
+                     ),
+                     trailing: Icon(
+                       PhosphorIcons.notePencil(),
+@@ -1026,7 +1138,12 @@ class _FailedSourcesSheetState extends State<_FailedSourcesSheet> {
+               SafeArea(
+                 top: false,
+                 child: Padding(
+-                  padding: const EdgeInsets.fromLTRB(AppSpace.lg, AppSpace.md, AppSpace.lg, AppSpace.lg),
++                  padding: const EdgeInsets.fromLTRB(
++                    AppSpace.lg,
++                    AppSpace.md,
++                    AppSpace.lg,
++                    AppSpace.lg,
++                  ),
+                   child: SizedBox(
+                     width: double.infinity,
+                     child: FilledButton.icon(
+@@ -1065,26 +1182,42 @@ class _FailedSourcesSheetState extends State<_FailedSourcesSheet> {
+   String _sheetReason(BuildContext context, SourceHealthCheckResult result) {
+     final arabic = Localizations.localeOf(context).languageCode == 'ar';
+     return switch (result.reason) {
+-      SourceHealthReason.cloudflare => arabic ? 'تحقق Cloudflare' : 'Cloudflare verification',
+-      SourceHealthReason.configurationRequired => arabic ? 'إعداد مطلوب' : 'Configuration required',
+-      SourceHealthReason.networkUnavailable => arabic ? 'مشكلة شبكة' : 'Network failure',
++      SourceHealthReason.cloudflare =>
++        arabic ? 'تحقق Cloudflare' : 'Cloudflare verification',
++      SourceHealthReason.configurationRequired =>
++        arabic ? 'إعداد مطلوب' : 'Configuration required',
++      SourceHealthReason.networkUnavailable =>
++        arabic ? 'مشكلة شبكة' : 'Network failure',
+       SourceHealthReason.dnsFailure => arabic ? 'مشكلة DNS' : 'DNS failure',
+       SourceHealthReason.timeout => arabic ? 'انتهاء المهلة' : 'Timeout',
+-      SourceHealthReason.tlsFailure => arabic ? 'شهادة TLS/SSL' : 'TLS/SSL certificate',
+-      SourceHealthReason.unauthorized => arabic ? 'يتطلب مصادقة' : 'Authentication required',
+-      SourceHealthReason.forbidden => arabic ? 'رفض / حظر الطلب' : 'Request forbidden',
++      SourceHealthReason.tlsFailure =>
++        arabic ? 'شهادة TLS/SSL' : 'TLS/SSL certificate',
++      SourceHealthReason.unauthorized =>
++        arabic ? 'يتطلب مصادقة' : 'Authentication required',
++      SourceHealthReason.forbidden =>
++        arabic ? 'رفض / حظر الطلب' : 'Request forbidden',
+       SourceHealthReason.rateLimited => arabic ? 'حد الطلبات' : 'Rate limited',
+-      SourceHealthReason.pathNotFound => arabic ? 'مسار غير موجود' : 'Path not found',
+-      SourceHealthReason.serverError => arabic ? 'خطأ في الخادم' : 'Server error',
+-      SourceHealthReason.invalidResponse => arabic ? 'استجابة غير صالحة' : 'Invalid response',
+-      SourceHealthReason.invalidEndpoint => arabic ? 'مسار غير صالح' : 'Invalid endpoint',
+-      SourceHealthReason.sourceMissing => arabic ? 'المصدر غير مسجل' : 'Source not registered',
+-      SourceHealthReason.extensionFailure => arabic ? 'خطأ في الإضافة' : 'Extension error',
+-      SourceHealthReason.unsupportedEngine => arabic ? 'محرك غير مدعوم' : 'Unsupported engine',
++      SourceHealthReason.pathNotFound =>
++        arabic ? 'مسار غير موجود' : 'Path not found',
++      SourceHealthReason.serverError =>
++        arabic ? 'خطأ في الخادم' : 'Server error',
++      SourceHealthReason.invalidResponse =>
++        arabic ? 'استجابة غير صالحة' : 'Invalid response',
++      SourceHealthReason.invalidEndpoint =>
++        arabic ? 'مسار غير صالح' : 'Invalid endpoint',
++      SourceHealthReason.sourceMissing =>
++        arabic ? 'المصدر غير مسجل' : 'Source not registered',
++      SourceHealthReason.extensionFailure =>
++        arabic ? 'خطأ في الإضافة' : 'Extension error',
++      SourceHealthReason.unsupportedEngine =>
++        arabic ? 'محرك غير مدعوم' : 'Unsupported engine',
+       SourceHealthReason.unknown => arabic ? 'خطأ غير معروف' : 'Unknown error',
+-      SourceHealthReason.searchResponded => arabic ? 'استجاب البحث' : 'Search responded',
+-      SourceHealthReason.endpointResponded => arabic ? 'استجاب العنوان' : 'Endpoint responded',
+-      SourceHealthReason.apiRequiresMedia => arabic ? 'يتطلب بيانات عمل' : 'Requires media metadata',
++      SourceHealthReason.searchResponded =>
++        arabic ? 'استجاب البحث' : 'Search responded',
++      SourceHealthReason.endpointResponded =>
++        arabic ? 'استجاب العنوان' : 'Endpoint responded',
++      SourceHealthReason.apiRequiresMedia =>
++        arabic ? 'يتطلب بيانات عمل' : 'Requires media metadata',
+     };
+   }
+ }
+diff --git a/lib/screens/common/source_health_probe_service.dart b/lib/screens/common/source_health_probe_service.dart
+index 6821162..6be2f26 100644
+--- a/lib/screens/common/source_health_probe_service.dart
++++ b/lib/screens/common/source_health_probe_service.dart
+@@ -110,7 +110,8 @@ class SourceHealthProbeService {
+       responseType: ResponseType.plain,
+       headers: const <String, String>{
+         'Accept': 'application/json, text/html, */*',
+-        'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
++        'User-Agent':
++            'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+             '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+       },
+     ),
+@@ -175,11 +176,7 @@ class SourceHealthProbeService {
+         case SourceEngineKind.vidkingDirect:
+           return await _checkVidkingDirect(source, watch);
+         case SourceEngineKind.vidkingWebView:
+-          return await _checkWebsite(
+-            source,
+-            'https://www.vidking.net/',
+-            watch,
+-          );
++          return await _checkWebsite(source, 'https://www.vidking.net/', watch);
+         case SourceEngineKind.webEmbed:
+           return await _checkWebEmbed(source, watch);
+         case SourceEngineKind.animeSite:
+@@ -233,12 +230,11 @@ class SourceHealthProbeService {
+     Object? lastSearchError;
+     for (final category in _quickJsSearchCategories(source)) {
+       try {
+-        final response = await _quickJsRuntime.call(
+-          source,
+-          'search',
+-          <Object?>['M', 1, <String, dynamic>{'category': category}],
+-          timeout: const Duration(seconds: 20),
+-        );
++        final response = await _quickJsRuntime.call(source, 'search', <Object?>[
++          'M',
++          1,
++          <String, dynamic>{'category': category},
++        ], timeout: const Duration(seconds: 20));
+         if (response is! List) {
+           lastSearchError = const FormatException(
+             'Provider search() did not return a list.',
+@@ -282,7 +278,8 @@ class SourceHealthProbeService {
+     final hasSeries = tags.any(
+       const <String>{'series', 'tv', 'show', 'shows'}.contains,
+     );
+-    final advertisesAnime = source.isAnimeOnly ||
++    final advertisesAnime =
++        source.isAnimeOnly ||
+         providerType.contains('anime') ||
+         providerType.contains('donghua') ||
+         tags.contains('anime') ||
+@@ -329,11 +326,12 @@ class SourceHealthProbeService {
+     try {
+       decoded = jsonDecode(response.data ?? '');
+     } on FormatException {
+-      final failure = _looksLikeCloudflare(
+-        response.data,
+-        response.headers,
+-        statusCode: statusCode,
+-      )
++      final failure =
++          _looksLikeCloudflare(
++            response.data,
++            response.headers,
++            statusCode: statusCode,
++          )
+           ? const _HealthFailure(
+               SourceHealthStatus.attention,
+               SourceHealthReason.cloudflare,
+@@ -382,7 +380,9 @@ class SourceHealthProbeService {
+         routeUri.hasScheme ||
+         routeUri.hasAuthority ||
+         route.startsWith('/') ||
+-        routeUri.pathSegments.any((segment) => segment == '.' || segment == '..')) {
++        routeUri.pathSegments.any(
++          (segment) => segment == '.' || segment == '..',
++        )) {
+       return _result(
+         source,
+         status: SourceHealthStatus.failed,
+@@ -448,10 +448,8 @@ class SourceHealthProbeService {
+     SourceManifest source,
+     Stopwatch watch,
+   ) async {
+-    final candidate = source.homepage ??
+-        source.engine.movieUrl ??
+-        source.engine.tvUrl ??
+-        '';
++    final candidate =
++        source.homepage ?? source.engine.movieUrl ?? source.engine.tvUrl ?? '';
+     final parsed = Uri.tryParse(candidate);
+     if (parsed == null || parsed.host.isEmpty || parsed.userInfo.isNotEmpty) {
+       return _result(
+@@ -461,7 +459,11 @@ class SourceHealthProbeService {
+         watch: watch,
+       );
+     }
+-    final uri = Uri(scheme: parsed.scheme, host: parsed.host, port: parsed.hasPort ? parsed.port : null);
++    final uri = Uri(
++      scheme: parsed.scheme,
++      host: parsed.host,
++      port: parsed.hasPort ? parsed.port : null,
++    );
+     return _checkWebsite(source, uri.toString(), watch);
+   }
+ 
+@@ -590,7 +592,9 @@ class SourceHealthProbeService {
+         uri.userInfo.isNotEmpty) {
+       throw const FormatException('Stremio manifest endpoint is invalid.');
+     }
+-    final segments = uri.pathSegments.where((segment) => segment.isNotEmpty).toList();
++    final segments = uri.pathSegments
++        .where((segment) => segment.isNotEmpty)
++        .toList();
+     if (segments.isNotEmpty && segments.last.toLowerCase() == 'manifest.json') {
+       segments.removeLast();
+     }
+@@ -605,10 +609,7 @@ class SourceHealthProbeService {
+   }) async {
+     final sources = await _mihonRuntime.listSources(reload: true);
+     if (sources.isEmpty) return const <SourceHealthCheckResult>[];
+-    final results = List<SourceHealthCheckResult?>.filled(
+-      sources.length,
+-      null,
+-    );
++    final results = List<SourceHealthCheckResult?>.filled(sources.length, null);
+     var next = 0;
+     var completed = 0;
+     final workerCount = math.min(3, sources.length).toInt();
+@@ -706,7 +707,9 @@ class SourceHealthProbeService {
+     Headers? headers, {
+     required int statusCode,
+   }) {
+-    final text = body is String ? body.toLowerCase() : body?.toString().toLowerCase() ?? '';
++    final text = body is String
++        ? body.toLowerCase()
++        : body?.toString().toLowerCase() ?? '';
+     final server = headers?.value('server')?.toLowerCase() ?? '';
+     final mitigation = headers?.value('cf-mitigated')?.toLowerCase() ?? '';
+     if (mitigation.contains('challenge')) return true;
+@@ -1003,11 +1006,7 @@ class SourceHealthProbeService {
+ }
+ 
+ class _HealthFailure {
+-  const _HealthFailure(
+-    this.status,
+-    this.reason, {
+-    this.httpStatusCode,
+-  });
++  const _HealthFailure(this.status, this.reason, {this.httpStatusCode});
+ 
+   final SourceHealthStatus status;
+   final SourceHealthReason reason;
+diff --git a/lib/screens/common/source_repositories_screen.dart b/lib/screens/common/source_repositories_screen.dart
+index 784feac..7902e22 100644
+--- a/lib/screens/common/source_repositories_screen.dart
++++ b/lib/screens/common/source_repositories_screen.dart
+@@ -1980,10 +1980,7 @@ class _PrioritySourceTile extends StatelessWidget {
+ }
+ 
+ class _SwapListHeading extends StatelessWidget {
+-  const _SwapListHeading({
+-    required this.title,
+-    required this.count,
+-  });
++  const _SwapListHeading({required this.title, required this.count});
+ 
+   final String title;
+   final int count;
+diff --git a/lib/screens/common/sync_screen.dart b/lib/screens/common/sync_screen.dart
+index a0792cb..9d280eb 100644
+--- a/lib/screens/common/sync_screen.dart
++++ b/lib/screens/common/sync_screen.dart
+@@ -16,10 +16,7 @@ class SyncScreen extends StatelessWidget {
+     return Scaffold(
+       backgroundColor: palette.page,
+       appBar: PageAppBar(title: tr('tv_choose_source_priority')),
+-      body: const SourceRepositoriesScreen(
+-        embedded: true,
+-        priorityOnly: true,
+-      ),
++      body: const SourceRepositoriesScreen(embedded: true, priorityOnly: true),
+     );
+   }
+ }
+diff --git a/test/video_providers/source_priority_manager_test.dart b/test/video_providers/source_priority_manager_test.dart
+index a2b911b..e46c09a 100644
+--- a/test/video_providers/source_priority_manager_test.dart
++++ b/test/video_providers/source_priority_manager_test.dart
+@@ -26,26 +26,9 @@ void main() {
+       hasLength(85),
+     );
+     expect(
+-      await manager.addPriorityKey(SourcePriorityCategory.movies, 'extra-primary'),
+-      isTrue,
+-    );
+-    expect(
+-      await manager.addKey(
+-        SourcePriorityCategory.movies,
+-        SourcePriorityLane.backup,
+-        'extra-backup',
+-      ),
+-      isTrue,
+-    );
+-  });
+-
+-  test('same source cannot be added to both lanes of one media category', () async {
+-    final manager = SourcePriorityManager();
+-    expect(
+-      await manager.addKey(
++      await manager.addPriorityKey(
+         SourcePriorityCategory.movies,
+-        SourcePriorityLane.primary,
+-        'repo::source-a',
++        'extra-primary',
+       ),
+       isTrue,
+     );
+@@ -53,20 +36,43 @@ void main() {
+       await manager.addKey(
+         SourcePriorityCategory.movies,
+         SourcePriorityLane.backup,
+-        'repo::source-a',
+-      ),
+-      isFalse,
+-    );
+-    expect(
+-      await manager.addKey(
+-        SourcePriorityCategory.series,
+-        SourcePriorityLane.backup,
+-        'repo::source-a',
++        'extra-backup',
+       ),
+       isTrue,
+     );
+   });
+ 
++  test(
++    'same source cannot be added to both lanes of one media category',
++    () async {
++      final manager = SourcePriorityManager();
++      expect(
++        await manager.addKey(
++          SourcePriorityCategory.movies,
++          SourcePriorityLane.primary,
++          'repo::source-a',
++        ),
++        isTrue,
++      );
++      expect(
++        await manager.addKey(
++          SourcePriorityCategory.movies,
++          SourcePriorityLane.backup,
++          'repo::source-a',
++        ),
++        isFalse,
++      );
++      expect(
++        await manager.addKey(
++          SourcePriorityCategory.series,
++          SourcePriorityLane.backup,
++          'repo::source-a',
++        ),
++        isTrue,
++      );
++    },
++  );
++
+   test('legacy v1 priority list is preserved as the primary list', () async {
+     SharedPreferences.setMockInitialValues(<String, Object>{
+       'raven23.source_priorities.v1.movies': <String>[
+@@ -80,10 +86,7 @@ void main() {
+       await manager.getPriorityKeys(SourcePriorityCategory.movies),
+       <String>['repo::first', 'repo::second'],
+     );
+-    expect(
+-      await manager.getBackupKeys(SourcePriorityCategory.movies),
+-      isEmpty,
+-    );
++    expect(await manager.getBackupKeys(SourcePriorityCategory.movies), isEmpty);
+   });
+ 
+   test('legacy backup migration seeds only missing backup lanes', () async {
+@@ -94,55 +97,56 @@ void main() {
+     );
+     expect(seeded, isTrue);
+ 
+-    await manager.setBackupKeys(
+-      SourcePriorityCategory.series,
+-      <String>['repo::user-choice'],
+-    );
++    await manager.setBackupKeys(SourcePriorityCategory.series, <String>[
++      'repo::user-choice',
++    ]);
+     final reseeded = await manager.seedBackupKeysIfMissing(
+       SourcePriorityCategory.series,
+       <String>['repo::new-default'],
+     );
+ 
+     expect(reseeded, isFalse);
+-    expect(
+-      await manager.getBackupKeys(SourcePriorityCategory.series),
+-      <String>['repo::user-choice'],
+-    );
+-  });
+-
+-  test('cross-lane swap exchanges positions and maintains uniqueness', () async {
+-    final manager = SourcePriorityManager();
+-    await manager.setPriorityKeys(SourcePriorityCategory.anime, <String>[
+-      'repo::p1',
+-      'repo::p2',
++    expect(await manager.getBackupKeys(SourcePriorityCategory.series), <String>[
++      'repo::user-choice',
+     ]);
+-    await manager.setBackupKeys(SourcePriorityCategory.anime, <String>[
+-      'repo::b1',
+-      'repo::b2',
+-    ]);
+-
+-    final swapped = await manager.swapKeys(
+-      SourcePriorityCategory.anime,
+-      firstKey: 'repo::p2',
+-      secondKey: 'repo::b1',
+-    );
+-
+-    expect(swapped, isTrue);
+-    expect(
+-      await manager.getPriorityKeys(SourcePriorityCategory.anime),
+-      <String>['repo::p1', 'repo::b1'],
+-    );
+-    expect(
+-      await manager.getBackupKeys(SourcePriorityCategory.anime),
+-      <String>['repo::p2', 'repo::b2'],
+-    );
+-    final all = <String>{
+-      ...(await manager.getPriorityKeys(SourcePriorityCategory.anime)),
+-      ...(await manager.getBackupKeys(SourcePriorityCategory.anime)),
+-    };
+-    expect(all, hasLength(4));
+   });
+ 
++  test(
++    'cross-lane swap exchanges positions and maintains uniqueness',
++    () async {
++      final manager = SourcePriorityManager();
++      await manager.setPriorityKeys(SourcePriorityCategory.anime, <String>[
++        'repo::p1',
++        'repo::p2',
++      ]);
++      await manager.setBackupKeys(SourcePriorityCategory.anime, <String>[
++        'repo::b1',
++        'repo::b2',
++      ]);
++
++      final swapped = await manager.swapKeys(
++        SourcePriorityCategory.anime,
++        firstKey: 'repo::p2',
++        secondKey: 'repo::b1',
++      );
++
++      expect(swapped, isTrue);
++      expect(
++        await manager.getPriorityKeys(SourcePriorityCategory.anime),
++        <String>['repo::p1', 'repo::b1'],
++      );
++      expect(
++        await manager.getBackupKeys(SourcePriorityCategory.anime),
++        <String>['repo::p2', 'repo::b2'],
++      );
++      final all = <String>{
++        ...(await manager.getPriorityKeys(SourcePriorityCategory.anime)),
++        ...(await manager.getBackupKeys(SourcePriorityCategory.anime)),
++      };
++      expect(all, hasLength(4));
++    },
++  );
++
+   test('reordering is isolated to the selected lane', () async {
+     final manager = SourcePriorityManager();
+     await manager.setPriorityKeys(SourcePriorityCategory.series, <String>[
+@@ -165,10 +169,10 @@ void main() {
+       await manager.getPriorityKeys(SourcePriorityCategory.series),
+       <String>['repo::p1', 'repo::p2'],
+     );
+-    expect(
+-      await manager.getBackupKeys(SourcePriorityCategory.series),
+-      <String>['repo::b2', 'repo::b1'],
+-    );
++    expect(await manager.getBackupKeys(SourcePriorityCategory.series), <String>[
++      'repo::b2',
++      'repo::b1',
++    ]);
+   });
+ 
+   test('repository removal clears primary and backup entries', () async {
+@@ -188,9 +192,8 @@ void main() {
+       await manager.getPriorityKeys(SourcePriorityCategory.movies),
+       <String>['other::keep'],
+     );
+-    expect(
+-      await manager.getBackupKeys(SourcePriorityCategory.movies),
+-      <String>['other::backup-keep'],
+-    );
++    expect(await manager.getBackupKeys(SourcePriorityCategory.movies), <String>[
++      'other::backup-keep',
++    ]);
+   });
+ }

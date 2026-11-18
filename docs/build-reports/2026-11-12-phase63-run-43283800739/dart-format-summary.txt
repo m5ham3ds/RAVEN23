@@ -1,0 +1,13 @@
+ lib/manga/anilist/anilist_manga_service.dart       |  28 +-
+ .../manga_page_translation_service.dart            |  47 +-
+ .../translation/manga_translation_models.dart      |   5 +-
+ .../translation/manga_translation_overlay.dart     |  42 +-
+ .../translation/manga_translation_platform.dart    |  28 +-
+ lib/manga/ui/manga_chapter_download_store.dart     |  25 +-
+ lib/manga/ui/manga_reader_screen.dart              | 864 +++++++++++++++------
+ lib/manga/ui/manga_reading_store.dart              |  11 +-
+ lib/manga/ui/manga_work_screen.dart                | 720 ++++++++++++-----
+ test/manga_detail_metadata_test.dart               |  25 +-
+ test/manga_reading_store_test.dart                 |  33 +-
+ test/manga_source_matcher_test.dart                |  25 +-
+ 12 files changed, 1330 insertions(+), 523 deletions(-)
