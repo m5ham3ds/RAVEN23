@@ -13,5 +13,10 @@ class AppRuntime {
       bool.fromEnvironment('ENABLE_FIREBASE', defaultValue: false) &&
           !localDevelopment;
 
+  /// Local development suppresses Firebase SDK initialization, but Google
+  /// identity sign-in is still available through the platform identity client.
+  static const bool googleSignInAvailable = true;
+
+  /// This build preset keeps account endpoints local-only until a backend is configured.
   static const bool useLocalServices = localDevelopment;
 }
