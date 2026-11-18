@@ -235,15 +235,16 @@ class SourcePriorityPolicy {
       (repository: 'spyhell-experiment', id: 'vidzee'),
       (repository: 'spyou-zangetsu', id: 'vegamovies'),
     ];
-    final keys = _resolveOrder(
-      previousOrder,
-      category,
-      catalog,
-      supportsRuntime: supportsRuntime,
-    )
-        .where((source) => isAvailable?.call(source) ?? true)
-        .map((source) => source.stableKey)
-        .toList(growable: true);
+    final keys =
+        _resolveOrder(
+              previousOrder,
+              category,
+              catalog,
+              supportsRuntime: supportsRuntime,
+            )
+            .where((source) => isAvailable?.call(source) ?? true)
+            .map((source) => source.stableKey)
+            .toList(growable: true);
     keys.insert(0, directVixSrcPriorityKey);
     return List<String>.unmodifiable(keys);
   }

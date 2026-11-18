@@ -1142,6 +1142,7 @@ void main() {
       // homeRows builds them; a forward-only scroll cannot revisit earlier rows.
       for (final label in <String>[
         'top_10_movies_today',
+        'top_10_series_today',
         'trending_anime',
         'new_episodes_series',
         'new_episodes_anime',
@@ -1154,6 +1155,7 @@ void main() {
           find.text(label),
           delta: 240,
         );
+        expect(find.text(label), findsOneWidget);
       }
 
       // Return to the top after validating lower lazy slivers. The pinned
@@ -1170,7 +1172,6 @@ void main() {
       // The initial All feed remains intact; only its redundant header chips
       // have been removed. Movies/Series/Anime navigation lives in the dock.
       expect(find.text('top_10_movies_today'), findsOneWidget);
-      expect(find.text('top_10_series_today'), findsOneWidget);
       expect(find.text('top_rated_anime'), findsOneWidget);
     },
   );

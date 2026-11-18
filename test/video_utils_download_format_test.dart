@@ -5,7 +5,7 @@ import 'package:raven23/video_providers/common.dart';
 
 void main() {
   test(
-    'download choices collapse duplicate heights but retain the chosen key',
+    'keeps same-resolution download choices separate for each server',
     () {
       expect(
         VideoUtils.uniqueQualityKeys(<String>[
@@ -15,13 +15,19 @@ void main() {
           '480p',
           '480p · Phoenix',
         ]),
-        <String>['1080p · Jett', '720p · Jett', '480p'],
+        <String>[
+          '1080p · Jett',
+          '1080p · Sova',
+          '720p · Jett',
+          '480p',
+          '480p · Phoenix',
+        ],
       );
     },
   );
 
   test(
-    'collapses unknown and Auto labels with generated occurrence suffixes',
+    'removes provider Auto and adaptive choices without merging real sources',
     () {
       expect(
         VideoUtils.uniqueQualityKeys(<String>[
@@ -29,10 +35,16 @@ void main() {
           'unknown quality 1',
           'Auto',
           'Auto (2)',
+          'Adaptive · Phoenix',
           'HD · Jett',
           'HD · Sova',
         ]),
-        <String>['unknown quality 0', 'Auto', 'HD · Jett'],
+        <String>[
+          'unknown quality 0',
+          'unknown quality 1',
+          'HD · Jett',
+          'HD · Sova',
+        ],
       );
     },
   );

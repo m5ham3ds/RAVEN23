@@ -399,9 +399,7 @@ class UnifiedSourceService {
               supportsRuntime: _engines.supports,
               isAvailable: isAvailable,
             );
-        final currentPrimary = await _priorityManager.getPriorityKeys(
-          category,
-        );
+        final currentPrimary = await _priorityManager.getPriorityKeys(category);
         final matchesUntouchedLegacyDefault =
             oldDefault.isNotEmpty &&
             _sameStringOrder(currentPrimary, oldDefault);
