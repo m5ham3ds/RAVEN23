@@ -119,7 +119,7 @@ jobs:
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
             -alias androiddebugkey \
-            -keypass android 2>/dev/null | \
+            2>/dev/null | \
             awk -F': ' '/SHA1:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]' )"
           if [[ -z "$ci_sha1" ]]; then
             echo 'Could not read the CI Android signing SHA-1.' >&2
