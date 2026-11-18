@@ -263,7 +263,7 @@ class _SignupScreenState extends State<LaravelSignupScreen> {
               TextFormField(
                 key: const ValueKey('Password'),
                 validator: (value) {
-                  if (value!.isEmpty || value.length < 7) {
+                  if (value!.isEmpty || value.length < 8) {
                     return tr('invalid_password');
                   } else if (value == '12345678' ||
                       value == 'qwertyuiop' ||
