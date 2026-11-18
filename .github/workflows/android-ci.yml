@@ -546,13 +546,7 @@ jobs:
               ;;
           esac
 
-          flutter build apk "$BUILD_FLAG" --flavor prod --target lib/main.dart \
-            --target-platform android-arm64 \
-            -Pdisable-abi-filtering=true \
-            --dart-define=ENABLE_FIREBASE=false \
-            --dart-define=LOCAL_DEV_MODE=false \\
-            --dart-define=RAVEN23_AUTH_ONLY=true \\
-            --dart-define=LARAVEL_API_URL=https://raven23-backend.onrender.com || exit $?
+          flutter build apk "$BUILD_FLAG" --flavor prod --target lib/main.dart --target-platform android-arm64 -Pdisable-abi-filtering=true --dart-define=ENABLE_FIREBASE=false --dart-define=LOCAL_DEV_MODE=false --dart-define=RAVEN23_AUTH_ONLY=true --dart-define=LARAVEL_API_URL=https://raven23-backend.onrender.com || exit $?
 
           test -s "$APK_OUTPUT" || exit $?
           cp "$APK_OUTPUT" RAVEN23-apk.apk || exit $?
