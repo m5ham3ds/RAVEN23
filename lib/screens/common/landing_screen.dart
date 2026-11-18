@@ -100,9 +100,7 @@ class _LandingScreenState extends State<LaravelLandingScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              tr(AppRuntime.localDevelopment
-                  ? 'local_development_mode'
-                  : 'login_signup'),
+              tr('login_signup'),
               style: AppType.sectionHeader.copyWith(
                 fontFamily: AppType.bold,
                 fontSize: 22,
@@ -111,38 +109,32 @@ class _LandingScreenState extends State<LaravelLandingScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              tr(AppRuntime.localDevelopment
-                  ? 'local_dev_guest_only'
-                  : 'unlimited_on_cinemax'),
+              tr('unlimited_on_cinemax'),
               style: AppType.body.copyWith(color: palette.mutedText),
             ),
             const SizedBox(height: 24),
-            if (!AppRuntime.localDevelopment) ...[
-              wide(
-                PillButton(
-                  primary: true,
-                  height: 50,
-                  label: tr('log_in'),
-                  onPressed: busy ? null : () => _push(const LoginScreen()),
-                ),
+            wide(
+              PillButton(
+                primary: true,
+                height: 50,
+                label: tr('log_in'),
+                onPressed: busy ? null : () => _push(const LoginScreen()),
               ),
-              const SizedBox(height: 12),
-              wide(
-                PillButton(
-                  height: 50,
-                  label: tr('sign_up'),
-                  onPressed: busy ? null : () => _push(const SignupScreen()),
-                ),
+            ),
+            const SizedBox(height: 12),
+            wide(
+              PillButton(
+                height: 50,
+                label: tr('sign_up'),
+                onPressed: busy ? null : () => _push(const SignupScreen()),
               ),
-            ],
-            if (AppRuntime.firebaseEnabled) ...[
-              const SizedBox(height: 12),
-              GoogleSignInButton(
-                loading: _loadingGoogle,
-                enabled: !_loadingAnonymous,
-                onPressed: () => _continueWithGoogle(settings),
-              ),
-            ],
+            ),
+            const SizedBox(height: 12),
+            GoogleSignInButton(
+              loading: _loadingGoogle,
+              enabled: !_loadingAnonymous,
+              onPressed: () => _continueWithGoogle(settings),
+            ),
             const SizedBox(height: 12),
             wide(
               PillButton(
