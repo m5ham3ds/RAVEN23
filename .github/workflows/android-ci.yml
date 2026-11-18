@@ -503,7 +503,7 @@ jobs:
 
           flutter build apk "$BUILD_FLAG" --flavor prod --target lib/main.dart \
             --target-platform android-arm64 \
-            -Pdisable-abi-filtering=true \\
+            -Pdisable-abi-filtering=true \
             --dart-define=ENABLE_FIREBASE=false \
             --dart-define=LOCAL_DEV_MODE=true || exit $?
 
