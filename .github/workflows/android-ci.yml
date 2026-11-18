@@ -551,6 +551,7 @@ jobs:
             -Pdisable-abi-filtering=true \
             --dart-define=ENABLE_FIREBASE=false \
             --dart-define=LOCAL_DEV_MODE=false \\
+            --dart-define=RAVEN23_AUTH_ONLY=true \\
             --dart-define=LARAVEL_API_URL=https://raven23-backend.onrender.com || exit $?
 
           test -s "$APK_OUTPUT" || exit $?
@@ -934,7 +935,7 @@ jobs:
               '- Android SDK: `platform-tools`, `platforms;android-36`, `build-tools;36.0.0`, `ndk;28.2.13676358`.',
               '- Flavor: `prod`; target: `lib/main.dart`.',
               '- ABI target: `android-arm64` (expected APK ABI: `arm64-v8a` only).',
-              '- Build defines: `ENABLE_FIREBASE=false`, `LOCAL_DEV_MODE=false`, `LARAVEL_API_URL=https://raven23-backend.onrender.com`.',
+              '- Build defines: `ENABLE_FIREBASE=false`, `LOCAL_DEV_MODE=false`, `RAVEN23_AUTH_ONLY=true`, `LARAVEL_API_URL=https://raven23-backend.onrender.com`.',
               '- Expected application ID: `com.m5ham3d.raven23`.',
               '',
               '### Run context',
