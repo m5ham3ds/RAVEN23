@@ -175,13 +175,6 @@ jobs:
               summary.write('- Firebase SHA-1: matched\n')
               summary.write('- Web OAuth client: matched\n')
           PY
-          {
-            echo '### Google Sign-In configuration'
-            echo "- Android package: com.m5ham3d.raven23"
-            echo "- CI APK SHA-1: ${ci_sha1}"
-            echo "- Firebase-configured SHA-1: ${configured_sha1s:-none}"
-            echo "- Web OAuth client matches Dart serverClientId: yes"
-          } >> "$GITHUB_STEP_SUMMARY"
       - name: Set up Flutter 3.35.7
         id: setup_flutter
         uses: subosito/flutter-action@v2
