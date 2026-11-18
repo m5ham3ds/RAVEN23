@@ -5,14 +5,18 @@ class MigrationFlags {
   MigrationFlags.parse(String value)
       : _features = value.split(',').map((item) => item.trim()).toSet();
 
-  /// Local mode is guest-only and keeps cloud config, sync, ads, notifications,
-  /// and telemetry disabled. Account APIs can be re-enabled in a later backend
-  /// integration phase without changing the local-development preset.
+  /// Runtime preset used while the Laravel account API is being brought online.
+  /// It keeps account/session endpoints active without enabling unrelated cloud
+  /// features (ads, sync, notifications) before their backend routes are ready.
   factory MigrationFlags.fromRuntime({
     bool firebaseEnabled = AppRuntime.firebaseEnabled,
     bool localDevelopment = AppRuntime.localDevelopment,
+    bool authOnly = const bool.fromEnvironment(
+      'RAVEN23_AUTH_ONLY',
+      defaultValue: false,
+    ),
   }) {
-    if (localDevelopment) return MigrationFlags.parse('auth');
+    if (localDevelopment || authOnly) return MigrationFlags.parse('auth');
     return MigrationFlags.parse(firebaseEnabled
         ? 'auth,config,ads,sync,notifications'
         : 'auth,ads,sync');
