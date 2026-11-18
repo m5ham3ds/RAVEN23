@@ -9,7 +9,20 @@ class PlatformGoogleIdentityClient implements GoogleIdentityClient {
   PlatformGoogleIdentityClient({GoogleSignIn? client}) : _provided = client;
   final GoogleSignIn? _provided;
   GoogleSignIn? _client;
-  GoogleSignIn get client => _client ??= _provided ?? GoogleSignIn();
+
+  // This is the Web OAuth client ID (client_type: 3) from the current
+  // Firebase project. Firebase initialization is intentionally disabled in
+  // local-development builds, so the Google Services Gradle plugin does not
+  // generate default_web_client_id for those APKs. Pass it explicitly instead.
+  static const String _serverClientId = String.fromEnvironment(
+    'RAVEN23_GOOGLE_SERVER_CLIENT_ID',
+    defaultValue:
+        '1021333219041-pvcdfbbia4qm8auut13usj6sf329ebb3.apps.googleusercontent.com',
+  );
+
+  GoogleSignIn get client => _client ??= _provided ??
+      GoogleSignIn(serverClientId: _serverClientId);
+
   @override
   Future<String?> authenticate() async {
     final account = await client.signIn();
