@@ -152,8 +152,8 @@ jobs:
           fi
           {
             echo '### Google Sign-In signing certificate'
-            echo "- CI APK SHA-1: `$ci_sha1`"
-            echo "- Firebase-configured SHA-1: `${configured_sha1s:-none}`"
+            echo "- CI APK SHA-1: ${ci_sha1}"
+            echo "- Firebase-configured SHA-1: ${configured_sha1s:-none}"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Set up Flutter 3.35.7
         id: setup_flutter
