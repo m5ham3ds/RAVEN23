@@ -125,56 +125,56 @@ jobs:
             echo 'Could not read the CI Android signing SHA-1.' >&2
             exit 1
           fi
-          configured_sha1s="$(python3 - <<'PY'
+          CI_ANDROID_SHA1="$ci_sha1" python3 - <<'PY'
           import json
-          from pathlib import Path
-          config = json.loads(Path('android/app/google-services.json').read_text())
-          package = 'com.m5ham3d.raven23'
-          values = set()
-          for client in config.get('client', []):
-              android = client.get('client_info', {}).get('android_client_info', {})
-              if android.get('package_name') != package:
-                  continue
-              for oauth in client.get('oauth_client', []):
-                  if oauth.get('client_type') == 1:
-                      value = oauth.get('android_info', {}).get('certificate_hash', '')
-                      if value:
-                          values.add(value.replace(':', '').lower())
-          print(' '.join(sorted(values)))
-          PY
-          )"
-          web_client_ids="$(python3 - <<'PY'
-          import json
-          from pathlib import Path
-          config = json.loads(Path('android/app/google-services.json').read_text())
-          values = {
-              oauth.get('client_id', '')
-              for client in config.get('client', [])
-              for oauth in client.get('oauth_client', [])
-              if oauth.get('client_type') == 3 and oauth.get('client_id')
-          }
-          print(' '.join(sorted(values)))
-          PY
-          )"
-          dart_web_client_id="$(python3 - <<'PY'
+          import os
           import re
           from pathlib import Path
+
+          package = 'com.m5ham3d.raven23'
+          ci_sha1 = re.sub(r'[^0-9a-f]', '', os.environ['CI_ANDROID_SHA1'].lower())
+          config = json.loads(Path('android/app/google-services.json').read_text())
+          matching_clients = [
+              client for client in config.get('client', [])
+              if client.get('client_info', {}).get('android_client_info', {}).get('package_name') == package
+          ]
+          if not matching_clients:
+              raise SystemExit(f'Firebase config has no Android client for {package}.')
+
+          fingerprints = {
+              re.sub(r'[^0-9a-f]', '', str(oauth.get('android_info', {}).get('certificate_hash', '')).lower())
+              for client in matching_clients
+              for oauth in client.get('oauth_client', [])
+              if str(oauth.get('client_type')) == '1'
+          }
+          web_client_ids = {
+              str(oauth.get('client_id', '')).strip()
+              for client in matching_clients
+              for oauth in client.get('oauth_client', [])
+              if str(oauth.get('client_type')) == '3' and oauth.get('client_id')
+          }
           source = Path('lib/data/sources/google_identity_client.dart').read_text()
-          match = re.search(r"defaultValue:\s*'([^']+)'", source)
-          print(match.group(1) if match else '')
+          match = re.search(r"defaultValue:\\s*'([^']+)'", source)
+          dart_web_client_id = match.group(1).strip() if match else ''
+
+          print(f'CI Android signing SHA-1: {ci_sha1}')
+          print('Firebase Android SHA-1 values: ' + ' '.join(sorted(fingerprints)))
+          print('Firebase Web OAuth client IDs: ' + ' '.join(sorted(web_client_ids)))
+          print(f'Dart Google serverClientId: {dart_web_client_id or "missing"}')
+
+          if ci_sha1 not in fingerprints:
+              raise SystemExit('CI APK signing SHA-1 is not registered in Firebase.')
+          if not dart_web_client_id or dart_web_client_id not in web_client_ids:
+              raise SystemExit('Dart Google serverClientId does not exactly match this Android Firebase client Web OAuth ID.')
+
+          print('Google Sign-In package, signing SHA-1 and Web OAuth client are aligned.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('### Google Sign-In configuration\\n')
+              summary.write(f'- Android package: {package}\\n')
+              summary.write(f'- CI APK SHA-1: {ci_sha1}\\n')
+              summary.write('- Firebase SHA-1: matched\\n')
+              summary.write('- Web OAuth client: matched\\n')
           PY
-          )"
-          echo "CI Android signing SHA-1: $ci_sha1"
-          echo "Firebase-configured Android SHA-1: ${configured_sha1s:-none}"
-          if [[ " $configured_sha1s " != *" $ci_sha1 "* ]]; then
-            echo '::error::The CI APK signing SHA-1 is not registered in Firebase. Google Sign-In would fail on this APK.'
-            exit 1
-          fi
-          if [[ -z "$web_client_ids" || -z "$dart_web_client_id" || " $web_client_ids " != *" $dart_web_client_id "* ]]; then
-            echo '::error::The Dart Google serverClientId does not match a Web OAuth client in google-services.json.'
-            exit 1
-          fi
-          echo 'Google Sign-In package, signing SHA-1 and Web OAuth client are aligned.'
           {
             echo '### Google Sign-In configuration'
             echo "- Android package: com.m5ham3d.raven23"
