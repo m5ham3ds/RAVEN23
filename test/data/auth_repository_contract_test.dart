@@ -151,7 +151,8 @@ void main() {
             'message': 'Action failed',
             'errors': {
               'email': ['Bad email']
-            }
+            },
+            if (entry.$1 == 500) 'request_id': 'test-request-123',
           },
           statusCode: entry.$1,
           headers: {
@@ -161,7 +162,12 @@ void main() {
           .signIn(const LoginRequest(email: 'a@b.test', password: 'secret'));
       final failure = result.when(ok: (_) => fail('Must fail'), err: (e) => e);
       expect(failure, entry.$2);
-      expect(failure.message, 'Action failed');
+      expect(
+        failure.message,
+        entry.$1 == 500
+            ? 'Action failed Reference: test-request-123'
+            : 'Action failed',
+      );
       if (failure is RateLimitedFailure) expect(failure.retryAfter, 27);
       if (failure is ValidationFailure) {
         expect(failure.fields, {
