@@ -550,7 +550,8 @@ jobs:
             --target-platform android-arm64 \
             -Pdisable-abi-filtering=true \
             --dart-define=ENABLE_FIREBASE=false \
-            --dart-define=LOCAL_DEV_MODE=true || exit $?
+            --dart-define=LOCAL_DEV_MODE=false \\
+            --dart-define=LARAVEL_API_URL=https://raven23-backend.onrender.com || exit $?
 
           test -s "$APK_OUTPUT" || exit $?
           cp "$APK_OUTPUT" RAVEN23-apk.apk || exit $?
@@ -933,7 +934,7 @@ jobs:
               '- Android SDK: `platform-tools`, `platforms;android-36`, `build-tools;36.0.0`, `ndk;28.2.13676358`.',
               '- Flavor: `prod`; target: `lib/main.dart`.',
               '- ABI target: `android-arm64` (expected APK ABI: `arm64-v8a` only).',
-              '- Build defines: `ENABLE_FIREBASE=false`, `LOCAL_DEV_MODE=true`.',
+              '- Build defines: `ENABLE_FIREBASE=false`, `LOCAL_DEV_MODE=false`, `LARAVEL_API_URL=https://raven23-backend.onrender.com`.',
               '- Expected application ID: `com.m5ham3d.raven23`.',
               '',
               '### Run context',
@@ -967,7 +968,7 @@ jobs:
               '- Required pre-build tests: thirty-two focused Manga/Home/Anime/Mihon/mobile-navigation/reader/source-priority/playback-quality and full-source-catalog Flutter test files, plus the Android `MihonExtensionLoaderAbiTest` (3 ABI cases) and `StreamDownloadStorePlayerContractTest` (4 Media3/download contract cases). Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
               '- Live Laravel smoke/E2E tests are not pre-build gates; their source files are preserved for explicit manual/staging validation after APK creation. The write-enabled E2E test still requires a disposable staging backend and explicit write consent.',
               '- Wrapper generation: `gradle wrapper --gradle-version 8.14 --distribution-type all`.',
-              '- APK build: `flutter build apk --${BUILD_MODE} --flavor prod --target lib/main.dart --target-platform android-arm64 -Pdisable-abi-filtering=true --dart-define=ENABLE_FIREBASE=false --dart-define=LOCAL_DEV_MODE=true`.',
+              '- APK build: `flutter build apk --${BUILD_MODE} --flavor prod --target lib/main.dart --target-platform android-arm64 -Pdisable-abi-filtering=true --dart-define=ENABLE_FIREBASE=false --dart-define=LOCAL_DEV_MODE=false`, `LARAVEL_API_URL=https://raven23-backend.onrender.com`.',
               '- APK audit: inspect archive CRC/listing, native ABI directories, package name and payload sizes.',
               '',
               '### Routine pre-build test gate',
