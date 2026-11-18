@@ -94,10 +94,13 @@ class AuthActionException implements Exception {
         retryAfter == null || retryAfter <= 0
             ? 'Too many attempts. Please wait a minute and try again.'
             : 'Too many attempts. Please wait $retryAfter seconds and try again.',
-      ValidationFailure(:final fields) when fields.isNotEmpty =>
+      ValidationFailure(:final fields)
+          when fields.containsKey('username') || fields.containsKey('email') =>
         fields.values.expand((messages) => messages).firstOrNull ??
             failure.message ??
             'Please check the entered information.',
+      ValidationFailure() =>
+        failure.message ?? 'Please check the entered information.',
       _ => failure.message ?? 'Unable to complete this request. Please try again.',
     };
     return AuthActionException(code: code, message: message,
