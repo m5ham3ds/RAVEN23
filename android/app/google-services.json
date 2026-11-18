@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1021333219041",
+    "project_id": "raven23-m5ham3ds",
+    "storage_bucket": "raven23-m5ham3ds.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1021333219041:android:80b9e74afc40e9955c39a0",
+        "android_client_info": {
+          "package_name": "com.m5ham3d.raven23"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqIhcAqJzX-zQogD0m_MchHWdIA49RnQI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -503,7 +503,8 @@ jobs:
 
           flutter build apk "$BUILD_FLAG" --flavor prod --target lib/main.dart \
             --target-platform android-arm64 \
-            -Pdisable-abi-filtering=true \
+            -Pdisable-abi-filtering=true \\
+            -PenableFirebaseGradlePlugins=true \
             --dart-define=ENABLE_FIREBASE=false \
             --dart-define=LOCAL_DEV_MODE=true || exit $?
 
@@ -665,8 +666,8 @@ jobs:
               echo "aapt dump badging failed with exit code $aapt_status" | tee -a build-artifacts/apk-audit.log
               exit "$aapt_status"
             fi
-            if ! grep -F "name='com.m5ham3ds.raven23'" build-artifacts/aapt-badging.txt >/dev/null; then
-              echo "APK package name did not match com.m5ham3ds.raven23" | tee -a build-artifacts/apk-audit.log
+            if ! grep -F "name='com.m5ham3d.raven23'" build-artifacts/aapt-badging.txt >/dev/null; then
+              echo "APK package name did not match com.m5ham3d.raven23" | tee -a build-artifacts/apk-audit.log
               exit 1
             fi
           else
@@ -889,7 +890,7 @@ jobs:
               '- Flavor: `prod`; target: `lib/main.dart`.',
               '- ABI target: `android-arm64` (expected APK ABI: `arm64-v8a` only).',
               '- Build defines: `ENABLE_FIREBASE=false`, `LOCAL_DEV_MODE=true`.',
-              '- Expected application ID: `com.m5ham3ds.raven23`.',
+              '- Expected application ID: `com.m5ham3d.raven23`.',
               '',
               '### Run context',
               '',

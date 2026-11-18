@@ -47,16 +47,36 @@ class SdkFirebaseConfigSource implements FirebaseConfigSource {
   }
 }
 
-/// Normalize Firebase's flat keys through the same DTO as Laravel. Unpublished
-/// keys use bundled defaults, including the historical enable_ott fallback.
+/// Firebase no longer controls application releases. These retired flat
+/// update keys belonged to the old Firebase update path and must not override
+/// the current Laravel bootstrap update contract.
+const _retiredFirebaseUpdateKeys = <String>{
+  'forced_update',
+  'latest_version',
+  'latest_build_number',
+  'min_build_number',
+  'app_download_url',
+  'app_download_url_arm64_v8a',
+  'app_download_url_armeabi_v7a',
+  'app_download_url_x86_64',
+  'change_log',
+};
+
+/// Normalize Firebase's remaining flat keys through the shared bootstrap DTO.
+/// Unpublished keys use bundled defaults, including the historical enable_ott
+/// fallback. Current app updates are supplied by Laravel's bootstrap only.
 BootstrapConfig firebaseConfigSnapshot(Map<String, dynamic> published) {
-  if (published.isEmpty) return const BootstrapConfig(configSource: 'firebase');
+  final activeValues = <String, dynamic>{
+    for (final entry in published.entries)
+      if (!_retiredFirebaseUpdateKeys.contains(entry.key)) entry.key: entry.value,
+  };
+  if (activeValues.isEmpty) return const BootstrapConfig(configSource: 'firebase');
   Map<String, dynamic> section(List<String> keys) => {
         for (final key in keys)
-          if (published.containsKey(key)) key: published[key],
+          if (activeValues.containsKey(key)) key: activeValues[key],
       };
   Object? jsonValue(String key) {
-    final value = published[key];
+    final value = activeValues[key];
     if (value is! String) return value;
     try {
       return jsonDecode(value);
@@ -68,7 +88,7 @@ BootstrapConfig firebaseConfigSnapshot(Map<String, dynamic> published) {
 
   return BootstrapConfig.fromJson({
     'config_source': 'firebase',
-    'runtime_settings': published,
+    'runtime_settings': activeValues,
     'features': section([
       'enable_stream',
       'enable_download',
@@ -76,14 +96,6 @@ BootstrapConfig firebaseConfigSnapshot(Map<String, dynamic> published) {
       'enable_ott',
     ]),
     'branding': section(['app_logo_url', 'cinemax_logo']),
-    'updates': section([
-      'forced_update',
-      'latest_version',
-      'latest_build_number',
-      'min_build_number',
-      'app_download_url',
-      'change_log',
-    ]),
     'network': section([
       'flixquest_api_instances',
       'flixquest_api_url_v2',

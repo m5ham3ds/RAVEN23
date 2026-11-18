@@ -486,14 +486,14 @@ void main() {
                   )
                   as Map<String, dynamic>)['data']
               as Map<String, dynamic>;
-      final expected = BootstrapConfig.fromJson(
-        data,
-      ).copyWith(configSource: 'firebase');
+      final expected = BootstrapConfig.fromJson(data).copyWith(
+        configSource: 'firebase',
+        updates: const UpdateConfig(),
+      );
       final flat = <String, dynamic>{
         for (final name in [
           'features',
           'branding',
-          'updates',
           'network',
           'ads',
         ])
@@ -512,6 +512,42 @@ void main() {
         actual.copyWith(runtimeSettings: const {}),
         expected.copyWith(runtimeSettings: const {}),
       );
+    },
+  );
+
+  test(
+    'Firebase ignores retired app update parameters; Laravel owns current updates',
+    () {
+      final config = firebaseConfigSnapshot({
+        'forced_update': 'true',
+        'latest_version': '99.0.0',
+        'latest_build_number': '9900',
+        'min_build_number': '9800',
+        'app_download_url': 'https://legacy.example/raven23.apk',
+        'app_download_url_arm64_v8a':
+            'https://legacy.example/raven23-arm64.apk',
+        'app_download_url_armeabi_v7a':
+            'https://legacy.example/raven23-armeabi.apk',
+        'app_download_url_x86_64':
+            'https://legacy.example/raven23-x64.apk',
+        'change_log': 'Obsolete Firebase update path',
+      });
+
+      expect(config.configSource, 'firebase');
+      expect(config.updates, const UpdateConfig());
+      for (final key in [
+        'forced_update',
+        'latest_version',
+        'latest_build_number',
+        'min_build_number',
+        'app_download_url',
+        'app_download_url_arm64_v8a',
+        'app_download_url_armeabi_v7a',
+        'app_download_url_x86_64',
+        'change_log',
+      ]) {
+        expect(config.runtimeSettings, isNot(contains(key)), reason: key);
+      }
     },
   );
 

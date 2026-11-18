@@ -108,25 +108,26 @@ joined. Closing or pressing Back restores focus to Home.
 
 ## App updates
 
-| Parameter | Firebase type | Default | Purpose |
-| --- | --- | --- | --- |
-| `forced_update` | Boolean | `false` | Makes a newer release mandatory: the update page covers the whole app, including a title or the player already open. |
-| `latest_version` | String | Empty | The newest release's version name. |
-| `latest_build_number` | Number | `0` | The newest release's build number; compared with the installed build when set. |
-| `min_build_number` | Number | `0` | Used in place of `latest_build_number` when that is `0`. |
-| `app_download_url` | String | Empty | The APK the update page downloads. |
-| `change_log` | String | Empty | Release notes, one item per line. |
+**Current RAVEN23 releases are controlled by the Laravel bootstrap, not Firebase
+Remote Config.** The Flutter client consumes the selected provider's typed
+`updates` section from `GET /api/v1/config/bootstrap` when Laravel is selected
+by the server's `config_source=laravel` decision.
 
-A device that fetched a mandatory update stays blocked offline, since the last
-activated values are kept. A device that launches offline before learning of
-it retries the fetch at most three times (after 15 s, 30 s and 60 s). A known
-disconnection pauses retries until connectivity returns. Reconnection or app
-resume can start a new retry burst after a failure, with a one-minute cooldown
-between recovery attempts. Retries stop while the app is in the background.
-Normal production fetches use a 30-minute minimum interval; debug builds use zero.
-The real-time listener still receives published updates independently of that
-interval. Once the required update configuration arrives, the update page appears
-over whatever page is open.
+The following flat Firebase keys are retired for the current client and are
+intentionally ignored even if old values remain published in Firebase:
+`forced_update`, `latest_version`, `latest_build_number`,
+`min_build_number`, `app_download_url`, the `app_download_url_<abi>`
+variants, and `change_log`. When Firebase is the selected configuration
+provider, app-update fields remain at their safe defaults. Do not use the old
+Firebase keys to force updates or distribute APKs to current RAVEN23 versions.
+
+Keep update version, minimum build, forced-update status, APK links and release
+notes in the Laravel bootstrap `updates` object. This preserves the current
+mobile/TV update gates and avoids reviving the retired Firebase update path.
+
+Firebase Remote Config remains available for the other documented runtime
+settings. Its SDK still activates cached settings offline and receives real-time
+published changes; application-release decisions are deliberately excluded.
 
 ## Ad networks at a glance
 
