@@ -2,6 +2,7 @@ import 'package:raven23/services/raven23_auth_service.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '/screens/user/forgot_password.dart';
+import '/screens/user/signup_screen.dart';
 import '/provider/settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -239,14 +240,20 @@ class _LoginScreenState extends State<LaravelLoginScreen> {
             MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
           ),
         ),
-        if (AppRuntime.firebaseEnabled) ...[
-          const AccountOrDivider(),
-          GoogleSignInButton(
-            loading: _googleLoading,
-            enabled: !isLoading,
-            onPressed: signInWithGoogle,
+        const AccountOrDivider(),
+        GoogleSignInButton(
+          loading: _googleLoading,
+          enabled: !isLoading,
+          onPressed: signInWithGoogle,
+        ),
+        const SizedBox(height: 8),
+        AccountLink(
+          label: tr('signup'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SignupScreen()),
           ),
-        ],
+        ),
       ],
     );
   }
