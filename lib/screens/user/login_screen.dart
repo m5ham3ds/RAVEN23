@@ -13,6 +13,7 @@ import '../../presentation/session/firebase_session_bridge.dart';
 import '../../services/globle_method.dart';
 import '../../services/auth_navigation_service.dart';
 import '../../core/error/failure.dart';
+import '../../core/config/app_runtime.dart';
 import '../../mobile/widgets/account_form.dart';
 import '../../mobile/widgets/device_limit_sheet.dart';
 import '../../widgets/google_sign_in_button.dart';
@@ -239,12 +240,14 @@ class _LoginScreenState extends State<LaravelLoginScreen> {
             MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
           ),
         ),
-        const AccountOrDivider(),
-        GoogleSignInButton(
-          loading: _googleLoading,
-          enabled: !isLoading,
-          onPressed: signInWithGoogle,
-        ),
+        if (AppRuntime.googleSignInAvailable) ...[
+          const AccountOrDivider(),
+          GoogleSignInButton(
+            loading: _googleLoading,
+            enabled: !isLoading,
+            onPressed: signInWithGoogle,
+          ),
+        ],
         const SizedBox(height: 8),
         AccountLink(
           label: tr('signup'),
