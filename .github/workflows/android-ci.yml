@@ -297,6 +297,7 @@ jobs:
           : > "$log_file"
           test_files=(
             test/core/app_environment_test.dart
+            test/core/dio_factory_test.dart
             test/core/auth_injector_test.dart
             test/data/app_user_test.dart
             test/data/auth_repository_contract_test.dart
