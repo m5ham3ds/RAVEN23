@@ -143,17 +143,44 @@ jobs:
           print(' '.join(sorted(values)))
           PY
           )"
+          web_client_ids="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path('android/app/google-services.json').read_text())
+          values = {
+              oauth.get('client_id', '')
+              for client in config.get('client', [])
+              for oauth in client.get('oauth_client', [])
+              if oauth.get('client_type') == 3 and oauth.get('client_id')
+          }
+          print(' '.join(sorted(values)))
+          PY
+          )"
+          dart_web_client_id="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path('lib/data/sources/google_identity_client.dart').read_text()
+          match = re.search(r"defaultValue:\\s*'([^']+)'", source)
+          print(match.group(1) if match else '')
+          PY
+          )"
           echo "CI Android signing SHA-1: $ci_sha1"
           echo "Firebase-configured Android SHA-1: ${configured_sha1s:-none}"
           if [[ " $configured_sha1s " != *" $ci_sha1 "* ]]; then
-            echo '::warning::The CI APK signing SHA-1 is not registered in the Firebase Android OAuth configuration. Google Sign-In will fail until this certificate is added to the Android Firebase app.'
-          else
-            echo 'Google Sign-In signing SHA-1 matches the Firebase Android OAuth configuration.'
+            echo '::error::The CI APK signing SHA-1 is not registered in Firebase. Google Sign-In would fail on this APK.'
+            exit 1
           fi
+          if [[ -z "$web_client_ids" || -z "$dart_web_client_id" || " $web_client_ids " != *" $dart_web_client_id "* ]]; then
+            echo '::error::The Dart Google serverClientId does not match a Web OAuth client in google-services.json.'
+            exit 1
+          fi
+          echo 'Google Sign-In package, signing SHA-1 and Web OAuth client are aligned.'
           {
-            echo '### Google Sign-In signing certificate'
+            echo '### Google Sign-In configuration'
+            echo "- Android package: com.m5ham3d.raven23"
             echo "- CI APK SHA-1: ${ci_sha1}"
             echo "- Firebase-configured SHA-1: ${configured_sha1s:-none}"
+            echo "- Web OAuth client matches Dart serverClientId: yes"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Set up Flutter 3.35.7
         id: setup_flutter
