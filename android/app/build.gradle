@@ -50,6 +50,19 @@ def hasReleaseSigning = keystorePropertiesFile.isFile() && releaseSigningKeys.ev
     value != null && !value.trim().isEmpty()
 } && file(keystoreProperties.getProperty('storeFile')).isFile()
 
+// CI creates and verifies one Firebase-registered development keystore before
+// building. Make the CI release variant use that exact file even if an
+// unrelated key.properties file happens to be present in the runner.
+def ciDevelopmentSigning = project.findProperty('ciDevelopmentSigning')
+        ?.toString()?.toBoolean() ?: false
+def ciDevelopmentKeystore = new File(
+        System.getProperty('user.home'), '.android/debug.keystore')
+if (ciDevelopmentSigning && !ciDevelopmentKeystore.isFile()) {
+    throw new GradleException(
+        "CI development signing was requested, but the verified keystore is missing: ${ciDevelopmentKeystore}"
+    )
+}
+
 android {
     namespace 'com.m5ham3ds.raven23'
     compileSdk 36
@@ -168,22 +181,31 @@ android {
     }
 
     signingConfigs {
-       release {
-           keyAlias keystoreProperties['keyAlias']
-           keyPassword keystoreProperties['keyPassword']
-           storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-           storePassword keystoreProperties['storePassword']
-       }
-   }
-   
-   buildTypes {
-       release {
-           // Use the project's private release key when key.properties is
-           // supplied. For local/CI development builds without that key,
-           // fall back to the standard debug signing identity so Release APKs
-           // remain installable and can be compared with Debug builds.
-           // Configure a private keystore before distributing to users.
-           signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile keystoreProperties['storeFile']
+                    ? file(keystoreProperties['storeFile']) : null
+            storePassword keystoreProperties['storePassword']
+        }
+        ciDevelopment {
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+            storeFile ciDevelopmentKeystore
+            storePassword 'android'
+        }
+    }
+
+    buildTypes {
+        release {
+            // CI must use the exact pre-verified keystore whose SHA-1 is
+            // registered in Firebase. Outside CI, prefer the private release
+            // key and otherwise use Android's normal debug signing fallback.
+            // A production distribution must use the private release key and
+            // register its fingerprint with Firebase.
+            signingConfig ciDevelopmentSigning
+                    ? signingConfigs.ciDevelopment
+                    : (hasReleaseSigning ? signingConfigs.release : signingConfigs.debug)
            // Mihon extension APKs are loaded later through DexClassLoader and link by
            // exact class/method names against these host-provided source APIs, OkHttp,
            // serialization, preferences and Material classes. R8 renaming/removal would
