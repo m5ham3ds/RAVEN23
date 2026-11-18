@@ -189,6 +189,22 @@ void main() {
     expect(AuthActionException.fromFailure(const Failure.conflict()).message,
         'This email already has a password account. Sign in with your password first.');
   });
+  test('registration rate limit tells the user when to retry', () {
+    final action = AuthActionException.fromFailure(
+        const Failure.rateLimited(retryAfter: 42, message: 'Too Many Attempts.'));
+    expect(action.code, 'too-many-requests');
+    expect(action.message, 'Too many attempts. Please wait 42 seconds and try again.');
+  });
+  test('validation messages prefer the field-specific error over the envelope', () {
+    final action = AuthActionException.fromFailure(
+      const Failure.validation(
+        {'username': ['The username has already been taken.']},
+        message: 'The given data was invalid.',
+      ),
+    );
+    expect(action.code, 'username-already-in-use');
+    expect(action.message, 'The username has already been taken.');
+  });
   for (final bad in <Object?>[
     null,
     [],
