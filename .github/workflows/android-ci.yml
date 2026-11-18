@@ -115,13 +115,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ci_sha1="$(keytool -list -v \\
-            -keystore \"$HOME/.android/debug.keystore\" \\
-            -storepass android \\
-            -alias androiddebugkey \\
-            -keypass android 2>/dev/null | \\
-            awk -F': ' '/SHA1:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
-          if [[ -z \"$ci_sha1\" ]]; then
+          ci_sha1="$(keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android 2>/dev/null | \
+            awk -F': ' '/SHA1:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]' )"
+          if [[ -z "$ci_sha1" ]]; then
             echo 'Could not read the CI Android signing SHA-1.' >&2
             exit 1
           fi
@@ -143,19 +143,18 @@ jobs:
           print(' '.join(sorted(values)))
           PY
           )"
-          echo \"CI Android signing SHA-1: $ci_sha1\"
-          echo \"Firebase-configured Android SHA-1: ${configured_sha1s:-none}\"
-          if [[ \" $configured_sha1s \" != *\" $ci_sha1 \"* ]]; then
-            echo '::warning::The CI APK signing SHA-1 is not registered in google-services.json / Firebase OAuth configuration. Google Sign-In will fail until this certificate is added to the Android Firebase app.'
+          echo "CI Android signing SHA-1: $ci_sha1"
+          echo "Firebase-configured Android SHA-1: ${configured_sha1s:-none}"
+          if [[ " $configured_sha1s " != *" $ci_sha1 "* ]]; then
+            echo '::warning::The CI APK signing SHA-1 is not registered in the Firebase Android OAuth configuration. Google Sign-In will fail until this certificate is added to the Android Firebase app.'
           else
             echo 'Google Sign-In signing SHA-1 matches the Firebase Android OAuth configuration.'
           fi
           {
             echo '### Google Sign-In signing certificate'
-            echo \"- CI APK SHA-1: `$ci_sha1`\"
-            echo \"- Firebase-configured SHA-1: `${configured_sha1s:-none}`\"
-          } >> \"$GITHUB_STEP_SUMMARY\"
-
+            echo "- CI APK SHA-1: `$ci_sha1`"
+            echo "- Firebase-configured SHA-1: `${configured_sha1s:-none}`"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Set up Flutter 3.35.7
         id: setup_flutter
         uses: subosito/flutter-action@v2
