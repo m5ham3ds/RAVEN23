@@ -24,6 +24,10 @@ Dio createLaravelDio(AppEnvironment environment, {
   final client = _create(environment, dio: dio, httpCache: httpCache,
       scope: 'laravel', debugLogging: debugLogging, retryDelay: retryDelay);
   client.options.baseUrl = environment.laravelApiUrl;
+  // The Render free service can take 50+ seconds to wake from sleep. Keep
+  // public API timeouts short, but allow the backend's first response to arrive.
+  client.options.connectTimeout = environment.laravelConnectTimeout;
+  client.options.receiveTimeout = environment.laravelReceiveTimeout;
   return client;
 }
 
