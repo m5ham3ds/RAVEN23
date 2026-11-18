@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:raven23/core/config/app_environment.dart';
 import 'package:raven23/core/network/dio_factory.dart';
