@@ -1456,6 +1456,7 @@ class CodegenLoader extends AssetLoader {
     "tv_use_at_least_3_letters_or_numbers":
         "Use at least 3 letters or numbers.",
     "tv_use_at_least_7_characters": "Use at least 7 characters.",
+    "tv_use_at_least_8_characters": "Use at least 8 characters.",
     "tv_confirm_password": "Confirm password",
     "tv_passwords_do_not_match": "Passwords do not match.",
     "tv_please_wait": "Please wait…",
@@ -9182,6 +9183,7 @@ class CodegenLoader extends AssetLoader {
     "tv_enter_your_full_name": "أدخل اسمك الكامل.",
     "tv_use_at_least_3_letters_or_numbers": "استخدم 3 أحرف أو أرقام على الأقل.",
     "tv_use_at_least_7_characters": "استخدم 7 أحرف على الأقل.",
+    "tv_use_at_least_8_characters": "استخدم 8 أحرف على الأقل.",
     "tv_confirm_password": "تأكيد كلمة المرور",
     "tv_passwords_do_not_match": "كلمتا المرور غير متطابقتين.",
     "tv_please_wait": "يرجى الانتظار…",
