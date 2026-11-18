@@ -1172,7 +1172,9 @@ void main() {
       // The initial All feed remains intact; only its redundant header chips
       // have been removed. Movies/Series/Anime navigation lives in the dock.
       expect(find.text('top_10_movies_today'), findsOneWidget);
-      expect(find.text('top_rated_anime'), findsOneWidget);
+      // top_rated_anime was already asserted while it was built and visible
+      // in the forward lazy-sliver traversal above. It is intentionally not
+      // expected to remain mounted after scrolling back to the top.
     },
   );
 
