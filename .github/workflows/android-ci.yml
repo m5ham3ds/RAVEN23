@@ -281,11 +281,11 @@ jobs:
           printf '\nCommand exit code: %s\n' "$command_status" | tee -a build-artifacts/flutter-analyze.log
           exit "$command_status"
 
-      # Routine APK CI runs focused Manga/Mihon work-detail, source-binding,
-      # offline-progress, quality-catalog/scanner, chapter-reader crop, Home/Anime separation and mobile-navigation regressions. Other
-      # deeper integration tests remain available for owner-led/manual regression.
+      # Routine APK CI runs focused authentication/session, Manga/Mihon work-detail,
+      # source-binding, offline-progress, quality-catalog/scanner, chapter-reader crop,
+      # Home/Anime separation and mobile-navigation regressions. Other deep integrations remain manual.
       # Run only after dependencies, canonical formatting and full-project analysis.
-      - name: Run focused Manga, Home, Anime, Mihon, navigation, reader, source-priority and playback-quality Flutter pre-build tests
+      - name: Run focused auth, Manga, Home, Anime, Mihon, navigation, reader and playback Flutter pre-build tests
         id: flutter_tests
         if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' }}
         timeout-minutes: 12
@@ -296,6 +296,15 @@ jobs:
           log_file=build-artifacts/flutter-prebuild-tests.log
           : > "$log_file"
           test_files=(
+            test/core/app_environment_test.dart
+            test/core/auth_injector_test.dart
+            test/data/app_user_test.dart
+            test/data/auth_repository_contract_test.dart
+            test/data/auth_repository_test.dart
+            test/presentation/auth_screens_test.dart
+            test/presentation/session_view_model_test.dart
+            test/presentation/firebase_session_bridge_test.dart
+            test/presentation/guest_account_session_test.dart
             test/manga/manga_repository_manager_test.dart
             test/manga/manga_reader_crop_test.dart
             test/manga/anilist_catalogue_cache_test.dart
