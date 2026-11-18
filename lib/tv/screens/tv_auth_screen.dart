@@ -118,7 +118,7 @@ class _TvAuthScreenState extends State<LaravelTvAuthScreen> {
   /// What the field needs, shown above the keyboard while it is typed into.
   String? _hint(_Field field) => switch (field) {
         _Field.username => tr('tv_use_at_least_3_letters_or_numbers'),
-        _Field.password => tr('tv_use_at_least_7_characters'),
+        _Field.password => tr(_isSignIn ? 'tv_use_at_least_7_characters' : 'tv_use_at_least_8_characters'),
         _ => null,
       };
 
@@ -131,8 +131,9 @@ class _TvAuthScreenState extends State<LaravelTvAuthScreen> {
         !value.contains('@') ? tr('tv_enter_a_valid_email_address') : null,
       _Field.username =>
         value.length < 3 ? tr('tv_use_at_least_3_letters_or_numbers') : null,
-      _Field.password =>
-        value.length < 7 ? tr('tv_use_at_least_7_characters') : null,
+      _Field.password => value.length < (_isSignIn ? 7 : 8)
+          ? tr(_isSignIn ? 'tv_use_at_least_7_characters' : 'tv_use_at_least_8_characters')
+          : null,
     };
   }
 
