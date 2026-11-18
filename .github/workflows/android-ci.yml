@@ -750,6 +750,44 @@ jobs:
           else
             echo 'aapt was not found; package-name badging check was skipped.' | tee -a build-artifacts/apk-audit.log
           fi
+          # Verify the certificate on the actual APK, not only the
+          # keystore selected before the build. This catches any Gradle
+          # release-signing override that would make Google Sign-In fail.
+          APK_SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          if [ ! -x "$APK_SIGNER" ]; then
+            echo "apksigner is missing: $APK_SIGNER" | tee -a build-artifacts/apk-audit.log
+            exit 1
+          fi
+          apk_sign_sha1="$("$APK_SIGNER" verify --print-certs RAVEN23-apk.apk 2>&1 | awk -F': ' '/Signer #1 certificate SHA-1 digest:/ {gsub(/:/, "", $2); print tolower($2); exit}')"
+          if [ -z "$apk_sign_sha1" ]; then
+            echo 'Could not read the actual APK signing SHA-1.' | tee -a build-artifacts/apk-audit.log
+            exit 1
+          fi
+          python3 - "$apk_sign_sha1" <<'PYTHON' 2>&1 | tee -a build-artifacts/apk-audit.log
+          import json
+          import sys
+          from pathlib import Path
+
+          actual = sys.argv[1].replace(':', '').lower()
+          config = json.loads(Path('android/app/google-services.json').read_text())
+          package = 'com.m5ham3d.raven23'
+          expected = set()
+          for client in config.get('client', []):
+              android = client.get('client_info', {}).get('android_client_info', {})
+              if android.get('package_name') != package:
+                  continue
+              for oauth in client.get('oauth_client', []):
+                  if oauth.get('client_type') == 1:
+                      sha = oauth.get('android_info', {}).get('certificate_hash', '')
+                      if sha:
+                          expected.add(sha.replace(':', '').lower())
+          print(f'Actual APK SHA-1: {actual}')
+          print(f'Firebase Android SHA-1 values: {", ".join(sorted(expected)) or "none"}')
+          if actual not in expected:
+              raise SystemExit('The actual APK signer is not registered in Firebase for this application ID.')
+          print('Verified: the actual APK signer is registered for Google Sign-In.')
+          PYTHON
+          printf '\n- Actual APK signing SHA-1: `%s`\n' "$apk_sign_sha1" >> "$GITHUB_STEP_SUMMARY"
           cat apk-size-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact and ABI diagnostics
