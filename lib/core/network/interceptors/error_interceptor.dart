@@ -15,6 +15,10 @@ Failure failureForDio(DioException error) {
   final status = error.response?.statusCode;
   final data = error.response?.data;
   final api = ApiError.fromJson(data is Map<String, dynamic> ? data : {});
+  final requestId = data is Map<String, dynamic> ? data['request_id'] : null;
+  final diagnosticMessage = requestId is String && requestId.trim().isNotEmpty
+      ? '${api.message} Reference: ${requestId.trim()}'
+      : api.message;
   if ([
     DioExceptionType.connectionTimeout,
     DioExceptionType.sendTimeout,
@@ -53,7 +57,7 @@ Failure failureForDio(DioException error) {
             int.tryParse(error.response?.headers.value('retry-after') ?? ''),
         message: api.message),
     final int code when code >= 500 =>
-      Failure.server(status: code, message: api.message),
+      Failure.server(status: code, message: diagnosticMessage),
     _ => Failure.unknown(message: api.message),
   };
 }
