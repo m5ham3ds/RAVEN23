@@ -93,7 +93,9 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.m5ham3ds.raven23"
+        // Firebase and Android application identity. Keep this exact value
+        // aligned with the package name registered in the Firebase Console.
+        applicationId "com.m5ham3d.raven23"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
