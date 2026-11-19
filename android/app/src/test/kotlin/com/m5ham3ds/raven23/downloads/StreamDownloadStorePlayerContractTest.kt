@@ -5,6 +5,8 @@ import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The native Media3 offline PlatformView resolves completed downloads through these store APIs. */
