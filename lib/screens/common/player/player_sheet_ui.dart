@@ -30,13 +30,28 @@ ThemeData playerVideoTheme(BuildContext context) {
 ThemeData _figtreePanelTheme(ThemeData app, {bool dark = false}) {
   // Navigator overlays and fullscreen routes may inherit a default theme.
   // Keep the app's typography explicit on every player-owned surface.
-  return betterPlayerPanelTheme(
+  final themed = betterPlayerPanelTheme(
     app.copyWith(
       textTheme: app.textTheme
           .apply(fontFamily: AppType.regular)
           .copyWith(labelLarge: AppType.button),
     ),
     dark: dark,
+  );
+  final activeIcon = dark ? Colors.white : themed.colorScheme.onSurface;
+  final disabledIcon = dark
+      ? Colors.white38
+      : themed.colorScheme.onSurface.withValues(alpha: .38);
+  return themed.copyWith(
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(
+        foregroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+          return states.contains(WidgetState.disabled)
+              ? disabledIcon
+              : activeIcon;
+        }),
+      ),
+    ),
   );
 }
 

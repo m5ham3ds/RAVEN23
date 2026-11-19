@@ -2530,5 +2530,7 @@
   "download_subtitle_description": "اختر مسار ترجمة واحداً لإضافته إلى هذا التنزيل.",
   "download_no_subtitles": "المتابعة دون ترجمة",
   "offline_downloaded_episodes": "الحلقات التي تم تنزيلها على هذا الجهاز",
-  "offline_no_downloaded_episodes": "لا توجد حلقات مكتملة التنزيل لهذا الموسم"
+  "offline_no_downloaded_episodes": "لا توجد حلقات مكتملة التنزيل لهذا الموسم",
+  "delete_download": "حذف التنزيل",
+  "confirm_delete_download": "هل أنت متأكد من حذف هذا الفيديو الذي تم تنزيله؟"
 }

@@ -2459,5 +2459,7 @@
   "download_subtitle_description": "Choose one subtitle track to include with this download.",
   "download_no_subtitles": "Continue without subtitles",
   "offline_downloaded_episodes": "Episodes downloaded on this device",
-  "offline_no_downloaded_episodes": "No completed downloads for this season"
+  "offline_no_downloaded_episodes": "No completed downloads for this season",
+  "delete_download": "Delete download",
+  "confirm_delete_download": "Are you sure you want to delete this downloaded video?"
 }
