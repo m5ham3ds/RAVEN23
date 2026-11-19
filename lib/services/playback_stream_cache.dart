@@ -369,12 +369,7 @@ class PlaybackStreamCacheStore {
       await response.stream.listen((_) {}).cancel();
 
       if (status >= 200 && status < 300) return true;
-      if (status == 401 ||
-          status == 403 ||
-          status == 404 ||
-          status == 410 ||
-          (status >= 400 && status < 500 &&
-              status != 408 && status != 425 && status != 429)) {
+      if (status == 401 || status == 403 || status == 404 || status == 410) {
         return false;
       }
       return null;
