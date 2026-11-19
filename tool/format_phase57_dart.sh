@@ -69,6 +69,7 @@ files=(
   lib/tv/screens/tv_settings_screen.dart
   lib/raven23_main.dart
   lib/services/app_network_state.dart
+  lib/services/playback_stream_cache.dart
   lib/services/minimum_loading_visibility.dart
   lib/translations/codegen_loader.g.dart
   lib/translations/locale_keys.g.dart
@@ -138,6 +139,7 @@ files=(
   lib/screens/common/bookmark_screen.dart
   lib/screens/common/download_selection_sheets.dart
   lib/screens/common/downloads_screen.dart
+  lib/screens/common/offline_player_screen.dart
   lib/screens/common/embedded_web_playback_screen.dart
   lib/screens/common/iptv_playlist_manager_dialog.dart
   lib/screens/common/live_tv_screen.dart

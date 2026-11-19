@@ -1026,7 +1026,7 @@ jobs:
               '## 4. Commands and build switches',
               '',
               '- Dependency resolution: `flutter pub get`.',
-              '- Formatting: scoped Manga/Home/Anime/Mihon, PHASE63 work-detail/reader/translation, source-priority, mobile-navigation, playback-quality and press-feedback Dart targets via `bash tool/format_phase57_dart.sh --fix` / `--check` (171 files).',
+              '- Formatting: scoped Manga/Home/Anime/Mihon, PHASE63 work-detail/reader/translation, source-priority, mobile-navigation, playback-quality and press-feedback Dart targets via `bash tool/format_phase57_dart.sh --fix` / `--check` (173 files).',
               '- Static analysis: `flutter analyze --no-fatal-infos`; it starts only after dependency resolution and formatting succeed.',
               '- Required pre-build tests: thirty-two focused Manga/Home/Anime/Mihon/mobile-navigation/reader/source-priority/playback-quality and full-source-catalog Flutter test files, plus the Android `MihonExtensionLoaderAbiTest` (3 ABI cases) and `StreamDownloadStorePlayerContractTest` (4 Media3/download contract cases). Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
               '- Live Laravel smoke/E2E tests are not pre-build gates; their source files are preserved for explicit manual/staging validation after APK creation. The write-enabled E2E test still requires a disposable staging backend and explicit write consent.',

@@ -246,6 +246,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   final Map<String, List<RegularVideoLinks>> _rawVideoLinksByProvider = {};
   final Map<String, List<RegularSubtitleLinks>> _subtitleLinksByProvider = {};
   final ValueNotifier<int> _streamCatalogRevision = ValueNotifier<int>(0);
+  ValueNotifier<List<QualityCatalogEntry>>? _downloadQualityEntriesNotifier;
+  ValueNotifier<bool>? _downloadQualitySearchingNotifier;
   final PlaybackStreamCacheStore _playbackCache = PlaybackStreamCacheStore();
   final AdaptiveQualityScanner _adaptiveQualityScanner =
       AdaptiveQualityScanner();
@@ -5144,8 +5146,22 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     );
   }
 
+  bool get _isDownloadQualitySearchActive {
+    final scan = widget.providerScanSession;
+    return (scan != null && !scan.isCompleted) ||
+        _adaptiveQualityScansInProgress.isNotEmpty;
+  }
+
   void _notifyStreamCatalogChanged() {
     _streamCatalogRevision.value = _streamCatalogRevision.value + 1;
+    final entriesNotifier = _downloadQualityEntriesNotifier;
+    if (entriesNotifier != null) {
+      entriesNotifier.value = _qualityCatalogEntries;
+    }
+    final searchingNotifier = _downloadQualitySearchingNotifier;
+    if (searchingNotifier != null) {
+      searchingNotifier.value = _isDownloadQualitySearchActive;
+    }
   }
 
   void _mergeAggregateLinks(List<RegularVideoLinks> incoming) {
@@ -5876,6 +5892,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     // The save captures them synchronously and can finish after this route pops.
     if (_isVideoInitializedSafely()) {
       _saveRecentProgress();
+      // The scan handlers persist incremental discoveries too. Flush the
+      // latest player/provider association once more before this route exits.
+      unawaited(_savePlaybackCache());
     }
     final measurement = _feedbackSession.freeze();
     final reportContext = _streamFeedbackContext;
@@ -5930,36 +5949,48 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> _downloadFromCurrentProvider() async {
-    if (!mounted) return;
-    // Wait for the existing background source pass so the download chooser is
-    // built from every resolved provider, not just the currently playing one.
-    final scan = widget.providerScanSession;
-    if (scan != null && !scan.isCompleted) {
-      await scan.completed;
-      if (!mounted) return;
-      _notifyStreamCatalogChanged();
-      setState(() {});
-    }
-    final entries = await PlaybackQualityCatalog.collectWithAdaptiveDiscovery(
-      linksByProvider: _rawVideoLinksByProvider,
-      activeProviderCode: _currentProviderCode,
-      activeSourceKey: _activeStreamQualityKey,
-      activeStreamUrl: _activeStreamUrl,
-      preferredServerOrder: StreamHostPriorityManager.instance.currentOrder,
+    if (!mounted || _downloadQualityEntriesNotifier != null) return;
+
+    // Render the qualities already known to this playback session immediately.
+    // The active provider scan and manifest checks continue to populate the
+    // same notifier while the picker is open.
+    final entriesNotifier = ValueNotifier<List<QualityCatalogEntry>>(
+      _qualityCatalogEntries,
     );
-    if (!mounted) return;
-    if (entries.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No direct downloadable qualities are available.'),
+    final searchingNotifier = ValueNotifier<bool>(
+      _isDownloadQualitySearchActive,
+    );
+    _downloadQualityEntriesNotifier = entriesNotifier;
+    _downloadQualitySearchingNotifier = searchingNotifier;
+
+    if (entriesNotifier.value.isEmpty &&
+        _adaptiveQualityScansInProgress.isEmpty) {
+      unawaited(
+        _scanAdaptiveQualityLinks(
+          _rawVideoLinksByProvider.values.expand((items) => items).toList(),
         ),
       );
-      return;
+      _notifyStreamCatalogChanged();
     }
-    final selected = await DownloadSelectionSheets.showQualityCatalog(
-      context,
-      entries: entries,
-    );
+
+    QualityCatalogEntry? selected;
+    try {
+      selected = await DownloadSelectionSheets.showQualityCatalog(
+        context,
+        entries: entriesNotifier.value,
+        entriesListenable: entriesNotifier,
+        searchingListenable: searchingNotifier,
+      );
+    } finally {
+      if (identical(_downloadQualityEntriesNotifier, entriesNotifier)) {
+        _downloadQualityEntriesNotifier = null;
+      }
+      if (identical(_downloadQualitySearchingNotifier, searchingNotifier)) {
+        _downloadQualitySearchingNotifier = null;
+      }
+      entriesNotifier.dispose();
+      searchingNotifier.dispose();
+    }
     if (!mounted || selected == null) return;
 
     final url = selected.link.url?.trim() ?? '';

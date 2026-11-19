@@ -271,7 +271,7 @@ class MainActivity: FlutterActivity() {
             .registry
             .registerViewFactory(
                 "com.m5ham3ds.raven23/offline_player",
-                StreamOfflinePlayerFactory(bridge.store),
+                StreamOfflinePlayerFactory(bridge.store, flutterEngine.dartExecutor.binaryMessenger),
             )
 
         MethodChannel(

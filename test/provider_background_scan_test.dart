@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:raven23/functions/video_utils.dart';
+import 'package:raven23/services/playback_stream_cache.dart';
 import 'package:raven23/video_providers/common.dart';
 import 'package:raven23/video_providers/names.dart';
 import 'package:raven23/video_providers/provider_loader.dart';
@@ -24,6 +25,24 @@ ProviderLoadResult _links(String quality) => ProviderLoadResult(
     ),
   ],
 );
+
+
+class _MemoryPlaybackCacheVault implements PlaybackCacheVault {
+  final Map<String, String> values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    values.remove(key);
+  }
+}
 
 void main() {
   final movieIdentity = const MediaIdentity(
@@ -627,6 +646,109 @@ void main() {
       expect(started, isEmpty);
     },
   );
+
+  test(
+    'cache restoration rejects a broken last URL and reuses another cached quality',
+    () async {
+      const identity = MediaIdentity(
+        type: UnifiedMediaType.movie,
+        title: 'Cache Validation Movie',
+      );
+      final provider = VideoProvider.scraper(
+        id: 'cache-validation',
+        name: 'Cache Validation',
+      );
+      final cache = PlaybackStreamCacheStore(
+        vault: _MemoryPlaybackCacheVault(),
+        linkProbe: (link) async =>
+            link.url?.endsWith('720.m3u8') == true,
+      );
+      await cache.save(
+        identity: identity,
+        providers: <String, CachedProviderStreams>{
+          provider.codeName: CachedProviderStreams(
+            providerCode: provider.codeName,
+            providerName: provider.displayName,
+            videoLinks: <RegularVideoLinks>[
+              RegularVideoLinks(
+                url: 'https://example.com/broken-1080.m3u8',
+                quality: '1080p',
+              ),
+              RegularVideoLinks(
+                url: 'https://example.com/working-720.m3u8',
+                quality: '720p',
+              ),
+            ],
+          ),
+        },
+        lastProviderCode: provider.codeName,
+        lastUrl: 'https://example.com/broken-1080.m3u8',
+      );
+
+      final restored = await ProviderLoader.restoreCachedSelection(
+        identity: identity,
+        providers: <VideoProvider>[provider],
+        cache: cache,
+      );
+
+      expect(restored?.restoredFromCache, isTrue);
+      expect(restored?.selectedUrl, 'https://example.com/working-720.m3u8');
+      expect(
+        restored?.cachedProviderResults[provider.codeName]?.videoLinks
+            ?.map((link) => link.quality),
+        <String?>['720p'],
+      );
+      expect(
+        (await cache.read(identity))?.providers[provider.codeName]?.videoLinks
+            .map((link) => link.quality),
+        <String?>['720p'],
+      );
+    },
+  );
+
+  test('an inconclusive cache probe falls back to a fresh source scan', () async {
+    const identity = MediaIdentity(
+      type: UnifiedMediaType.movie,
+      title: 'Inconclusive Cache Probe',
+    );
+    final provider = VideoProvider.scraper(
+      id: 'cache-timeout',
+      name: 'Cache Timeout',
+    );
+    final cache = PlaybackStreamCacheStore(
+      vault: _MemoryPlaybackCacheVault(),
+      linkProbe: (_) async => null,
+    );
+    await cache.save(
+      identity: identity,
+      providers: <String, CachedProviderStreams>{
+        provider.codeName: CachedProviderStreams(
+          providerCode: provider.codeName,
+          providerName: provider.displayName,
+          videoLinks: <RegularVideoLinks>[
+            RegularVideoLinks(
+              url: 'https://example.com/cached-1080.m3u8',
+              quality: '1080p',
+            ),
+          ],
+        ),
+      },
+      lastProviderCode: provider.codeName,
+      lastUrl: 'https://example.com/cached-1080.m3u8',
+    );
+
+    final restored = await ProviderLoader.restoreCachedSelection(
+      identity: identity,
+      providers: <VideoProvider>[provider],
+      cache: cache,
+    );
+
+    expect(restored, isNull);
+    expect(
+      (await cache.read(identity))?.providers[provider.codeName]?.videoLinks,
+      hasLength(1),
+    );
+  });
 
   test('quality map keeps duplicate resolutions from different providers', () {
     final links = <RegularVideoLinks>[

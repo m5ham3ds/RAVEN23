@@ -4,6 +4,8 @@ import 'package:raven23/services/adsterra_playback_ads_service.dart';
 import 'package:raven23/widgets/ad_block_gate.dart';
 // ignore_for_file: use_build_context_synchronously
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:raven23/functions/function.dart';
 import 'package:raven23/functions/network.dart';
 import 'package:raven23/functions/video_utils.dart';
@@ -19,6 +21,7 @@ import 'package:raven23/widgets/playback_loading_screen.dart';
 import 'package:raven23/video_providers/provider_loader.dart';
 import '../../controllers/recently_watched_database_controller.dart';
 import '../../provider/recently_watched_provider.dart';
+import '../../video_providers/adaptive_quality_scanner.dart';
 import '../../video_providers/common.dart';
 import '../../video_providers/quality_catalog.dart';
 import '../../video_providers/unified/stream_host_priority_manager.dart';
@@ -555,24 +558,185 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
       _showErrorSheet(tr('movie_vid_404'));
       return;
     }
-    final scan = ProviderLoader.startScan(
+
+    // Reuse the exact playback cache first. Only providers with no cached
+    // result are scheduled, and the standard heights remain completion
+    // targets rather than a whitelist of selectable qualities.
+    final restored = await ProviderLoader.restoreCachedSelection(
+      identity: _playbackMediaIdentity,
       providers: eligible,
+    );
+    if (!mounted) return;
+    final resultsByProvider = <String, ProviderLoadResult>{
+      ...?restored?.cachedProviderResults,
+    };
+    final providersToScan = eligible
+        .where((provider) => !resultsByProvider.containsKey(provider.codeName))
+        .toList(growable: false);
+    final entriesNotifier = ValueNotifier<List<QualityCatalogEntry>>(
+      PlaybackQualityCatalog.collect(
+        linksByProvider: _downloadLinksByProvider(resultsByProvider),
+        preferredServerOrder: StreamHostPriorityManager.instance.currentOrder,
+      ),
+    );
+    final searchingNotifier = ValueNotifier<bool>(true);
+    final adaptiveScanner = AdaptiveQualityScanner();
+    final adaptiveTasks = <Future<void>>[];
+    final adaptiveSignatures = <String>{};
+    final qualityReady = Completer<void>();
+    var adaptiveScansInProgress = 0;
+    var scanFinished = false;
+    var pickerActive = true;
+    ProviderScanSession? activeScan;
+    var lastProviderCode = restored?.provider.codeName;
+    var lastUrl = restored?.selectedUrl;
+    Future<void> cacheWriteQueue = Future<void>.value();
+
+    void publish() {
+      if (pickerActive) {
+        entriesNotifier.value = PlaybackQualityCatalog.collect(
+          linksByProvider: _downloadLinksByProvider(resultsByProvider),
+          preferredServerOrder:
+              StreamHostPriorityManager.instance.currentOrder,
+        );
+        searchingNotifier.value = !scanFinished || adaptiveScansInProgress > 0;
+        if (entriesNotifier.value.isNotEmpty && !qualityReady.isCompleted) {
+          qualityReady.complete();
+        }
+      }
+      if (scanFinished && adaptiveScansInProgress == 0 &&
+          entriesNotifier.value.isEmpty && !qualityReady.isCompleted) {
+        qualityReady.complete();
+      }
+    }
+
+    void queueCacheWrite() {
+      final snapshot = Map<String, ProviderLoadResult>.of(resultsByProvider);
+      cacheWriteQueue = cacheWriteQueue
+          .then(
+            (_) => ProviderLoader.persistResolvedResults(
+              identity: _playbackMediaIdentity,
+              providers: eligible,
+              results: snapshot,
+              lastProviderCode: lastProviderCode,
+              lastUrl: lastUrl,
+            ),
+          )
+          .catchError((Object error) {
+            debugPrint('[MovieVideoLoader] Playback cache save failed: $error');
+          });
+    }
+
+    void startAdaptiveScan(RegularVideoLinks link) {
+      if (!AdaptiveQualityScanner.isCandidate(link)) return;
+      final url = link.url?.trim() ?? '';
+      if (url.isEmpty) return;
+      final headers = (link.headers ?? const <String, String>{}).entries
+          .map((entry) => '${entry.key.toLowerCase()}:${entry.value}')
+          .toList()
+        ..sort();
+      if (!adaptiveSignatures.add('$url|${headers.join('|')}')) return;
+      adaptiveScansInProgress++;
+      final task = adaptiveScanner
+          .scan(link)
+          .then<void>((heights) {
+            final changed =
+                link.availableHeights.toSet().difference(heights.toSet()).isNotEmpty ||
+                heights.toSet().difference(link.availableHeights.toSet()).isNotEmpty;
+            link.availableHeights = heights;
+            if (heights.isNotEmpty) link.isAdaptive = true;
+            activeScan?.reportAdaptiveQualityHeights(heights);
+            if (changed) queueCacheWrite();
+            publish();
+          })
+          .catchError((Object error) {
+            debugPrint('[MovieVideoLoader] Adaptive quality scan failed: $error');
+          })
+          .whenComplete(() {
+            adaptiveScansInProgress--;
+            publish();
+          });
+      adaptiveTasks.add(task);
+    }
+
+    // Cached adaptive masters are inspected without delaying the picker.
+    for (final result in resultsByProvider.values) {
+      for (final link in result.videoLinks ?? const <RegularVideoLinks>[]) {
+        startAdaptiveScan(link);
+      }
+    }
+    publish();
+
+    final scan = activeScan = ProviderLoader.startScan(
+      providers: providersToScan,
+      initialResults: resultsByProvider,
       unifiedMediaIdentity: _playbackMediaIdentity,
       maxConcurrency: 3,
       continueAfterFirstPlayable: true,
-      stopAfterStandardQualities: false,
-      fallbackHeadStart: Duration.zero,
+      stopAfterStandardQualities: true,
       load: (provider) => ProviderLoader.loadMovieFromProvider(
         provider: provider,
         movieId: _metadata.movieId!,
         scraperApiUrl: _scraperApiUrl,
         mediaIdentity: _playbackMediaIdentity,
       ),
+      onResult: (_, provider, result) {
+        if (result.videoLinks?.isNotEmpty == true) {
+          resultsByProvider[provider.codeName] = result;
+          for (final link in result.videoLinks!) {
+            startAdaptiveScan(link);
+          }
+          publish();
+          queueCacheWrite();
+        }
+      },
     );
-    await scan.completed;
-    if (!mounted) return;
-    await _enqueueUnifiedDownload(scan.resolvedResults);
+    scan.completed.then((_) async {
+      scanFinished = true;
+      publish();
+      await Future.wait(adaptiveTasks);
+      adaptiveScanner.dispose();
+      publish();
+      queueCacheWrite();
+    });
+
+    try {
+      // With no cache, wait only until the first concrete quality appears;
+      // the remaining servers continue in the background while the picker is
+      // already available and receives their new qualities live.
+      await qualityReady.future;
+      if (!mounted) return;
+      if (entriesNotifier.value.isEmpty) {
+        _showErrorSheet(
+          'No direct downloadable video qualities were returned by the installed sources.',
+        );
+        return;
+      }
+      await _enqueueUnifiedDownload(
+        resultsByProvider,
+        entriesListenable: entriesNotifier,
+        searchingListenable: searchingNotifier,
+        onSelected: (entry) {
+          lastProviderCode = entry.sourceProviderCode;
+          lastUrl = entry.link.url;
+          queueCacheWrite();
+        },
+      );
+    } finally {
+      pickerActive = false;
+      entriesNotifier.dispose();
+      searchingNotifier.dispose();
+    }
   }
+
+  Map<String, List<RegularVideoLinks>> _downloadLinksByProvider(
+    Map<String, ProviderLoadResult> resultsByProvider,
+  ) => <String, List<RegularVideoLinks>>{
+    for (final entry in resultsByProvider.entries)
+      if (entry.value.videoLinks?.isNotEmpty == true)
+        entry.key: entry.value.videoLinks!,
+  };
+
 
   int _firstLoadingProviderIndex() {
     for (var index = 0; index < providerStates.length; index++) {
@@ -763,18 +927,17 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
   }
 
   Future<void> _enqueueUnifiedDownload(
-    Map<String, ProviderLoadResult> resultsByProvider,
-  ) async {
-    final linksByProvider = <String, List<RegularVideoLinks>>{
-      for (final entry in resultsByProvider.entries)
-        if (entry.value.videoLinks?.isNotEmpty == true)
-          entry.key: entry.value.videoLinks!,
-    };
-    final entries = await PlaybackQualityCatalog.collectWithAdaptiveDiscovery(
+    Map<String, ProviderLoadResult> resultsByProvider, {
+    ValueListenable<List<QualityCatalogEntry>>? entriesListenable,
+    ValueListenable<bool>? searchingListenable,
+    ValueChanged<QualityCatalogEntry>? onSelected,
+  }) async {
+    final linksByProvider = _downloadLinksByProvider(resultsByProvider);
+    final entries = PlaybackQualityCatalog.collect(
       linksByProvider: linksByProvider,
       preferredServerOrder: StreamHostPriorityManager.instance.currentOrder,
     );
-    if (entries.isEmpty) {
+    if (entries.isEmpty && entriesListenable == null) {
       _showErrorSheet(
         'No direct downloadable video qualities were returned by the installed sources.',
       );
@@ -783,6 +946,8 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     final selected = await DownloadSelectionSheets.showQualityCatalog(
       context,
       entries: entries,
+      entriesListenable: entriesListenable,
+      searchingListenable: searchingListenable,
     );
     if (!mounted) return;
     if (selected == null) {
@@ -876,6 +1041,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
         ),
       );
+      onSelected?.call(selected);
       settings.analytics.trackDownload(
         action: 'enqueue',
         mediaType: 'movie',
