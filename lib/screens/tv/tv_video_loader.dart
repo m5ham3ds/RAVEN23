@@ -596,6 +596,8 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     var scanFinished = false;
     var pickerActive = true;
     ProviderScanSession? activeScan;
+    var lastProviderCode = restored?.provider.codeName;
+    var lastUrl = restored?.selectedUrl;
     Future<void> cacheWriteQueue = Future<void>.value();
 
     void publish() {
@@ -624,8 +626,8 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               identity: _playbackMediaIdentity,
               providers: eligible,
               results: snapshot,
-              lastProviderCode: restored?.provider.codeName,
-              lastUrl: restored?.selectedUrl,
+              lastProviderCode: lastProviderCode,
+              lastUrl: lastUrl,
             ),
           )
           .catchError((Object error) {
@@ -720,6 +722,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         resultsByProvider,
         entriesListenable: entriesNotifier,
         searchingListenable: searchingNotifier,
+        onSelected: (entry) {
+          lastProviderCode = entry.sourceProviderCode;
+          lastUrl = entry.link.url;
+          queueCacheWrite();
+        },
       );
     } finally {
       pickerActive = false;
@@ -909,6 +916,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     Map<String, ProviderLoadResult> resultsByProvider, {
     ValueListenable<List<QualityCatalogEntry>>? entriesListenable,
     ValueListenable<bool>? searchingListenable,
+    ValueChanged<QualityCatalogEntry>? onSelected,
   }) async {
     final linksByProvider = _downloadLinksByProvider(resultsByProvider);
     final entries = PlaybackQualityCatalog.collect(
@@ -1022,6 +1030,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
         ),
       );
+      onSelected?.call(selected);
       settings.analytics.trackDownload(
         action: 'enqueue',
         mediaType: 'tv',
