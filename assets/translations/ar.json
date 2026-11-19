@@ -2526,5 +2526,9 @@
   "notification_test_description": "يفحص الإشعارات المحلية على هذا الجهاز. إشعارات Push عن بُعد تحتاج إلى Firebase والباك إند.",
   "notification_test_sent": "تم إرسال إشعار تجريبي. تحقق من لوحة إشعارات Android.",
   "notification_test_failed": "تعذر عرض الإشعار التجريبي.",
-  "notification_permission_required": "إذن الإشعارات غير مفعّل. فعّله من إعدادات تطبيق Android ثم أعد المحاولة."
+  "notification_permission_required": "إذن الإشعارات غير مفعّل. فعّله من إعدادات تطبيق Android ثم أعد المحاولة.",
+  "download_subtitle_description": "اختر مسار ترجمة واحداً لإضافته إلى هذا التنزيل.",
+  "download_no_subtitles": "المتابعة دون ترجمة",
+  "offline_downloaded_episodes": "الحلقات التي تم تنزيلها على هذا الجهاز",
+  "offline_no_downloaded_episodes": "لا توجد حلقات مكتملة التنزيل لهذا الموسم"
 }

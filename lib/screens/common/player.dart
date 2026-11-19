@@ -6024,24 +6024,19 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final season = episode?.seasonNumber ?? 0;
     final episodeNumber = episode?.episodeNumber ?? 0;
     final posterPath = isMovie ? movie?.posterPath : episode?.posterPath;
-    // A subtitle already selected from the currently playing source is only
-    // reused when the selected quality belongs to that same source.
-    final subtitleTrack = sourceProviderCode == _currentProviderCode
-        ? _originalSubtitleTrack()
-        : null;
+    final subtitleCandidates =
+        _subtitleLinksByProvider[sourceProviderCode] ??
+        _subtitleLinksByProvider[owningProviderCode] ??
+        const <RegularSubtitleLinks>[];
 
     try {
-      final audioSelection = await DownloadSelectionSheets.chooseAudio(
+      final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
         context,
-        tracks: OfflineDownloadService.instance.getAudioTracks(
-          url: url,
-          format: format,
-          headers: downloadHeaders,
-          maxVideoHeight: maxHeight,
-        ),
+        tracks: subtitleCandidates,
         inPlayer: true,
       );
-      if (!mounted || audioSelection == null) return;
+      if (!mounted || subtitleSelection == null) return;
+      final subtitleTrack = subtitleSelection.track;
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
           id: isMovie
@@ -6064,7 +6059,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
           maxVideoHeight: maxHeight,
           headers: downloadHeaders,
-          audioTrack: audioSelection.track,
           streamIdentity: <String, Object?>{
             'server': selected.link.server?.trim().isNotEmpty == true
                 ? selected.link.server!.trim()
@@ -6084,8 +6078,8 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           contentId: isMovie ? movie?.movieId : episode?.tvId,
           seasonNumber: isMovie ? null : season,
           episodeNumber: isMovie ? null : episodeNumber,
-          subtitleTrackUrl: subtitleTrack?.urls?.firstOrNull,
-          subtitleTrackName: subtitleTrack?.name,
+          subtitleTrackUrl: subtitleTrack?.url,
+          subtitleTrackName: subtitleTrack?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
         ),
       );

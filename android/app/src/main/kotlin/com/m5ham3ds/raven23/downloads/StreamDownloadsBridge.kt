@@ -89,6 +89,9 @@ class StreamDownloadsBridge(
                 )
             }
             "getExportProgress" -> exportProgress(call, result)
+            "prepareForPlayback" -> withExportedFile(call, result) { file ->
+                result.success(file.absolutePath)
+            }
             "openExternal" -> exportForExternalPlayer(call, result)
             "saveCopy" -> exportForDocument(call, result)
             "remove" -> withId(call, result) { id ->

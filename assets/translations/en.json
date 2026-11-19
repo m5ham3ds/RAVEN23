@@ -2455,5 +2455,9 @@
   "notification_test_description": "Checks local notifications for this device. Remote push alerts require Firebase and the backend.",
   "notification_test_sent": "A test notification was sent. Check the Android notification shade.",
   "notification_test_failed": "The test notification could not be displayed.",
-  "notification_permission_required": "Notification permission is off. Enable it in Android app settings and try again."
+  "notification_permission_required": "Notification permission is off. Enable it in Android app settings and try again.",
+  "download_subtitle_description": "Choose one subtitle track to include with this download.",
+  "download_no_subtitles": "Continue without subtitles",
+  "offline_downloaded_episodes": "Episodes downloaded on this device",
+  "offline_no_downloaded_episodes": "No completed downloads for this season"
 }

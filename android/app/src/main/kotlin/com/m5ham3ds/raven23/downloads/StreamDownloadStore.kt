@@ -275,6 +275,10 @@ class StreamDownloadStore private constructor(context: Context) {
 
         return TrackSelectionParameters.Builder(appContext)
             .setForceHighestSupportedBitrate(true)
+            // Prefer English when the manifest has it. When it does not,
+            // Media3 falls back to the stream's declared default/original
+            // language without asking the user to pick an audio track.
+            .setPreferredAudioLanguages("en")
             .apply {
                 if (maxVideoHeight != null) {
                     setMaxVideoSize(Int.MAX_VALUE, maxVideoHeight)

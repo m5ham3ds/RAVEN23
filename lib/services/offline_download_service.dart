@@ -91,6 +91,20 @@ class OfflineDownloadService implements OfflineDownloadGateway {
     return _methods.invokeMethod<void>('enqueue', request.toMap());
   }
 
+  /// Returns a persistent local MP4 prepared from the completed Media3 cache.
+  /// The regular BetterPlayer can then play the exact same file source on
+  /// Android as it does on the other platforms, instead of using a second UI.
+  Future<String> prepareForPlayback(String id) async {
+    final path = await _methods.invokeMethod<String>(
+      'prepareForPlayback',
+      {'id': id},
+    );
+    if (path == null || path.trim().isEmpty) {
+      throw StateError('The downloaded video could not be prepared for playback.');
+    }
+    return path;
+  }
+
   Future<List<OfflineAudioTrack>> getAudioTracks({
     required String url,
     required String format,

@@ -8,6 +8,8 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../models/offline_download.dart';
+import '../../functions/language_names.dart';
+import '../../video_providers/common.dart';
 import '../../video_providers/names.dart';
 import '../../video_providers/quality_catalog.dart';
 import 'player/player_sheet_ui.dart';
@@ -31,6 +33,50 @@ abstract final class DownloadSelectionSheets {
             builder: builder,
           )
         : showAppSheet<DownloadAudioSelection>(context, builder: builder);
+  }
+
+  /// After quality selection, let the user choose the subtitle to store with
+  /// the download. The stream's default audio is kept automatically by Media3.
+  static Future<DownloadSubtitleSelection?> chooseSubtitle(
+    BuildContext context, {
+    required List<RegularSubtitleLinks> tracks,
+    bool inPlayer = false,
+  }) {
+    final unique = <RegularSubtitleLinks>[];
+    final seen = <String>{};
+    for (final track in tracks) {
+      final url = track.url?.trim() ?? '';
+      if (url.isEmpty || !seen.add(url)) continue;
+      unique.add(track);
+    }
+    final choices = <_Choice<DownloadSubtitleSelection>>[
+      _Choice(
+        value: const DownloadSubtitleSelection(null),
+        title: tr('download_no_subtitles'),
+        subtitle: '',
+        icon: PhosphorIcons.closedCaptioning(),
+      ),
+      for (final track in unique)
+        _Choice(
+          value: DownloadSubtitleSelection(track),
+          title: languageDisplayName(track.language) == ''
+              ? tr('not_available')
+              : languageDisplayName(track.language),
+          subtitle: track.language == null ? '' : track.language!,
+          icon: PhosphorIcons.closedCaptioning(),
+        ),
+    ];
+    Widget builder(BuildContext context) => _ChoiceSheet<DownloadSubtitleSelection>(
+      title: tr('choose_subtitle_language'),
+      subtitle: tr('download_subtitle_description'),
+      choices: choices,
+    );
+    return inPlayer
+        ? showPlayerSheet<DownloadSubtitleSelection>(
+            context: context,
+            builder: builder,
+          )
+        : showAppSheet<DownloadSubtitleSelection>(context, builder: builder);
   }
 
   static Future<VideoProvider?> showProvider(
@@ -249,10 +295,10 @@ abstract final class DownloadSelectionSheets {
   }
 }
 
-class DownloadAudioSelection {
-  const DownloadAudioSelection(this.track);
+class DownloadSubtitleSelection {
+  const DownloadSubtitleSelection(this.track);
 
-  final OfflineAudioTrack? track;
+  final RegularSubtitleLinks? track;
 }
 
 class _AudioSelectionSheet extends StatefulWidget {
