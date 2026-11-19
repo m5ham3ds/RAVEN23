@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 import '../video_providers/common.dart';
 import '../video_providers/unified/media_identity.dart';
+
+typedef PlaybackCacheLinkProbe = Future<bool?> Function(RegularVideoLinks link);
 
 abstract interface class PlaybackCacheVault {
   Future<String?> read(String key);
@@ -153,6 +157,7 @@ class PlaybackStreamCacheStore {
     PlaybackCacheVault? vault,
     DateTime Function()? clock,
     this.maxAge = const Duration(hours: 24),
+    this.linkProbe,
   }) : _vault = vault ?? SecurePlaybackCacheVault(),
        _clock = clock ?? DateTime.now;
 
@@ -160,6 +165,7 @@ class PlaybackStreamCacheStore {
   final PlaybackCacheVault _vault;
   final DateTime Function() _clock;
   final Duration maxAge;
+  final PlaybackCacheLinkProbe? linkProbe;
 
   String _storageKey(MediaIdentity identity) {
     final digest = sha256.convert(utf8.encode(identity.playbackCacheKey));
@@ -333,6 +339,52 @@ class PlaybackStreamCacheStore {
       'providers': usableProviders.map((item) => item.toJson()).toList(),
     };
     await _vault.write(storageKey, jsonEncode(payload));
+  }
+
+  /// Performs a small range request before reusing a cached signed URL.
+  /// A definite HTTP rejection invalidates the link; timeouts and transient
+  /// server/network errors are inconclusive so a temporary outage never
+  /// destroys a still-useful cache entry.
+  Future<bool?> validateLink(RegularVideoLinks link) async {
+    final probe = linkProbe;
+    if (probe != null) return probe(link);
+
+    final rawUrl = link.url?.trim() ?? '';
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return false;
+    }
+
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', uri)
+        ..followRedirects = true
+        ..maxRedirects = 5
+        ..headers.addAll(link.headers ?? const <String, String>{})
+        ..headers.putIfAbsent('Range', () => 'bytes=0-0');
+      final response = await client
+          .send(request)
+          .timeout(const Duration(seconds: 4));
+      final status = response.statusCode;
+      await response.stream.listen((_) {}).cancel();
+
+      if (status >= 200 && status < 300) return true;
+      if (status == 401 ||
+          status == 403 ||
+          status == 404 ||
+          status == 410 ||
+          (status >= 400 && status < 500 &&
+              status != 408 && status != 425 && status != 429)) {
+        return false;
+      }
+      return null;
+    } on TimeoutException {
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
   }
 
   Future<void> invalidateUrl({
