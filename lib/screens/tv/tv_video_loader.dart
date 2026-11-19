@@ -595,6 +595,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     var adaptiveScansInProgress = 0;
     var scanFinished = false;
     var pickerActive = true;
+    ProviderScanSession? activeScan;
     Future<void> cacheWriteQueue = Future<void>.value();
 
     void publish() {
@@ -650,6 +651,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
                 heights.toSet().difference(link.availableHeights.toSet()).isNotEmpty;
             link.availableHeights = heights;
             if (heights.isNotEmpty) link.isAdaptive = true;
+            activeScan?.reportAdaptiveQualityHeights(heights);
             if (changed) queueCacheWrite();
             publish();
           })
@@ -670,7 +672,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     }
     publish();
 
-    final scan = ProviderLoader.startScan(
+    final scan = activeScan = ProviderLoader.startScan(
       providers: providersToScan,
       initialResults: resultsByProvider,
       unifiedMediaIdentity: _playbackMediaIdentity,
