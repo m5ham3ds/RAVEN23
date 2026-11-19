@@ -101,7 +101,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
           await File(savedSubtitle).exists();
       if (!mounted) return;
       if (savedSubtitleExists &&
-          savedSubtitle != null &&
           !subtitleSources.any((source) => source.urls?.contains(savedSubtitle) == true)) {
         subtitleSources.add(
           BetterPlayerSubtitlesSource(
