@@ -609,25 +609,50 @@ abstract final class ProviderLoader {
             provider.supportsMedia(identity),
       ),
     ];
-    final candidates = <({VideoProvider provider, CachedProviderStreams cached, RegularVideoLinks link})>[];
+    final linkGroups = <({
+      VideoProvider provider,
+      CachedProviderStreams cached,
+      List<RegularVideoLinks> links,
+    })>[];
     for (final provider in orderedProviders) {
       final cached = entry.providers[provider.codeName];
       if (cached == null) continue;
       final links = List<RegularVideoLinks>.of(cached.videoLinks);
       if (provider.codeName == entry.lastProviderCode) {
         links.sort((left, right) {
-          if (left.url == entry.lastUrl) return -1;
-          if (right.url == entry.lastUrl) return 1;
-          return 0;
+          final leftIsLast = left.url == entry.lastUrl;
+          final rightIsLast = right.url == entry.lastUrl;
+          if (leftIsLast == rightIsLast) return 0;
+          return leftIsLast ? -1 : 1;
         });
       }
-      for (final link in links) {
-        candidates.add((provider: provider, cached: cached, link: link));
-        // Validate a small first batch in parallel so a cache hit adds one
-        // bounded network round trip rather than a serial walk over every URL.
-        if (candidates.length >= 4) break;
+      if (links.isNotEmpty) {
+        linkGroups.add((
+          provider: provider,
+          cached: cached,
+          links: links,
+        ));
       }
-      if (candidates.length >= 4) break;
+    }
+
+    final candidates =
+        <({VideoProvider provider, CachedProviderStreams cached, RegularVideoLinks link})>[];
+    // Probe providers in a round-robin batch: the preferred last URL is first,
+    // but one dead provider cannot hide a healthy cached URL from another.
+    for (
+      var qualityIndex = 0;
+      candidates.length < 6 && qualityIndex < 6;
+      qualityIndex++
+    ) {
+      for (final group in linkGroups) {
+        if (qualityIndex >= group.links.length) continue;
+        candidates.add((
+          provider: group.provider,
+          cached: group.cached,
+          link: group.links[qualityIndex],
+        ));
+        if (candidates.length >= 6) break;
+      }
     }
     if (candidates.isEmpty) return null;
 
