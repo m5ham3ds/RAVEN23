@@ -421,7 +421,8 @@ class _EpisodeScreenState extends State<EpisodeScreen>
         .downloadForId(_downloadId);
     final isDownloaded = downloaded?.isComplete == true;
     final isDownloading = downloaded?.isActive == true;
-    final canPlay = (dependencies?.displayWatchNowButton ?? true) &&
+    final canPlay =
+        (dependencies?.displayWatchNowButton ?? true || isDownloaded) &&
         (aired || isDownloaded);
     final canDownload = (dependencies?.displayDownloadButton ?? false) &&
         (aired || downloaded != null);

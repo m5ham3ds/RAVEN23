@@ -151,6 +151,27 @@ void main() {
       expect(item.totalBytesIsEstimated, isTrue);
     });
 
+    test('serializes automatic audio, expected duration, and selected external subtitle', () {
+      const request = OfflineDownloadRequest(
+        id: 'tv_7_s1_e2',
+        url: 'https://example.test/master.m3u8',
+        format: 'hls',
+        title: 'Example show',
+        mediaType: 'episode',
+        quality: '1080p',
+        audioLanguages: ['ja', 'en'],
+        expectedDurationMs: 1_320_000,
+        subtitleTrackName: 'Arabic',
+        subtitleTrackContent: 'WEBVTT\\n\\n00:00:01.000 --> 00:00:02.000\\nمرحبا',
+      );
+
+      final payload = request.toMap();
+      expect(payload['audioLanguages'], ['ja', 'en']);
+      expect(payload['expectedDurationMs'], 1_320_000);
+      expect(payload['subtitleTrackName'], 'Arabic');
+      expect(payload['subtitleTrackContent'], contains('WEBVTT'));
+    });
+
     test('encodes every source field needed by the native downloader', () {
       const request = OfflineDownloadRequest(
         id: 'tv_7_s1_e2',
