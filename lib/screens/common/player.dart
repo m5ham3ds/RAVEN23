@@ -6139,22 +6139,6 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     return _providerDisplayName(_currentProviderCode);
   }
 
-  BetterPlayerSubtitlesSource? _originalSubtitleTrack() {
-    BetterPlayerSubtitlesSource? fallback;
-    for (final source in _activeSubtitles) {
-      final urls = source.urls;
-      if (source.type != BetterPlayerSubtitlesSourceType.network ||
-          urls == null ||
-          urls.isEmpty ||
-          urls.first?.isNotEmpty != true) {
-        continue;
-      }
-      if (source.selectedByDefault == true) return source;
-      fallback ??= source;
-    }
-    return fallback;
-  }
-
   void _showSubtitleSwitcher() {
     final subtitles = List<BetterPlayerSubtitlesSource>.of(
       _betterPlayerController.betterPlayerSubtitlesSourceList,

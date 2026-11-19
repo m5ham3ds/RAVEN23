@@ -85,6 +85,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
   Future<void> _initializePlayer() async {
     try {
       final settings = context.read<SettingsProvider>();
+      final accent = Theme.of(context).primaryColor;
       await _externalSubtitles.restoreCachedSubtitles(
         mediaCacheKey: _subtitlePlaybackKey,
         preferredLanguageCode: settings.defaultSubtitleLanguage,
@@ -95,9 +96,12 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         ..._externalSubtitles.appliedSubtitles,
       ];
       final savedSubtitle = widget.download.offlineSubtitlePath?.trim();
-      if (savedSubtitle != null &&
+      final savedSubtitleExists = savedSubtitle != null &&
           savedSubtitle.isNotEmpty &&
-          await File(savedSubtitle).exists() &&
+          await File(savedSubtitle).exists();
+      if (!mounted) return;
+      if (savedSubtitleExists &&
+          savedSubtitle != null &&
           !subtitleSources.any((source) => source.urls?.contains(savedSubtitle) == true)) {
         subtitleSources.add(
           BetterPlayerSubtitlesSource(
@@ -109,7 +113,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         );
       }
 
-      final accent = Theme.of(context).primaryColor;
       final controls = BetterPlayerControlsConfiguration(
         gestureConfiguration: BetterPlayerGestureConfiguration(
           enableVolumeSwipe: true,
@@ -147,6 +150,13 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         playIcon: PhosphorIcons.play(PhosphorIconsStyle.fill),
         showControlsOnInitialize: false,
         controlsHideTime: const Duration(milliseconds: 300),
+        backwardSkipTimeInMilliseconds: Duration(
+          seconds: settings.defaultSeekDuration,
+        ).inMilliseconds,
+        forwardSkipTimeInMilliseconds: Duration(
+          seconds: settings.defaultSeekDuration,
+        ).inMilliseconds,
+        watchingText: tr('watching_text'),
         loadingColor: Colors.white,
         iconsColor: Colors.white,
         progressBarPlayedColor: accent,
@@ -362,12 +372,13 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
               subtitle: isOff ? '' : (source.name ?? ''),
               selected: current,
               onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(sheetContext);
                 try {
                   await controller.selectSubtitlesSource(source);
                 } catch (error) {
                   if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(tr('subtitle_unavailable_pick_another'))),
                   );
                 }
