@@ -38,7 +38,14 @@ class OfflinePlayerScreen extends StatefulWidget {
 }
 
 class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
-  late final BetterPlayerController _controller;
+  BetterPlayerController? _controller;
+  StreamSubscription<dynamic>? _nativePlayerEvents;
+  int _nativeDurationMs = 0;
+  int _nativePositionMs = 0;
+  String? _nativePlaybackError;
+
+  bool get _usesNativeOfflinePlayer =>
+      defaultTargetPlatform == TargetPlatform.android;
   final GlobalKey _playerKey = GlobalKey();
   var _initialized = false;
   late final WellnessPlaybackTracker _wellnessTracker;
@@ -64,6 +71,11 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
+    // Android already has a registered Media3 PlatformView backed by the
+    // completed DownloadRequest and the exact read-only download cache.
+    // Do not send its synthetic local URI through BetterPlayer's HTTP stack.
+    if (_usesNativeOfflinePlayer) return;
+
     final accent = Theme.of(context).primaryColor;
     final settings = context.read<SettingsProvider>();
     final controls = BetterPlayerControlsConfiguration(
@@ -175,7 +187,59 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     );
   }
 
+  void _onNativePlayerCreated(int viewId) {
+    _nativePlayerEvents?.cancel();
+    final channel = EventChannel('raven23/offline_player_events/$viewId');
+    _nativePlayerEvents = channel.receiveBroadcastStream().listen(
+      (event) {
+        if (!mounted || event is! Map) return;
+        final duration = event['durationMs'];
+        final position = event['positionMs'];
+        if (duration is num) _nativeDurationMs = duration.toInt();
+        if (position is num) _nativePositionMs = position.toInt();
+
+        final name = event['event']?.toString();
+        switch (name) {
+          case 'playing':
+            _nativePlaybackError = null;
+            _wellnessTracker.play();
+          case 'paused':
+          case 'buffering':
+            _wellnessTracker.pause();
+          case 'ready':
+          case 'progress':
+          case 'snapshot':
+            if (event['isPlaying'] == true) {
+              _wellnessTracker.play();
+            } else {
+              _wellnessTracker.pause();
+            }
+          case 'ended':
+            _completed = true;
+            _wellnessTracker.pause();
+            unawaited(_persistWellnessSession(syncImmediately: true));
+          case 'error':
+            _wellnessTracker.pause();
+            setState(() {
+              _nativePlaybackError =
+                  event['error']?.toString().trim().isNotEmpty == true
+                  ? event['error'].toString()
+                  : tr('offline_play_failed_hint');
+            });
+        }
+      },
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _nativePlaybackError = tr('offline_play_failed_hint');
+        });
+      },
+    );
+  }
+
   void _onPlayerEvent(BetterPlayerEvent event) {
+    final controller = _controller;
+    if (controller == null) return;
     switch (event.betterPlayerEventType) {
       case BetterPlayerEventType.play:
         _wellnessTracker.play();
@@ -183,7 +247,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       case BetterPlayerEventType.bufferingStart:
         _wellnessTracker.pause();
       case BetterPlayerEventType.bufferingEnd:
-        if (_controller.videoPlayerController?.value.isPlaying == true) {
+        if (controller.videoPlayerController?.value.isPlaying == true) {
           _wellnessTracker.play();
         }
       case BetterPlayerEventType.finished:
@@ -196,7 +260,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
   }
 
   Future<void> _persistWellnessSession({bool syncImmediately = false}) async {
-    final value = _controller.videoPlayerController?.value;
+    final value = _controller?.videoPlayerController?.value;
     final isMovie = widget.download.mediaType == 'movie';
     final contentId = isMovie
         ? (widget.download.contentId?.toString() ?? widget.download.id)
@@ -214,8 +278,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       subtitle: widget.download.subtitle,
       seasonNumber: widget.download.seasonNumber,
       episodeNumber: widget.download.episodeNumber,
-      durationMs: value?.duration?.inMilliseconds ?? 0,
-      progressEndMs: value?.position.inMilliseconds ?? 0,
+      durationMs: value?.duration?.inMilliseconds ?? _nativeDurationMs,
+      progressEndMs: value?.position.inMilliseconds ?? _nativePositionMs,
       completed: _completed,
       posterPath: widget.download.posterUrl,
       provider: 'Downloaded',
@@ -243,6 +307,13 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       return;
     }
     final isMovie = widget.download.mediaType == 'movie';
+    final controller = _controller;
+    if (controller == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('offline_play_failed_hint'))),
+      );
+      return;
+    }
     _externalSubtitles.showExternalSubtitlesMenu(
       context: context,
       colors: [
@@ -277,17 +348,21 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
               tvId: id,
               airDate: null,
             ),
-      betterPlayerController: _controller,
+      betterPlayerController: controller,
     );
   }
 
   @override
   void dispose() {
+    _nativePlayerEvents?.cancel();
+    final controller = _controller;
+    if (controller != null) {
+      controller.removeEventsListener(_onPlayerEvent);
+      controller.dispose();
+    }
     if (_initialized) {
-      _controller.removeEventsListener(_onPlayerEvent);
       _wellnessTracker.pause();
       unawaited(_persistWellnessSession(syncImmediately: true));
-      _controller.dispose();
     }
     SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.portraitUp,
@@ -307,8 +382,27 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: SizedBox.expand(
-          child: BetterPlayer(controller: _controller, key: _playerKey),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_usesNativeOfflinePlayer)
+              AndroidView(
+                viewType: 'com.m5ham3ds.raven23/offline_player',
+                creationParams: <String, Object>{
+                  'id': widget.download.id,
+                },
+                creationParamsCodec: const StandardMessageCodec(),
+                onPlatformViewCreated: _onNativePlayerCreated,
+              )
+            else if (_controller != null)
+              BetterPlayer(controller: _controller!, key: _playerKey)
+            else
+              const Center(child: CircularProgressIndicator()),
+            if (_nativePlaybackError != null)
+              _OfflinePlaybackError(
+                onClose: () => Navigator.pop(context),
+              ),
+          ],
         ),
       ),
     );
