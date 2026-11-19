@@ -585,6 +585,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     var adaptiveScansInProgress = 0;
     var scanFinished = false;
     var pickerActive = true;
+    ProviderScanSession? activeScan;
     Future<void> cacheWriteQueue = Future<void>.value();
 
     void publish() {
@@ -640,6 +641,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
                 heights.toSet().difference(link.availableHeights.toSet()).isNotEmpty;
             link.availableHeights = heights;
             if (heights.isNotEmpty) link.isAdaptive = true;
+            activeScan?.reportAdaptiveQualityHeights(heights);
             if (changed) queueCacheWrite();
             publish();
           })
@@ -661,7 +663,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     }
     publish();
 
-    final scan = ProviderLoader.startScan(
+    final scan = activeScan = ProviderLoader.startScan(
       providers: providersToScan,
       initialResults: resultsByProvider,
       unifiedMediaIdentity: _playbackMediaIdentity,
