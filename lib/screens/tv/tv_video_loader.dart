@@ -1185,7 +1185,6 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               : '${TMDB_BASE_IMAGE_URL}w500${widget.metadata.posterPath}',
           maxVideoHeight: maxHeight,
           headers: headers,
-          audioTrack: audioSelection.track,
           streamIdentity: <String, Object?>{
             'server': selected.sourceDisplayName,
             'providerCode': selected.providerCode,
@@ -1206,6 +1205,9 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: subtitleTrack?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
+          subtitleTrackContent: subtitleContent,
+          audioLanguages: (widget.metadata.isAnime ? const <String>['ja', 'en'] : const <String>['en']),
+          expectedDurationMs: (widget.metadata.currentEpisodeRuntime != null && widget.metadata.currentEpisodeRuntime! > 0 ? widget.metadata.currentEpisodeRuntime! * 60 * 1000 : null),
         ),
       );
       settings.analytics.trackDownload(

@@ -1186,7 +1186,6 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
               : '${TMDB_BASE_IMAGE_URL}w500${_metadata.posterPath}',
           maxVideoHeight: maxHeight,
           headers: headers,
-          audioTrack: audioSelection.track,
           streamIdentity: <String, Object?>{
             'server': selected.sourceDisplayName,
             'providerCode': selected.providerCode,
@@ -1205,6 +1204,9 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: subtitleTrack?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
+          subtitleTrackContent: subtitleContent,
+          audioLanguages: (_metadata.isAnimeContent ? const <String>['ja', 'en'] : const <String>['en']),
+          expectedDurationMs: (_metadata.runtime != null && _metadata.runtime! > 0 ? _metadata.runtime! * 60 * 1000 : null),
         ),
       );
       settings.analytics.trackDownload(
