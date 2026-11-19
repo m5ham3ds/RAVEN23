@@ -61,7 +61,14 @@ class StreamDownloadExporter(
         }
 
         val output = outputFile(download)
-        if (output.isFile && isValidExport(download, output)) {
+        val marker = validationMarker(output)
+        val hasCurrentMarker = runCatching {
+            marker.isFile && marker.readText().trim() == EXPORT_VALIDATION_VERSION
+        }.getOrDefault(false)
+        // Exports produced before the validation marker existed are discarded
+        // and regenerated from the completed Media3 cache, rather than trusting
+        // an old short MP4 merely because the container can be opened.
+        if (output.isFile && hasCurrentMarker && isValidExport(download, output)) {
             callback(Result.success(output))
             return
         }
@@ -70,6 +77,7 @@ class StreamDownloadExporter(
             return
         }
         if (output.exists()) output.delete()
+        marker.delete()
         val temporary = temporaryFile(output)
         temporary.delete()
         if (activeExportId != null) {
@@ -129,6 +137,9 @@ class StreamDownloadExporter(
                     finish(Result.failure(IOException("Could not finalize the offline video file.")))
                     return
                 }
+                // A missing marker forces one safe regeneration on the next
+                // app version instead of silently reusing an older export.
+                runCatching { validationMarker(output).writeText(EXPORT_VALIDATION_VERSION) }
                 finish(Result.success(output))
             }
 
@@ -179,7 +190,11 @@ class StreamDownloadExporter(
         }
         val suffix = "-${Integer.toHexString(downloadId.hashCode())}.mp4"
         exportDirectory.listFiles()
-            ?.filter { it.name.endsWith(suffix) || it.name.endsWith(suffix.removeSuffix(".mp4") + ".part.mp4") }
+            ?.filter {
+                it.name.endsWith(suffix) ||
+                    it.name.endsWith(suffix.removeSuffix(".mp4") + ".part.mp4") ||
+                    it.name.endsWith("$suffix.validated")
+            }
             ?.forEach(File::delete)
     }
 
@@ -259,6 +274,9 @@ class StreamDownloadExporter(
     private fun temporaryFile(output: File): File =
         File(output.parentFile, output.name.removeSuffix(".mp4") + ".part.mp4")
 
+    private fun validationMarker(output: File): File =
+        File(output.parentFile, output.name + ".validated")
+
     private fun validateExport(download: Download, file: File): Exception? {
         if (isValidExport(download, file)) return null
         val expectedMs = StreamDownloadStore.requestMetadata(download.request)
@@ -315,6 +333,7 @@ class StreamDownloadExporter(
         const val TAG = "StreamDownloadExporter"
         const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
         const val MIN_VALID_MP4_BYTES = 16L * 1024
+        const val EXPORT_VALIDATION_VERSION = "1"
     }
 }
 
