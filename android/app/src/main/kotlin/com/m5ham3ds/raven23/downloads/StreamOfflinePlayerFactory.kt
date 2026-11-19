@@ -2,14 +2,18 @@ package com.m5ham3ds.raven23.downloads
 
 import android.content.Context
 import android.graphics.Color
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadHelper
@@ -20,6 +24,7 @@ import io.flutter.plugin.common.MessageCodec
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
+import java.io.File
 
 @UnstableApi
 class StreamOfflinePlayerFactory(
@@ -111,10 +116,37 @@ private class StreamOfflinePlayerView(
             check(download.state == Download.STATE_COMPLETED) {
                 "The download must complete before offline playback."
             }
-            val mediaSource = DownloadHelper.createMediaSource(
-                download.request,
+            val metadata = StreamDownloadStore.requestMetadata(download.request)
+            var mediaItem = download.request.toMediaItem()
+            val subtitlePath = metadata.optString("offlineSubtitlePath")
+            if (subtitlePath.isNotBlank()) {
+                val subtitleFile = File(subtitlePath)
+                if (subtitleFile.isFile && subtitleFile.length() > 0L) {
+                    val subtitleMimeType = when (subtitleFile.extension.lowercase()) {
+                        "srt" -> MimeTypes.APPLICATION_SUBRIP
+                        else -> MimeTypes.TEXT_VTT
+                    }
+                    val subtitle = MediaItem.SubtitleConfiguration.Builder(
+                        Uri.fromFile(subtitleFile),
+                    )
+                        .setMimeType(subtitleMimeType)
+                        .setLabel(
+                            metadata.optString("offlineSubtitleName")
+                                .ifBlank { "Downloaded subtitle" },
+                        )
+                        .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                        .build()
+                    mediaItem = mediaItem.buildUpon()
+                        .setSubtitleConfigurations(listOf(subtitle))
+                        .build()
+                }
+            }
+            val readOnlyDataSource = DefaultDataSource.Factory(
+                context,
                 store.readOnlyCacheFactory(download.request),
             )
+            val mediaSource = DefaultMediaSourceFactory(readOnlyDataSource)
+                .createMediaSource(mediaItem)
             playerView.player = player
             player.setMediaSource(mediaSource)
             player.prepare()
