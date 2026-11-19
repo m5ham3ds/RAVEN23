@@ -3,6 +3,7 @@ import '../../data/sync/library_scope.dart';
 
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
