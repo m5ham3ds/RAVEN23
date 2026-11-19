@@ -84,13 +84,31 @@ void main() {
                 url: links.first.url!),
             isNull);
       }
+      final vixLink = RegularVideoLinks(
+        url: 'https://cdn.vixsrc.to/master.m3u8?token=old',
+        quality: 'auto',
+        isM3U8: true,
+      );
+      final vixSource = OfflineDownloadSource.forSelection(
+        provider: VideoProvider.directVixSrc,
+        apiBaseUrl: 'https://api.test',
+        links: [vixLink],
+        url: vixLink.url!,
+      );
+      expect(vixSource, isNotNull);
+      expect(vixSource!.resolverType, 'vixsrc');
+      expect(vixSource.providerId, 'vixsrc');
+      expect(vixSource.apiBaseUrl, 'https://vixsrc.to');
+      expect(vixSource.quality, 'auto');
       expect(
-          OfflineDownloadSource.forSelection(
-              provider: VideoProvider.directVixSrc,
-              apiBaseUrl: 'https://api.test',
-              links: links,
-              url: links.first.url!),
-          isNull);
+        OfflineDownloadSource.forSelection(
+          provider: VideoProvider.directVixSrc,
+          apiBaseUrl: 'https://api.test',
+          links: [vixLink, vixLink],
+          url: vixLink.url!,
+        ),
+        isNull,
+      );
     });
   });
 

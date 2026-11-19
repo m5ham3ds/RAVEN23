@@ -9,6 +9,7 @@ class OfflineDownloadSource {
     required this.providerName,
     required this.server,
     required this.quality,
+    this.resolverType = 'scraperApi',
   });
 
   final String apiBaseUrl;
@@ -16,6 +17,7 @@ class OfflineDownloadSource {
   final String providerName;
   final String? server;
   final String quality;
+  final String resolverType;
 
   static OfflineDownloadSource? forSelection({
     required VideoProvider? provider,
@@ -23,16 +25,30 @@ class OfflineDownloadSource {
     required Iterable<RegularVideoLinks> links,
     required String url,
   }) {
+    final matches = links.where((link) => link.url == url).toList();
+    if (matches.length != 1) return null;
+    final link = matches.single;
+
+    // VixSrc signs its own HLS playlist through an embed page, not the
+    // Scraper API. Preserve the title identity for a source-specific renewal.
+    if (provider?.type == VideoProviderType.directVixSrc &&
+        provider?.apiId == 'vixsrc') {
+      return OfflineDownloadSource(
+        apiBaseUrl: 'https://vixsrc.to',
+        providerId: 'vixsrc',
+        providerName: provider!.displayName,
+        server: link.server ?? provider.displayName,
+        quality: link.quality ?? 'auto',
+        resolverType: 'vixsrc',
+      );
+    }
+
     if (provider?.type != VideoProviderType.scraperApi ||
         provider?.apiId?.isNotEmpty != true ||
         apiBaseUrl.trim().isEmpty) {
       return null;
     }
-    final matches = links.where((link) => link.url == url).toList();
-    // Display labels can contain server names or occurrence numbers. Save the
-    // actual API quality and server instead, and never guess an ambiguous link.
-    if (matches.length != 1) return null;
-    final link = matches.single;
+    // Save the API quality and server, never a duplicate display label.
     return OfflineDownloadSource(
       apiBaseUrl: apiBaseUrl,
       providerId: provider!.apiId!,
@@ -49,6 +65,7 @@ class OfflineDownloadSource {
         'providerName': providerName,
         'server': server ?? '',
         'quality': quality,
+        'resolverType': resolverType,
       };
 }
 
