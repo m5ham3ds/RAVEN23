@@ -665,8 +665,11 @@ abstract final class ProviderLoader {
       final candidate = candidates[index];
       final url = candidate.link.url;
       if (url != null) {
-        invalidUrls.putIfAbsent(candidate.provider.codeName, () => <String>{})
-          ..add(url);
+        final providerInvalidUrls = invalidUrls.putIfAbsent(
+          candidate.provider.codeName,
+          () => <String>{},
+        );
+        providerInvalidUrls.add(url);
       }
     }
     for (final entryToInvalidate in invalidUrls.entries) {
