@@ -204,14 +204,14 @@ internal class DownloadSourceResolver {
         }
 
         val apiPath = when (metadata.optString("mediaType")) {
-            "movie" -> "/api/movie/\${metadata.getInt("contentId")}"
+            "movie" -> "/api/movie/${metadata.getInt("contentId")}"
             "episode" -> {
                 val season = metadata.optInt("seasonNumber", -1)
                 val episode = metadata.optInt("episodeNumber", -1)
                 if (season <= 0 || episode <= 0) {
                     throw IOException("VixSrc episode recovery metadata is incomplete.")
                 }
-                "/api/tv/\${metadata.getInt("contentId")}/$season/$episode"
+                "/api/tv/${metadata.getInt("contentId")}/$season/$episode"
             }
             else -> throw IOException("VixSrc only supports movie and episode downloads.")
         }
@@ -226,7 +226,7 @@ internal class DownloadSourceResolver {
         repeat(2) {
             val apiResponse = requestText(apiUrl, headers)
             if (apiResponse.code !in 200..299) {
-                throw IOException("VixSrc could not renew the original title link (HTTP \${apiResponse.code}).")
+                throw IOException("VixSrc could not renew the original title link (HTTP ${apiResponse.code}).")
             }
             val embedReference = try {
                 JSONObject(apiResponse.body).optString("src").takeIf(String::isNotBlank)
@@ -238,7 +238,7 @@ internal class DownloadSourceResolver {
             val embedResponse = requestText(embedUrl, headers)
             if (embedResponse.code == 410) return@repeat
             if (embedResponse.code !in 200..299) {
-                throw IOException("VixSrc embed is unavailable (HTTP \${embedResponse.code}).")
+                throw IOException("VixSrc embed is unavailable (HTTP ${embedResponse.code}).")
             }
             val playlistUrl = vixSrcMasterPlaylistUrl(embedResponse.body, base)
                 ?: throw IOException("VixSrc did not provide a renewed HLS playlist.")
@@ -308,11 +308,11 @@ internal class DownloadSourceResolver {
         val body = try {
             JSONObject(response.body)
         } catch (_: Exception) {
-            throw IOException("Download provider returned an invalid response (HTTP \${response.code}).")
+            throw IOException("Download provider returned an invalid response (HTTP ${response.code}).")
         }
         if (response.code !in 200..299 &&
             !body.optString("error").contains("full stream collection", true)) {
-            throw IOException("Download provider is unavailable (HTTP \${response.code}). Retry later.")
+            throw IOException("Download provider is unavailable (HTTP ${response.code}). Retry later.")
         }
         return body
     }
