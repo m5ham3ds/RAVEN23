@@ -301,6 +301,12 @@ class DownloadSubtitleSelection {
   final RegularSubtitleLinks? track;
 }
 
+class DownloadAudioSelection {
+  const DownloadAudioSelection(this.track);
+
+  final OfflineAudioTrack? track;
+}
+
 class _AudioSelectionSheet extends StatefulWidget {
   const _AudioSelectionSheet({required this.tracks});
 
