@@ -8,6 +8,8 @@ class MovieStreamMetadata {
   bool? isAdult;
   String? releaseDate;
   String? originalLanguage;
+  /// TMDB runtime in minutes, when known; used to verify complete offline exports.
+  int? runtime;
   bool isAnime;
   List<String> genres;
 
@@ -33,6 +35,7 @@ class MovieStreamMetadata {
     this.languages = const <String>[],
     this.countries = const <String>[],
     this.originalLanguage,
+    this.runtime,
     this.isAnime = false,
     this.recommendations,
     this.onMovieChange,

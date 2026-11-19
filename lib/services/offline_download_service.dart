@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../manga/ui/manga_notification_service.dart';
 
 import '../models/offline_download.dart';
 
@@ -72,6 +75,7 @@ class OfflineDownloadService implements OfflineDownloadGateway {
       EventChannel('com.m5ham3ds.raven23/stream_download_events');
 
   Stream<List<OfflineDownload>>? _downloadEvents;
+  Future<void>? _notificationPermissionRequest;
 
   @override
   Stream<List<OfflineDownload>> get downloadEvents =>
@@ -87,8 +91,30 @@ class OfflineDownloadService implements OfflineDownloadGateway {
   }
 
   @override
-  Future<void> enqueue(OfflineDownloadRequest request) {
-    return _methods.invokeMethod<void>('enqueue', request.toMap());
+  Future<void> enqueue(OfflineDownloadRequest request) async {
+    await _requestDownloadNotificationPermissionOnce();
+    await _methods.invokeMethod<void>('enqueue', request.toMap());
+  }
+
+  /// Ask Android only when the first real download is about to be queued.
+  /// Persist before opening the system dialog so a denial is not repeatedly
+  /// prompted on every later download attempt.
+  Future<void> _requestDownloadNotificationPermissionOnce() {
+    return _notificationPermissionRequest ??=
+        _requestDownloadNotificationPermissionOnceInternal();
+  }
+
+  Future<void> _requestDownloadNotificationPermissionOnceInternal() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      const key = 'raven23.download_notifications_prompted.v1';
+      if (preferences.getBool(key) == true) return;
+      await preferences.setBool(key, true);
+      await MangaNotificationService.instance.requestPermission();
+    } catch (_) {
+      // Notifications are optional; a permission/plugin issue must never
+      // prevent the underlying video download from starting.
+    }
   }
 
   /// Returns a persistent local MP4 prepared from the completed Media3 cache.

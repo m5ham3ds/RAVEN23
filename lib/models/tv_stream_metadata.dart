@@ -9,6 +9,8 @@ class TVStreamMetadata {
   int? elapsed;
   int? tvId;
   String? airDate;
+  /// Current episode runtime in minutes, when TMDB provides it.
+  int? episodeRuntime;
   List<String> genres;
 
   /// The series' TMDB genre ids, when the caller has them; they settle
@@ -33,6 +35,7 @@ class TVStreamMetadata {
     required this.seriesName,
     required this.tvId,
     required this.airDate,
+    this.episodeRuntime,
     this.genres = const <String>[],
     this.genreIds,
     this.languages = const <String>[],
@@ -105,7 +108,7 @@ class EpisodeMetadata {
       seasonNumber: episode.seasonNumber ?? 0,
       stillPath: episode.stillPath,
       airDate: episode.airDate,
-      runtime: null, // Runtime might not be in EpisodeList
+      runtime: episode.runtime,
       overview: episode.overview,
       voteAverage: episode.voteAverage,
     );

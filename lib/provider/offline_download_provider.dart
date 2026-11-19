@@ -24,6 +24,13 @@ class OfflineDownloadProvider extends ChangeNotifier {
   String? get error => _error;
   OfflineExportProgress? exportFor(String id) => _exports[id];
 
+  OfflineDownload? downloadForId(String id) {
+    for (final download in _downloads) {
+      if (download.id == id) return download;
+    }
+    return null;
+  }
+
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;

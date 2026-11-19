@@ -91,6 +91,7 @@ class OfflineDownload {
     this.offlineSubtitlePath,
     this.offlineSubtitleName,
     this.audioTrackName,
+    this.expectedDurationMs,
     this.streamIdentity = const <String, Object?>{},
   });
 
@@ -113,6 +114,8 @@ class OfflineDownload {
   final String? offlineSubtitlePath;
   final String? offlineSubtitleName;
   final String? audioTrackName;
+  /// Expected media duration, in milliseconds, used to reject truncated exports.
+  final int? expectedDurationMs;
   final Map<String, Object?> streamIdentity;
 
   bool get isComplete => state == OfflineDownloadState.completed;
@@ -154,6 +157,7 @@ class OfflineDownload {
       offlineSubtitlePath: offlineSubtitlePath,
       offlineSubtitleName: offlineSubtitleName,
       audioTrackName: audioTrackName,
+      expectedDurationMs: expectedDurationMs,
       streamIdentity: streamIdentity,
     );
   }
@@ -195,6 +199,7 @@ class OfflineDownload {
       offlineSubtitlePath: value<String>('offlineSubtitlePath'),
       offlineSubtitleName: value<String>('offlineSubtitleName'),
       audioTrackName: value<String>('audioTrackName'),
+      expectedDurationMs: value<num>('expectedDurationMs')?.toInt(),
       streamIdentity: streamIdentity,
     );
   }
@@ -233,6 +238,9 @@ class OfflineDownloadRequest {
     this.subtitleTrackName,
     this.subtitleTrackHeaders = const {},
     this.audioTrack,
+    this.audioLanguages = const <String>['en'],
+    this.expectedDurationMs,
+    this.subtitleTrackContent,
     this.source,
     this.streamIdentity = const <String, Object?>{},
   });
@@ -254,6 +262,11 @@ class OfflineDownloadRequest {
   final String? subtitleTrackName;
   final Map<String, String> subtitleTrackHeaders;
   final OfflineAudioTrack? audioTrack;
+  /// Language priority for automatic track selection (Japanese then English for anime).
+  final List<String> audioLanguages;
+  final int? expectedDurationMs;
+  /// A normalized WebVTT subtitle selected from an external subtitle catalogue.
+  final String? subtitleTrackContent;
   final OfflineDownloadSource? source;
   /// Stable provenance for the exact selected stream; this is metadata only
   /// and is not used as an automatic URL-renewal resolver.
@@ -272,6 +285,9 @@ class OfflineDownloadRequest {
         'headers': headers,
         'audioTrack': audioTrack?.selection,
         'audioTrackName': audioTrack?.name,
+        'audioLanguages': audioLanguages,
+        'expectedDurationMs': expectedDurationMs,
+        'subtitleTrackContent': subtitleTrackContent,
         'source': source?.toMap(),
         'streamIdentity': streamIdentity,
         'contentId': contentId,
