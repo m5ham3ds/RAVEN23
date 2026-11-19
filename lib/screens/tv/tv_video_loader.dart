@@ -4,6 +4,8 @@ import 'package:raven23/services/adsterra_playback_ads_service.dart';
 import 'package:raven23/widgets/ad_block_gate.dart';
 // ignore_for_file: use_build_context_synchronously
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:raven23/functions/function.dart';
 import 'package:raven23/functions/network.dart';
 import 'package:raven23/functions/video_utils.dart';
@@ -643,7 +645,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           .map((entry) => '${entry.key.toLowerCase()}:${entry.value}')
           .toList()
         ..sort();
-      if (!adaptiveSignatures.add('${url}|${headers.join('|')}')) return;
+      if (!adaptiveSignatures.add('$url|${headers.join('|')}')) return;
       adaptiveScansInProgress++;
       final task = adaptiveScanner
           .scan(link)
@@ -1002,7 +1004,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           quality: quality,
           posterUrl: posterPath == null
               ? null
-              : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
+              : '$TMDB_BASE_IMAGE_URLw500$posterPath',
           maxVideoHeight: maxHeight,
           headers: headers,
           audioTrack: audioSelection.track,
