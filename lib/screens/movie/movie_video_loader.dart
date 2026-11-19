@@ -4,6 +4,8 @@ import 'package:raven23/services/adsterra_playback_ads_service.dart';
 import 'package:raven23/widgets/ad_block_gate.dart';
 // ignore_for_file: use_build_context_synchronously
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:raven23/functions/function.dart';
 import 'package:raven23/functions/network.dart';
 import 'package:raven23/functions/video_utils.dart';
@@ -633,7 +635,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           .map((entry) => '${entry.key.toLowerCase()}:${entry.value}')
           .toList()
         ..sort();
-      if (!adaptiveSignatures.add('${url}|${headers.join('|')}')) return;
+      if (!adaptiveSignatures.add('$url|${headers.join('|')}')) return;
       adaptiveScansInProgress++;
       final task = adaptiveScanner
           .scan(link)
