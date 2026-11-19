@@ -1004,7 +1004,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           quality: quality,
           posterUrl: posterPath == null
               ? null
-              : '$TMDB_BASE_IMAGE_URLw500$posterPath',
+              : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
           maxVideoHeight: maxHeight,
           headers: headers,
           audioTrack: audioSelection.track,
