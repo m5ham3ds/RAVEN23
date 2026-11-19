@@ -110,6 +110,40 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun vixSrcRefreshBuildsNewSignedMasterPlaylistUrlFromEmbed() {
+        val html = """
+            <script>
+              window.masterPlaylist = { url: "/master.m3u8?asset=movie-42" };
+              const signing = {"token":"new-token-123","expires":"1893456000"};
+            </script>
+        """.trimIndent()
+
+        val renewed = vixSrcMasterPlaylistUrl(
+            html,
+            "https://vixsrc.to/embed/42",
+        )
+
+        assertTrue(renewed!!.startsWith("https://vixsrc.to/master.m3u8?"))
+        assertTrue(renewed.contains("asset=movie-42"))
+        assertTrue(renewed.contains("token=new-token-123"))
+        assertTrue(renewed.contains("expires=1893456000"))
+        assertTrue(renewed.contains("h=1"))
+        assertTrue(renewed.contains("lang=en"))
+    }
+
+    @Test
+    fun vixSrcRefreshResolvesRelativeAndProtocolRelativeEmbedUrls() {
+        assertEquals(
+            "https://vixsrc.to/embed/player",
+            resolveVixSrcUrl("https://vixsrc.to/api/movie/42", "/embed/player"),
+        )
+        assertEquals(
+            "https://cdn.vixsrc.to/embed/player",
+            resolveVixSrcUrl("https://vixsrc.to/api/movie/42", "//cdn.vixsrc.to/embed/player"),
+        )
+    }
+
+    @Test
     fun playerReflectionTargetsStillExist() {
         val store = StreamDownloadStore::class.java
         assertEquals(
