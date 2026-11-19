@@ -469,6 +469,9 @@ jobs:
                   'progressiveContainersMapToMedia3ProgressiveMimeTypes',
                   'refreshedLinksRespectDeclaredContainerForOpaqueSignedUrls',
                   'unsupportedProgressiveContainerIsRejected',
+                  'offlineExportRejectsShortSegmentsButAllowsSmallRuntimeDifferences',
+                  'vixSrcRefreshBuildsNewSignedMasterPlaylistUrlFromEmbed',
+                  'vixSrcRefreshResolvesRelativeAndProtocolRelativeEmbedUrls',
                   'playerReflectionTargetsStillExist',
               },
           }
