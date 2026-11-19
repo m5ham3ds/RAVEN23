@@ -16,7 +16,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadHelper
 import androidx.media3.ui.PlayerView
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
