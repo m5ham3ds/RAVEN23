@@ -132,8 +132,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         showSubtitlesButton: false,
         enableQualities: false,
         showQualitiesButton: false,
-        enableDownloadButton: true,
-        onDownloadTap: _showAlreadyDownloaded,
+        enableDownloadButton: false,
         enableCrop: true,
         cropIcon: PhosphorIcons.crop(),
         enablePip: true,
@@ -170,17 +169,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         controlBarHeight: 56,
                 playerTimeMode: settings.playerTimeDisplay,
         quickActions: [
-          BetterPlayerOverflowMenuItem(
-            PhosphorIcons.hardDrives(),
-            tr('switch_provider'),
-            _ignoreUnavailableNetworkAction,
-          ),
-          if (_isMovie)
-            BetterPlayerOverflowMenuItem(
-              PhosphorIcons.squaresFour(),
-              playerControlsStrings().moreLikeThis,
-              _ignoreUnavailableNetworkAction,
-            ),
           if (!_isMovie)
             BetterPlayerOverflowMenuItem(
               PhosphorIcons.cardsThree(),
@@ -191,11 +179,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
             PhosphorIcons.closedCaptioning(),
             playerControlsStrings().audioAndSubtitles,
             _showSubtitleSwitcher,
-          ),
-          BetterPlayerOverflowMenuItem(
-            PhosphorIcons.highDefinition(),
-            playerControlsStrings().quality,
-            _ignoreUnavailableNetworkAction,
           ),
         ],
       );
@@ -260,10 +243,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     }
   }
 
-  void _ignoreUnavailableNetworkAction() {
-    // Intentionally retained as a visible, inert player action while offline.
-  }
-
   void _onPlayerEvent(BetterPlayerEvent event) {
     final controller = _controller;
     if (controller == null) return;
@@ -310,12 +289,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       posterPath: widget.download.posterUrl,
       provider: 'Downloaded',
       syncImmediately: syncImmediately,
-    );
-  }
-
-  void _showAlreadyDownloaded() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${widget.download.quality} is already downloaded.')),
     );
   }
 
