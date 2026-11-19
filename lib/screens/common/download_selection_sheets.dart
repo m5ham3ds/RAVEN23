@@ -58,20 +58,27 @@ abstract final class DownloadSelectionSheets {
   }
 
   /// Shows the same per-server, per-quality catalogue used by the player.
-  /// The selected entry retains its original URL, headers and format metadata.
+  /// New scan results can be published while the sheet is open, so a user can
+  /// pick a cached quality immediately without waiting for remaining sources.
   static Future<QualityCatalogEntry?> showQualityCatalog(
     BuildContext context, {
     required List<QualityCatalogEntry> entries,
+    ValueListenable<List<QualityCatalogEntry>>? entriesListenable,
+    ValueListenable<bool>? searchingListenable,
   }) {
-    final concreteEntries = entries
-        .where(
-          (entry) => !entry.isAdaptive || entry.adaptiveTargetHeight != null,
-        )
-        .where((entry) => !_isProviderAutoLabel(entry.qualityLabel))
-        .toList(growable: false);
-    return showPlayerSheet<QualityCatalogEntry>(
-      context: context,
-      builder: (sheetContext) => PlayerSheetScaffold(
+    Widget buildCatalog(
+      BuildContext sheetContext,
+      List<QualityCatalogEntry> currentEntries,
+      bool searching,
+    ) {
+      final concreteEntries = currentEntries
+          .where(
+            (entry) =>
+                !entry.isAdaptive || entry.adaptiveTargetHeight != null,
+          )
+          .where((entry) => !_isProviderAutoLabel(entry.qualityLabel))
+          .toList(growable: false);
+      return PlayerSheetScaffold(
         title: tr('download_choose_resolution'),
         subtitle: tr('download_resolution_description'),
         actions: [
@@ -81,21 +88,80 @@ abstract final class DownloadSelectionSheets {
             onPressed: () => Navigator.pop(sheetContext),
           ),
         ],
-        child: ListView.separated(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-          itemCount: concreteEntries.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 2),
-          itemBuilder: (context, index) {
-            final entry = concreteEntries[index];
-            return PlayerChoiceCard(
-              title: entry.qualityLabel,
-              subtitle: entry.selectionSubtitle,
-              onTap: () => Navigator.pop(sheetContext, entry),
-            );
-          },
+        child: Column(
+          children: [
+            if (searching)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            Expanded(
+              child: concreteEntries.isEmpty
+                  ? Center(
+                      child: searching
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox.square(
+                                  dimension: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(tr('loading_video_sources')),
+                              ],
+                            )
+                          : Text(
+                              'No direct downloadable qualities are available.',
+                              textAlign: TextAlign.center,
+                            ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                      itemCount: concreteEntries.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 2),
+                      itemBuilder: (context, index) {
+                        final entry = concreteEntries[index];
+                        return PlayerChoiceCard(
+                          title: entry.qualityLabel,
+                          subtitle: entry.selectionSubtitle,
+                          onTap: () => Navigator.pop(sheetContext, entry),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
-      ),
+      );
+    }
+
+    Widget buildWithSearchState(
+      BuildContext sheetContext,
+      List<QualityCatalogEntry> currentEntries,
+    ) {
+      final listenable = searchingListenable;
+      return listenable == null
+          ? buildCatalog(sheetContext, currentEntries, false)
+          : ValueListenableBuilder<bool>(
+              valueListenable: listenable,
+              builder: (_, searching, __) =>
+                  buildCatalog(sheetContext, currentEntries, searching),
+            );
+    }
+
+    return showPlayerSheet<QualityCatalogEntry>(
+      context: context,
+      builder: (sheetContext) {
+        final listenable = entriesListenable;
+        return listenable == null
+            ? buildWithSearchState(sheetContext, entries)
+            : ValueListenableBuilder<List<QualityCatalogEntry>>(
+                valueListenable: listenable,
+                builder: (_, currentEntries, __) =>
+                    buildWithSearchState(sheetContext, currentEntries),
+              );
+      },
     );
   }
 
