@@ -134,7 +134,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       ],
       controlBarHeight: 56,
     );
-    _controller = BetterPlayerController(
+    final controller = BetterPlayerController(
       BetterPlayerConfiguration(
         autoDetectFullscreenDeviceOrientation: true,
         autoDetectFullscreenAspectRatio: true,
@@ -155,14 +155,15 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         ),
       ),
     );
-    _controller.setBetterPlayerGlobalKey(_playerKey);
-    _controller.addEventsListener(_onPlayerEvent);
+    _controller = controller;
+    controller.setBetterPlayerGlobalKey(_playerKey);
+    controller.addEventsListener(_onPlayerEvent);
     final savedSubtitle = widget.download.offlineSubtitlePath;
     final quality = widget.download.quality.trim().isEmpty
         ? 'Auto'
         : widget.download.quality.trim();
     final offlineUrl = 'raven23-offline://${widget.download.id}';
-    _controller.setupDataSource(
+    controller.setupDataSource(
       BetterPlayerDataSource(
         BetterPlayerDataSourceType.network,
         offlineUrl,
