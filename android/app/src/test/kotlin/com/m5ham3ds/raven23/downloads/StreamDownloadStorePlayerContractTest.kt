@@ -7,7 +7,7 @@ import androidx.media3.exoplayer.offline.DownloadRequest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The external better_player_plus package opens offline downloads through its retained reflection API. */
+/** The native Media3 offline PlatformView resolves completed downloads through these store APIs. */
 class StreamDownloadStorePlayerContractTest {
     @Test
     fun progressiveContainersMapToMedia3ProgressiveMimeTypes() {
