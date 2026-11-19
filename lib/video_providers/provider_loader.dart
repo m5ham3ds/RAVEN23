@@ -584,63 +584,165 @@ abstract final class ProviderLoader {
   }
 
   /// Restores previously resolved links without starting a new source search.
-  /// The last successful provider/link is preferred, but only if that provider
-  /// is still installed and its cached URL has not passed its expiry timestamp.
+  /// The most recently used URL is checked with a small Range request first;
+  /// a definite rejection removes only that URL and falls through to another
+  /// cached quality/provider. If the check is inconclusive, the caller starts
+  /// a normal source scan instead of risking a long player spinner.
   static Future<ProviderSelection?> restoreCachedSelection({
     required MediaIdentity identity,
     required List<VideoProvider> providers,
     PlaybackStreamCacheStore? cache,
   }) async {
-    final entry = await (cache ?? PlaybackStreamCacheStore()).read(identity);
+    final cacheStore = cache ?? PlaybackStreamCacheStore();
+    final entry = await cacheStore.read(identity);
     if (entry == null) return null;
 
-    VideoProvider? selectedProvider;
-    CachedProviderStreams? selectedCached;
-    var selectedUrl = entry.lastUrl;
-    final preferred = providers.where(
-      (provider) => provider.codeName == entry.lastProviderCode,
+    final orderedProviders = <VideoProvider>[
+      ...providers.where(
+        (provider) =>
+            provider.codeName == entry.lastProviderCode &&
+            provider.supportsMedia(identity),
+      ),
+      ...providers.where(
+        (provider) =>
+            provider.codeName != entry.lastProviderCode &&
+            provider.supportsMedia(identity),
+      ),
+    ];
+    final candidates = <({VideoProvider provider, CachedProviderStreams cached, RegularVideoLinks link})>[];
+    for (final provider in orderedProviders) {
+      final cached = entry.providers[provider.codeName];
+      if (cached == null) continue;
+      final links = List<RegularVideoLinks>.of(cached.videoLinks);
+      if (provider.codeName == entry.lastProviderCode) {
+        links.sort((left, right) {
+          if (left.url == entry.lastUrl) return -1;
+          if (right.url == entry.lastUrl) return 1;
+          return 0;
+        });
+      }
+      for (final link in links) {
+        candidates.add((provider: provider, cached: cached, link: link));
+        // Validate a small first batch in parallel so a cache hit adds one
+        // bounded network round trip rather than a serial walk over every URL.
+        if (candidates.length >= 4) break;
+      }
+      if (candidates.length >= 4) break;
+    }
+    if (candidates.isEmpty) return null;
+
+    final validation = await Future.wait(
+      candidates.map((candidate) => cacheStore.validateLink(candidate.link)),
     );
-    if (preferred.isNotEmpty) {
-      final candidate = preferred.first;
-      final cached = entry.providers[candidate.codeName];
-      if (cached != null && candidate.supportsMedia(identity)) {
-        selectedProvider = candidate;
-        selectedCached = cached;
+    final invalidUrls = <String, Set<String>>{};
+    for (var index = 0; index < candidates.length; index++) {
+      if (validation[index] != false) continue;
+      final candidate = candidates[index];
+      final url = candidate.link.url;
+      if (url != null) {
+        invalidUrls.putIfAbsent(candidate.provider.codeName, () => <String>{})
+          ..add(url);
+      }
+    }
+    for (final entryToInvalidate in invalidUrls.entries) {
+      for (final url in entryToInvalidate.value) {
+        await cacheStore.invalidateUrl(
+          identity: identity,
+          providerCode: entryToInvalidate.key,
+          url: url,
+        );
       }
     }
 
-    if (selectedProvider == null) {
-      for (final provider in providers) {
-        final cached = entry.providers[provider.codeName];
-        if (cached == null || !provider.supportsMedia(identity)) continue;
-        selectedProvider = provider;
-        selectedCached = cached;
-        selectedUrl = cached.videoLinks.first.url ?? '';
-        break;
-      }
-    }
-    if (selectedProvider == null || selectedCached == null) return null;
-    if (!selectedCached.videoLinks.any((link) => link.url == selectedUrl)) {
-      selectedUrl = selectedCached.videoLinks.first.url ?? '';
-    }
+    final selectedIndex = validation.indexWhere((value) => value == true);
+    if (selectedIndex < 0) return null;
+    final selected = candidates[selectedIndex];
+    final selectedUrl = selected.link.url?.trim() ?? '';
     if (selectedUrl.isEmpty) return null;
 
-    final cachedResults = <String, ProviderLoadResult>{
-      for (final provider in providers)
-        if (entry.providers.containsKey(provider.codeName) &&
-            provider.supportsMedia(identity))
-          provider.codeName: entry.providers[provider.codeName]!.toLoadResult(),
-    };
-    final selectedIndex = providers.indexOf(selectedProvider);
+    final cachedResults = <String, ProviderLoadResult>{};
+    for (final provider in orderedProviders) {
+      final cached = entry.providers[provider.codeName];
+      if (cached == null) continue;
+      final failedUrls = invalidUrls[provider.codeName] ?? const <String>{};
+      final usableLinks = cached.videoLinks
+          .where((link) => !failedUrls.contains(link.url))
+          .toList(growable: false);
+      if (usableLinks.isEmpty) continue;
+      cachedResults[provider.codeName] = ProviderLoadResult(
+        success: true,
+        videoLinks: usableLinks,
+        subtitleLinks: cached.subtitleLinks,
+      );
+    }
+
+    final selectedLinks = selected.cached.videoLinks
+        .where(
+          (link) =>
+              !(invalidUrls[selected.provider.codeName] ?? const <String>{})
+                  .contains(link.url),
+        )
+        .toList(growable: false);
+    final selectedResult = ProviderLoadResult(
+      success: selectedLinks.isNotEmpty,
+      videoLinks: selectedLinks,
+      subtitleLinks: selected.cached.subtitleLinks,
+    );
+    cachedResults[selected.provider.codeName] = selectedResult;
+    final providerIndex = providers.indexOf(selected.provider);
     return ProviderSelection(
-      index: selectedIndex < 0 ? 0 : selectedIndex,
-      provider: selectedProvider,
-      result: selectedCached.toLoadResult(),
+      index: providerIndex < 0 ? 0 : providerIndex,
+      provider: selected.provider,
+      result: selectedResult,
       cachedProviderResults: Map<String, ProviderLoadResult>.unmodifiable(
         cachedResults,
       ),
       selectedUrl: selectedUrl,
       restoredFromCache: true,
+    );
+  }
+
+  /// Persists a scan snapshot so detail-page downloads and playback share the
+  /// same 24-hour cache. Existing URLs keep their original discovery times.
+  static Future<void> persistResolvedResults({
+    required MediaIdentity identity,
+    required List<VideoProvider> providers,
+    required Map<String, ProviderLoadResult> results,
+    String? lastProviderCode,
+    String? lastUrl,
+    PlaybackStreamCacheStore? cache,
+  }) async {
+    final cachedProviders = <String, CachedProviderStreams>{};
+    for (final provider in providers) {
+      final result = results[provider.codeName];
+      final links = result?.videoLinks ?? const <RegularVideoLinks>[];
+      if (links.isEmpty) continue;
+      cachedProviders[provider.codeName] = CachedProviderStreams(
+        providerCode: provider.codeName,
+        providerName: provider.displayName,
+        videoLinks: links,
+        subtitleLinks: result?.subtitleLinks ?? const <RegularSubtitleLinks>[],
+      );
+    }
+    if (cachedProviders.isEmpty) return;
+
+    var selectedCode = lastProviderCode ?? '';
+    var selectedUrl = lastUrl ?? '';
+    if (!cachedProviders.containsKey(selectedCode)) {
+      final first = cachedProviders.entries.first;
+      selectedCode = first.key;
+      selectedUrl = first.value.videoLinks.first.url ?? '';
+    } else if (!cachedProviders[selectedCode]!.videoLinks.any(
+      (link) => link.url == selectedUrl,
+    )) {
+      selectedUrl = cachedProviders[selectedCode]!.videoLinks.first.url ?? '';
+    }
+    if (selectedCode.isEmpty || selectedUrl.isEmpty) return;
+    await (cache ?? PlaybackStreamCacheStore()).save(
+      identity: identity,
+      providers: cachedProviders,
+      lastProviderCode: selectedCode,
+      lastUrl: selectedUrl,
     );
   }
 
