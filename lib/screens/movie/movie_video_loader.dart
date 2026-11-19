@@ -17,6 +17,8 @@ import 'package:raven23/models/provider_video_source.dart';
 import 'package:raven23/models/provider_load_state.dart';
 import 'package:raven23/services/globle_method.dart';
 import 'package:raven23/services/offline_download_service.dart';
+import 'package:raven23/services/external_subtitle_service.dart';
+import 'package:raven23/models/external_subtitles.dart';
 import 'package:raven23/widgets/playback_loading_screen.dart';
 import 'package:raven23/video_providers/provider_loader.dart';
 import '../../controllers/recently_watched_database_controller.dart';
@@ -983,24 +985,32 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     final sourceLinks =
         sourceResult?.videoLinks ?? <RegularVideoLinks>[selected.link];
     final subtitles = sourceResult?.subtitleLinks;
-    final subtitleTrack = _preferredSubtitle(subtitles);
     final posterPath = _metadata.posterPath;
     final quality = selected.qualityLabel;
     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
-    final audioSelection = await DownloadSelectionSheets.chooseAudio(
+    final externalSubtitleFuture = ExternalSubtitleService(_scraperApiUrl).fetchMovieSubtitles(
+      _metadata.movieId ?? 0,
+      title: _metadata.movieName,
+      year: _metadata.releaseYear,
+      preferredLanguageCode: context.read<SettingsProvider>().defaultSubtitleLanguage,
+    ).catchError((Object _) => <ExternalSubtitle>[]);
+    final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
       context,
-      tracks: OfflineDownloadService.instance.getAudioTracks(
-        url: url,
-        format: format,
-        headers: headers,
-        maxVideoHeight: maxHeight,
-      ),
+      tracks: subtitles ?? const <RegularSubtitleLinks>[],
+      externalTracks: externalSubtitleFuture,
     );
     if (!mounted) return;
-    if (audioSelection == null) {
+    if (subtitleSelection == null) {
       Navigator.pop(context, false);
       return;
     }
+    final subtitleTrack = subtitleSelection.track;
+    final externalSubtitle = subtitleSelection.externalTrack;
+    final subtitleContent = externalSubtitle == null
+        ? null
+        : await ExternalSubtitleService(_scraperApiUrl)
+            .downloadAndNormalizeForPlayback(externalSubtitle);
+    if (!mounted) return;
     try {
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
@@ -1018,7 +1028,6 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
               : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
           maxVideoHeight: maxHeight,
           headers: headers,
-          audioTrack: audioSelection.track,
           streamIdentity: <String, Object?>{
             'server': selected.link.server?.trim().isNotEmpty == true
                 ? selected.link.server!.trim()
@@ -1039,6 +1048,9 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: subtitleTrack?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
+          subtitleTrackContent: subtitleContent,
+          audioLanguages: (_metadata.isAnimeContent ? const <String>['ja', 'en'] : const <String>['en']),
+          expectedDurationMs: (_metadata.runtime != null && _metadata.runtime! > 0 ? _metadata.runtime! * 60 * 1000 : null),
         ),
       );
       onSelected?.call(selected);
@@ -1136,22 +1148,30 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
         VideoUtils.inferVideoHeaders(url) ??
         const <String, String>{};
     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
-    final subtitleTrack = _preferredSubtitle(movieVideoSubs);
     try {
-      final audioSelection = await DownloadSelectionSheets.chooseAudio(
+      final externalSubtitleFuture = ExternalSubtitleService(_scraperApiUrl).fetchMovieSubtitles(
+        _metadata.movieId ?? 0,
+        title: _metadata.movieName,
+        year: _metadata.releaseYear,
+        preferredLanguageCode: context.read<SettingsProvider>().defaultSubtitleLanguage,
+      ).catchError((Object _) => <ExternalSubtitle>[]);
+      final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
         context,
-        tracks: OfflineDownloadService.instance.getAudioTracks(
-          url: url,
-          format: format,
-          headers: headers,
-          maxVideoHeight: maxHeight,
-        ),
+        tracks: movieVideoSubs ?? const <RegularSubtitleLinks>[],
+        externalTracks: externalSubtitleFuture,
       );
       if (!mounted) return;
-      if (audioSelection == null) {
+      if (subtitleSelection == null) {
         Navigator.pop(context, false);
         return;
       }
+      final subtitleTrack = subtitleSelection.track;
+      final externalSubtitle = subtitleSelection.externalTrack;
+      final subtitleContent = externalSubtitle == null
+          ? null
+          : await ExternalSubtitleService(_scraperApiUrl)
+              .downloadAndNormalizeForPlayback(externalSubtitle);
+      if (!mounted) return;
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
           id: 'movie_${_metadata.movieId}',

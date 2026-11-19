@@ -17,6 +17,8 @@ import 'package:raven23/constants/app_constants.dart' show MediaType;
 import 'package:raven23/models/provider_load_state.dart';
 import 'package:raven23/services/globle_method.dart';
 import 'package:raven23/services/offline_download_service.dart';
+import 'package:raven23/services/external_subtitle_service.dart';
+import 'package:raven23/models/external_subtitles.dart';
 import 'package:raven23/widgets/playback_loading_screen.dart';
 import 'package:raven23/video_providers/provider_loader.dart';
 import '../../controllers/recently_watched_database_controller.dart';
@@ -971,24 +973,34 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     final sourceLinks =
         sourceResult?.videoLinks ?? <RegularVideoLinks>[selected.link];
     final subtitles = sourceResult?.subtitleLinks;
-    final subtitleTrack = _preferredSubtitle(subtitles);
     final posterPath = widget.metadata.posterPath;
     final quality = selected.qualityLabel;
     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
-    final audioSelection = await DownloadSelectionSheets.chooseAudio(
+    final externalSubtitleFuture = ExternalSubtitleService(_scraperApiUrl).fetchTVSubtitles(
+      widget.metadata.tvId ?? 0,
+      widget.metadata.seasonNumber ?? 0,
+      widget.metadata.episodeNumber ?? 0,
+      title: widget.metadata.seriesName,
+      year: int.tryParse(widget.metadata.airDate?.take(4) ?? ''),
+      preferredLanguageCode: context.read<SettingsProvider>().defaultSubtitleLanguage,
+    ).catchError((Object _) => <ExternalSubtitle>[]);
+    final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
       context,
-      tracks: OfflineDownloadService.instance.getAudioTracks(
-        url: url,
-        format: format,
-        headers: headers,
-        maxVideoHeight: maxHeight,
-      ),
+      tracks: subtitles ?? const <RegularSubtitleLinks>[],
+      externalTracks: externalSubtitleFuture,
     );
     if (!mounted) return;
-    if (audioSelection == null) {
+    if (subtitleSelection == null) {
       Navigator.pop(context, false);
       return;
     }
+    final subtitleTrack = subtitleSelection.track;
+    final externalSubtitle = subtitleSelection.externalTrack;
+    final subtitleContent = externalSubtitle == null
+        ? null
+        : await ExternalSubtitleService(_scraperApiUrl)
+            .downloadAndNormalizeForPlayback(externalSubtitle);
+    if (!mounted) return;
     final season = widget.metadata.seasonNumber ?? 0;
     final episode = widget.metadata.episodeNumber ?? 0;
     try {
@@ -1007,7 +1019,6 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
           maxVideoHeight: maxHeight,
           headers: headers,
-          audioTrack: audioSelection.track,
           streamIdentity: <String, Object?>{
             'server': selected.link.server?.trim().isNotEmpty == true
                 ? selected.link.server!.trim()
@@ -1030,6 +1041,9 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: subtitleTrack?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
+          subtitleTrackContent: subtitleContent,
+          audioLanguages: (widget.metadata.isAnime ? const <String>['ja', 'en'] : const <String>['en']),
+          expectedDurationMs: (widget.metadata.currentEpisodeRuntime != null && widget.metadata.currentEpisodeRuntime! > 0 ? widget.metadata.currentEpisodeRuntime! * 60 * 1000 : null),
         ),
       );
       onSelected?.call(selected);
@@ -1129,22 +1143,32 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     final maxHeight = selected.height ?? selected.adaptiveTargetHeight;
     final season = widget.metadata.seasonNumber ?? 0;
     final episode = widget.metadata.episodeNumber ?? 0;
-    final subtitleTrack = _preferredSubtitle(tvVideoSubs);
     try {
-      final audioSelection = await DownloadSelectionSheets.chooseAudio(
+      final externalSubtitleFuture = ExternalSubtitleService(_scraperApiUrl).fetchTVSubtitles(
+        widget.metadata.tvId ?? 0,
+        widget.metadata.seasonNumber ?? 0,
+        widget.metadata.episodeNumber ?? 0,
+        title: widget.metadata.seriesName,
+        year: int.tryParse(widget.metadata.airDate?.take(4) ?? ''),
+        preferredLanguageCode: context.read<SettingsProvider>().defaultSubtitleLanguage,
+      ).catchError((Object _) => <ExternalSubtitle>[]);
+      final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
         context,
-        tracks: OfflineDownloadService.instance.getAudioTracks(
-          url: url,
-          format: format,
-          headers: headers,
-          maxVideoHeight: maxHeight,
-        ),
+        tracks: tvVideoSubs ?? const <RegularSubtitleLinks>[],
+        externalTracks: externalSubtitleFuture,
       );
       if (!mounted) return;
-      if (audioSelection == null) {
+      if (subtitleSelection == null) {
         Navigator.pop(context, false);
         return;
       }
+      final subtitleTrack = subtitleSelection.track;
+      final externalSubtitle = subtitleSelection.externalTrack;
+      final subtitleContent = externalSubtitle == null
+          ? null
+          : await ExternalSubtitleService(_scraperApiUrl)
+              .downloadAndNormalizeForPlayback(externalSubtitle);
+      if (!mounted) return;
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
           id: 'tv_${widget.metadata.tvId}_s${season}_e$episode',

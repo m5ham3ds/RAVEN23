@@ -6081,6 +6081,21 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: subtitleTrack?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
+          audioLanguages: isMovie
+              ? (movie?.isAnimeContent == true
+                    ? const <String>['ja', 'en']
+                    : const <String>['en'])
+              : (episode?.isAnime == true
+                    ? const <String>['ja', 'en']
+                    : const <String>['en']),
+          expectedDurationMs: isMovie
+              ? (movie?.runtime != null && movie!.runtime! > 0
+                    ? movie.runtime! * 60 * 1000
+                    : null)
+              : (episode?.currentEpisodeRuntime != null &&
+                        episode!.currentEpisodeRuntime! > 0
+                    ? episode.currentEpisodeRuntime! * 60 * 1000
+                    : null),
         ),
       );
       settings.analytics.trackDownload(

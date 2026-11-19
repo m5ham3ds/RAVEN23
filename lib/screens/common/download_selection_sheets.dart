@@ -8,6 +8,7 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../mobile/widgets/page_kit.dart';
 import '../../models/offline_download.dart';
+import '../../models/external_subtitles.dart';
 import '../../functions/language_names.dart';
 import '../../video_providers/common.dart';
 import '../../video_providers/names.dart';
@@ -40,43 +41,102 @@ abstract final class DownloadSelectionSheets {
   static Future<DownloadSubtitleSelection?> chooseSubtitle(
     BuildContext context, {
     required List<RegularSubtitleLinks> tracks,
+    Future<List<ExternalSubtitle>>? externalTracks,
     bool inPlayer = false,
   }) {
     final unique = <RegularSubtitleLinks>[];
-    final seen = <String>{};
+    final seenUrls = <String>{};
     for (final track in tracks) {
       final url = track.url?.trim() ?? '';
-      if (url.isEmpty || !seen.add(url)) continue;
+      if (url.isEmpty || !seenUrls.add(url)) continue;
       unique.add(track);
     }
-    final choices = <_Choice<DownloadSubtitleSelection>>[
-      _Choice(
-        value: const DownloadSubtitleSelection(null),
-        title: tr('download_no_subtitles'),
-        subtitle: '',
-        icon: PhosphorIcons.closedCaptioning(),
-      ),
-      for (final track in unique)
+
+    Widget buildChoices(
+      BuildContext sheetContext,
+      List<ExternalSubtitle> external,
+    ) {
+      final seenExternal = <String>{};
+      final choices = <_Choice<DownloadSubtitleSelection>>[
         _Choice(
-          value: DownloadSubtitleSelection(track),
-          title: languageDisplayName(track.language) == ''
-              ? tr('not_available')
-              : languageDisplayName(track.language),
-          subtitle: track.language == null ? '' : track.language!,
+          value: const DownloadSubtitleSelection(null),
+          title: tr('download_no_subtitles'),
+          subtitle: '',
           icon: PhosphorIcons.closedCaptioning(),
         ),
-    ];
-    Widget builder(BuildContext context) => _ChoiceSheet<DownloadSubtitleSelection>(
-      title: tr('choose_subtitle_language'),
-      subtitle: tr('download_subtitle_description'),
-      choices: choices,
-    );
+        for (final track in unique)
+          _Choice(
+            value: DownloadSubtitleSelection(track),
+            title: languageDisplayName(track.language) == ''
+                ? tr('not_available')
+                : languageDisplayName(track.language),
+            subtitle: track.language == null ? '' : track.language!,
+            icon: PhosphorIcons.closedCaptioning(),
+          ),
+        for (final track in external)
+          if (track.url.trim().isNotEmpty && seenExternal.add(track.id))
+            _Choice(
+              value: DownloadSubtitleSelection.external(track),
+              title: '${languageDisplayName(track.language)} · ${track.source}',
+              subtitle: [
+                if (track.release.trim().isNotEmpty) track.release.trim(),
+                track.format.toUpperCase(),
+                if (track.isHearingImpaired) 'HI',
+              ].join(' · '),
+              icon: PhosphorIcons.closedCaptioning(),
+            ),
+      ];
+      return _ChoiceSheet<DownloadSubtitleSelection>(
+        title: tr('choose_subtitle_language'),
+        subtitle: tr('download_subtitle_description'),
+        choices: choices,
+      );
+    }
+
+    Widget builder(BuildContext sheetContext) {
+      final future = externalTracks;
+      if (future == null) return buildChoices(sheetContext, const []);
+      return FutureBuilder<List<ExternalSubtitle>>(
+        future: future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return PlayerSheetScaffold(
+              title: tr('choose_subtitle_language'),
+              subtitle: tr('download_subtitle_description'),
+              actions: [
+                PlayerSheetAction(
+                  icon: PhosphorIcons.x(),
+                  tooltip: tr('close'),
+                  onPressed: () => Navigator.pop(sheetContext),
+                ),
+              ],
+              child: const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          return buildChoices(
+            sheetContext,
+            snapshot.hasError
+                ? const <ExternalSubtitle>[]
+                : snapshot.data ?? const <ExternalSubtitle>[],
+          );
+        },
+      );
+    }
+
     return inPlayer
         ? showPlayerSheet<DownloadSubtitleSelection>(
             context: context,
             builder: builder,
           )
-        : showAppSheet<DownloadSubtitleSelection>(context, builder: builder);
+        : showAppSheet<DownloadSubtitleSelection>(
+            context,
+            builder: builder,
+          );
   }
 
   static Future<VideoProvider?> showProvider(
@@ -296,9 +356,13 @@ abstract final class DownloadSelectionSheets {
 }
 
 class DownloadSubtitleSelection {
-  const DownloadSubtitleSelection(this.track);
+  const DownloadSubtitleSelection(this.track) : externalTrack = null;
+
+  const DownloadSubtitleSelection.external(this.externalTrack)
+      : track = null;
 
   final RegularSubtitleLinks? track;
+  final ExternalSubtitle? externalTrack;
 }
 
 class DownloadAudioSelection {

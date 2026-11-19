@@ -27,12 +27,15 @@ import '../../models/genres.dart';
 import '../../models/images.dart';
 import '../../models/movie.dart';
 import '../../models/movie_stream_metadata.dart';
+import '../../models/offline_download.dart';
 import '../../models/tv.dart';
 import '../../models/videos.dart';
 import '../../provider/app_dependency_provider.dart';
 import '../../provider/recently_watched_provider.dart';
+import '../../provider/offline_download_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
+import '../../screens/common/offline_player_screen.dart';
 import '../../screens/movie/collection_detail.dart';
 import '../../screens/movie/movie_castandcrew.dart';
 import '../../screens/movie/movie_video_loader.dart';
@@ -342,6 +345,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
           : movieDetails?.genreIds,
       originalLanguage:
           item.movie?.originalLanguage ?? movieDetails?.originalLanguage,
+      runtime: movieDetails?.runtime,
       isAnime: movieDetails?.isLikelyAnime == true,
       languages: insights.languages,
       countries: insights.countries,
@@ -821,7 +825,20 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
         label: _playLabel(plan),
         resume: plan.resume,
         busy: _starting,
-        onPressed: () => _run(() => _playMovie(elapsed: plan.resume?.elapsed)),
+        onPressed: () => _run(() async {
+          final downloaded = context
+              .read<OfflineDownloadProvider>()
+              .downloadForId('movie_${_item.id}');
+          if (downloaded?.isComplete == true) {
+            await Navigator.of(context).push<void>(
+              MaterialPageRoute<void>(
+                builder: (_) => OfflinePlayerScreen(download: downloaded!),
+              ),
+            );
+            return;
+          }
+          await _playMovie(elapsed: plan.resume?.elapsed);
+        }),
       );
     }
     return FutureBuilder<TVDetails>(
@@ -861,23 +878,80 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     };
   }
 
+  Future<void> _showDownloadedActions(OfflineDownload download) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(tr('delete_download')),
+              onTap: () => Navigator.pop(sheetContext, 'delete'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: Text(tr('cancel')),
+              onTap: () => Navigator.pop(sheetContext, 'cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action != 'delete' || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('delete_download')),
+        content: Text(tr('confirm_delete_download')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(tr('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await context.read<OfflineDownloadProvider>().remove(download.id);
+    }
+  }
+
   Widget _downloadButton(BuildContext context) {
     final dependencies = context.watch<AppDependencyProvider?>();
+    final download = context.watch<OfflineDownloadProvider>()
+        .downloadForId('movie_${_item.id}');
     final released = DateTime.tryParse(_item.releaseDate ?? '') != null;
-    if (!(dependencies?.displayDownloadButton ?? false) || !released) {
+    if (!(dependencies?.displayDownloadButton ?? false) ||
+        (!released && download == null)) {
       return const SizedBox.shrink();
     }
+    final complete = download?.isComplete == true;
     return Padding(
       padding: const EdgeInsets.only(top: AppSpace.sm),
       child: SizedBox(
         width: double.infinity,
         child: PillButton(
-          label: tr('download_action'),
-          icon: PhosphorIcons.downloadSimple(),
+          label: complete
+              ? tr('download_status_completed')
+              : download?.isActive == true
+                  ? tr('download_status_downloading')
+                  : tr('download_action'),
+          icon: complete
+              ? PhosphorIcons.checkCircle()
+              : PhosphorIcons.downloadSimple(),
           height: 48,
           onPressed: _starting
               ? null
-              : () => _run(() => _playMovie(download: true)),
+              : complete
+                  ? () => _showDownloadedActions(download!)
+                  : () => _run(() => _playMovie(download: true)),
         ),
       ),
     );

@@ -46,6 +46,17 @@ class TVStreamMetadata {
     this.allSeasons,
     this.onSeasonChange,
   });
+
+  int? get currentEpisodeRuntime {
+    if (episodeRuntime != null) return episodeRuntime;
+    for (final episode in seasonEpisodes ?? const <EpisodeMetadata>[]) {
+      if (episode.episodeNumber == episodeNumber &&
+          episode.seasonNumber == seasonNumber) {
+        return episode.runtime;
+      }
+    }
+    return null;
+  }
 }
 
 // Metadata for each season
