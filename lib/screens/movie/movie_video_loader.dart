@@ -1244,27 +1244,6 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     }
   }
 
-  RegularSubtitleLinks? _preferredSubtitle(
-    List<RegularSubtitleLinks>? subtitles,
-  ) {
-    if (subtitles == null || subtitles.isEmpty) return null;
-    final preferred = settings.defaultSubtitleLanguage.toLowerCase();
-    for (final subtitle in subtitles) {
-      final language = subtitle.language?.toLowerCase() ?? '';
-      if (subtitle.url?.isNotEmpty == true &&
-          preferred.isNotEmpty &&
-          (language == preferred ||
-              language.startsWith(preferred) ||
-              (preferred == 'en' && language.startsWith('english')))) {
-        return subtitle;
-      }
-    }
-    return subtitles.cast<RegularSubtitleLinks?>().firstWhere(
-      (subtitle) => subtitle?.url?.isNotEmpty == true,
-      orElse: () => null,
-    );
-  }
-
   void _addSubtitles(List<RegularSubtitleLinks>? subtitleLinks) {
     if (subtitleLinks == null || subtitleLinks.isEmpty) return;
     final preferredLang = settings.defaultSubtitleLanguage.toLowerCase();

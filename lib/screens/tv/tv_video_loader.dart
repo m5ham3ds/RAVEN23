@@ -981,7 +981,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       widget.metadata.seasonNumber ?? 0,
       widget.metadata.episodeNumber ?? 0,
       title: widget.metadata.seriesName,
-      year: int.tryParse(widget.metadata.airDate?.take(4) ?? ''),
+      year: DateTime.tryParse(widget.metadata.airDate ?? '')?.year,
       preferredLanguageCode: context.read<SettingsProvider>().defaultSubtitleLanguage,
     ).catchError((Object _) => <ExternalSubtitle>[]);
     final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
@@ -1149,7 +1149,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         widget.metadata.seasonNumber ?? 0,
         widget.metadata.episodeNumber ?? 0,
         title: widget.metadata.seriesName,
-        year: int.tryParse(widget.metadata.airDate?.take(4) ?? ''),
+        year: DateTime.tryParse(widget.metadata.airDate ?? '')?.year,
         preferredLanguageCode: context.read<SettingsProvider>().defaultSubtitleLanguage,
       ).catchError((Object _) => <ExternalSubtitle>[]);
       final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
@@ -1243,27 +1243,6 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       );
       Navigator.pop(context, false);
     }
-  }
-
-  RegularSubtitleLinks? _preferredSubtitle(
-    List<RegularSubtitleLinks>? subtitles,
-  ) {
-    if (subtitles == null || subtitles.isEmpty) return null;
-    final preferred = settings.defaultSubtitleLanguage.toLowerCase();
-    for (final subtitle in subtitles) {
-      final language = subtitle.language?.toLowerCase() ?? '';
-      if (subtitle.url?.isNotEmpty == true &&
-          preferred.isNotEmpty &&
-          (language == preferred ||
-              language.startsWith(preferred) ||
-              (preferred == 'en' && language.startsWith('english')))) {
-        return subtitle;
-      }
-    }
-    return subtitles.cast<RegularSubtitleLinks?>().firstWhere(
-      (subtitle) => subtitle?.url?.isNotEmpty == true,
-      orElse: () => null,
-    );
   }
 
   void _addSubtitles(List<RegularSubtitleLinks>? subtitleLinks) {
