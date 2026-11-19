@@ -278,13 +278,21 @@ class StreamDownloadStore private constructor(context: Context) {
             // Prefer English when the manifest has it. When it does not,
             // Media3 falls back to the stream's declared default/original
             // language without asking the user to pick an audio track.
-            .setPreferredAudioLanguages("en")
+            .setPreferredAudioLanguages(*preferredAudioLanguages(arguments).toTypedArray())
             .apply {
                 if (maxVideoHeight != null) {
                     setMaxVideoSize(Int.MAX_VALUE, maxVideoHeight)
                 }
             }
             .build()
+    }
+
+    private fun preferredAudioLanguages(arguments: Map<*, *>): List<String> {
+        val configured = (arguments["audioLanguages"] as? List<*>)
+            ?.mapNotNull { (it as? String)?.trim()?.takeIf { language -> language.isNotEmpty() } }
+            ?.distinct()
+            .orEmpty()
+        return configured.ifEmpty { listOf("en") }
     }
 
     private fun createHelper(arguments: Map<*, *>, id: String, url: String, format: String): DownloadHelper {
@@ -374,6 +382,7 @@ class StreamDownloadStore private constructor(context: Context) {
             "episodeNumber" to metadata.optInt("episodeNumber").takeIf { it >= 0 },
             "offlineSubtitlePath" to metadata.optString("offlineSubtitlePath").ifBlank { null },
             "offlineSubtitleName" to metadata.optString("offlineSubtitleName").ifBlank { null },
+            "expectedDurationMs" to metadata.optLong("expectedDurationMs").takeIf { it > 0L },
             "streamIdentity" to metadata.optJSONObject("streamIdentity")?.let { identity ->
                 buildMap<String, Any?> {
                     val keys = identity.keys()
@@ -399,6 +408,8 @@ class StreamDownloadStore private constructor(context: Context) {
         put("posterUrl", arguments["posterUrl"] as? String ?: "")
         put("format", arguments["format"] as? String ?: "")
         put("maxVideoHeight", arguments["maxVideoHeight"] ?: JSONObject.NULL)
+        put("expectedDurationMs", (arguments["expectedDurationMs"] as? Number)?.toLong() ?: 0L)
+        put("audioLanguages", JSONArray(preferredAudioLanguages(arguments)))
         (arguments["streamIdentity"] as? Map<*, *>)?.let { rawIdentity ->
             val identity = JSONObject()
             rawIdentity.forEach { (key, value) ->
@@ -429,11 +440,18 @@ class StreamDownloadStore private constructor(context: Context) {
     }
 
     private fun downloadSubtitle(arguments: Map<*, *>, id: String, metadata: JSONObject) {
-        val url = arguments["subtitleTrackUrl"] as? String
-        if (url.isNullOrBlank()) return
+        val url = (arguments["subtitleTrackUrl"] as? String).orEmpty().trim()
+        val content = (arguments["subtitleTrackContent"] as? String).orEmpty()
+        if (url.isEmpty() && content.isBlank()) return
+        // Provider subtitles already arrive normalized to WebVTT. Keep their
+        // contents out of DownloadRequest.data and persist only a local file path.
+        if (content.toByteArray(StandardCharsets.UTF_8).size > MAX_SUBTITLE_BYTES) return
+
         val name = (arguments["subtitleTrackName"] as? String).orEmpty()
             .ifBlank { "Original subtitle" }
-        val extension = if (Uri.parse(url).path?.lowercase()?.endsWith(".srt") == true) {
+        val extension = if (content.isNotBlank()) {
+            "vtt"
+        } else if (Uri.parse(url).path?.lowercase()?.endsWith(".srt") == true) {
             "srt"
         } else {
             "vtt"
@@ -447,11 +465,15 @@ class StreamDownloadStore private constructor(context: Context) {
             }
         }
         try {
-            val dataSource = httpFactory(headers).createDataSource()
-            DataSourceInputStream(dataSource, DataSpec(Uri.parse(url))).use { input ->
-                output.outputStream().use(input::copyTo)
+            if (content.isNotBlank()) {
+                output.writeText(content, StandardCharsets.UTF_8)
+            } else {
+                val dataSource = httpFactory(headers).createDataSource()
+                DataSourceInputStream(dataSource, DataSpec(Uri.parse(url))).use { input ->
+                    output.outputStream().use(input::copyTo)
+                }
             }
-            if (output.length() > 0) {
+            if (output.length() > 0L) {
                 metadata.put("offlineSubtitlePath", output.absolutePath)
                 metadata.put("offlineSubtitleName", name)
             } else {
@@ -513,6 +535,8 @@ class StreamDownloadStore private constructor(context: Context) {
         fun get(context: Context): StreamDownloadStore = instance ?: synchronized(this) {
             instance ?: StreamDownloadStore(context).also { instance = it }
         }
+
+        private const val MAX_SUBTITLE_BYTES = 12 * 1024 * 1024
 
         fun requestMetadata(request: DownloadRequest): JSONObject = try {
             JSONObject(String(request.data, StandardCharsets.UTF_8))

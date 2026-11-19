@@ -1,6 +1,7 @@
 package com.m5ham3ds.raven23.downloads
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.os.Handler
 import android.os.Looper
 import android.text.format.Formatter
@@ -21,6 +22,7 @@ import androidx.media3.transformer.InAppMp4Muxer
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.CancellationException
 
 @UnstableApi
@@ -46,7 +48,7 @@ class StreamDownloadExporter(
         }
 
         val output = outputFile(download)
-        if (output.isFile && output.length() > 0) {
+        if (output.isFile && isValidExport(download, output)) {
             callback(Result.success(output))
             return
         }
@@ -54,6 +56,9 @@ class StreamDownloadExporter(
             callbacks.add(callback)
             return
         }
+        if (output.exists()) output.delete()
+        val temporary = temporaryFile(output)
+        temporary.delete()
         if (activeExportId != null) {
             callback(Result.failure(IllegalStateException("Another video is already being prepared.")))
             return
@@ -70,7 +75,7 @@ class StreamDownloadExporter(
 
         activeExportId = downloadId
         callbacks.add(callback)
-        startTransformer(download, output, inAppMuxer = false)
+        startTransformer(download, temporary, output, inAppMuxer = false)
     }
 
     /**
@@ -78,7 +83,12 @@ class StreamDownloadExporter(
      * HLS/DASH sample streams (it fails while writing or finalising the file),
      * so a muxing failure is retried once with Media3's own MP4 muxer.
      */
-    private fun startTransformer(download: Download, output: File, inAppMuxer: Boolean) {
+    private fun startTransformer(
+        download: Download,
+        temporary: File,
+        output: File,
+        inAppMuxer: Boolean,
+    ) {
         val downloadId = download.request.id
         val mediaSourceFactory = DefaultMediaSourceFactory(store.readOnlyCacheFactory(download.request))
         val assetLoaderFactory = DefaultAssetLoaderFactory(
@@ -90,6 +100,22 @@ class StreamDownloadExporter(
         )
         val listener = object : Transformer.Listener {
             override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                val validationError = validateExport(download, temporary)
+                if (validationError != null) {
+                    temporary.delete()
+                    finish(Result.failure(validationError))
+                    return
+                }
+                if (output.exists() && !output.delete()) {
+                    temporary.delete()
+                    finish(Result.failure(IOException("Could not replace the previous offline video.")))
+                    return
+                }
+                if (!temporary.renameTo(output)) {
+                    temporary.delete()
+                    finish(Result.failure(IOException("Could not finalize the offline video file.")))
+                    return
+                }
                 finish(Result.success(output))
             }
 
@@ -98,7 +124,7 @@ class StreamDownloadExporter(
                 exportResult: ExportResult,
                 exportException: ExportException,
             ) {
-                output.delete()
+                temporary.delete()
                 Log.e(
                     TAG,
                     "Export of $downloadId failed with the " +
@@ -110,7 +136,7 @@ class StreamDownloadExporter(
                     // Start the retry outside the failed Transformer's callback.
                     mainHandler.post {
                         if (activeExportId == downloadId) {
-                            startTransformer(download, output, inAppMuxer = true)
+                            startTransformer(download, temporary, output, inAppMuxer = true)
                         }
                     }
                     return
@@ -128,7 +154,7 @@ class StreamDownloadExporter(
                 .build()
                 .also { it.start(download.request.toMediaItem(), output.absolutePath) }
         } catch (error: Exception) {
-            output.delete()
+            temporary.delete()
             finish(Result.failure(describeFailure(download, error)))
         }
     }
@@ -138,8 +164,9 @@ class StreamDownloadExporter(
             activeTransformer?.cancel()
             finish(Result.failure(CancellationException("Video export was cancelled.")))
         }
+        val suffix = "-${Integer.toHexString(downloadId.hashCode())}.mp4"
         exportDirectory.listFiles()
-            ?.filter { it.name.endsWith("-${Integer.toHexString(downloadId.hashCode())}.mp4") }
+            ?.filter { it.name.endsWith(suffix) || it.name.endsWith(suffix.removeSuffix(".mp4") + ".part.mp4") }
             ?.forEach(File::delete)
     }
 
@@ -216,6 +243,57 @@ class StreamDownloadExporter(
         errorCode == ExportException.ERROR_CODE_MUXING_FAILED ||
             errorCode == ExportException.ERROR_CODE_MUXING_TIMEOUT
 
+    private fun temporaryFile(output: File): File =
+        File(output.parentFile, output.name.removeSuffix(".mp4") + ".part.mp4")
+
+    private fun validateExport(download: Download, file: File): Exception? {
+        if (isValidExport(download, file)) return null
+        val expectedMs = StreamDownloadStore.requestMetadata(download.request)
+            .optLong("expectedDurationMs", 0L)
+        val message = if (expectedMs > 0L) {
+            "The offline video is incomplete. Expected about ${expectedMs / 60000L} minutes; " +
+                "the exported file is shorter or unreadable. Retry the download before playing it."
+        } else {
+            "The offline video file is incomplete or unreadable. Retry the download before playing it."
+        }
+        return StreamDownloadExportException("EXPORT_INCOMPLETE", message, null)
+    }
+
+    private fun isValidExport(download: Download, file: File): Boolean {
+        if (!file.isFile || file.length() < MIN_VALID_MP4_BYTES) return false
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(file.absolutePath)
+            val durationMs = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_DURATION,
+            )?.toLongOrNull() ?: return false
+            val width = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH,
+            )?.toIntOrNull() ?: 0
+            val height = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT,
+            )?.toIntOrNull() ?: 0
+            if (durationMs <= 0L || width <= 0 || height <= 0) {
+                false
+            } else {
+                val expectedMs = StreamDownloadStore.requestMetadata(download.request)
+                    .optLong("expectedDurationMs", 0L)
+                if (expectedMs <= 0L) true
+                else {
+                    val minimumDurationMs = maxOf(
+                        (expectedMs * MIN_EXPECTED_DURATION_RATIO).toLong(),
+                        expectedMs - MAX_EXPECTED_DURATION_SHORTFALL_MS,
+                    )
+                    durationMs >= minimumDurationMs
+                }
+            }
+        } catch (_: Exception) {
+            false
+        } finally {
+            runCatching { retriever.release() }
+        }
+    }
+
     private fun outputFile(download: Download): File {
         val metadata = StreamDownloadStore.requestMetadata(download.request)
         val title = metadata.optString("title", "RAVEN23 video")
@@ -230,6 +308,9 @@ class StreamDownloadExporter(
     private companion object {
         const val TAG = "StreamDownloadExporter"
         const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
+        const val MIN_VALID_MP4_BYTES = 16L * 1024
+        const val MIN_EXPECTED_DURATION_RATIO = 0.90
+        const val MAX_EXPECTED_DURATION_SHORTFALL_MS = 2L * 60L * 1000L
     }
 }
 
