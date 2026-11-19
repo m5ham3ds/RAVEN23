@@ -17,10 +17,13 @@ import '../../models/credits.dart';
 import '../../models/genres.dart';
 import '../../models/images.dart';
 import '../../models/tv.dart';
+import '../../models/offline_download.dart';
 import '../../provider/app_dependency_provider.dart';
+import '../../provider/offline_download_provider.dart';
 import '../../provider/recently_watched_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../screens/common/photoview.dart';
+import '../../screens/common/offline_player_screen.dart';
 import '../../services/ambient_theme_service.dart';
 import '../../services/media_link.dart';
 import '../episode_playback.dart';
@@ -191,7 +194,66 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     }
   }
 
+  String get _downloadId =>
+      'tv_${_seriesId}_s${_seasonNumber ?? 0}_e${_number ?? 0}';
+
+  Future<void> _showDownloadedActions(OfflineDownload download) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: Text(tr('delete_download')),
+              onTap: () => Navigator.pop(sheetContext, 'delete'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: Text(tr('cancel')),
+              onTap: () => Navigator.pop(sheetContext, 'cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action != 'delete' || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('delete_download')),
+        content: Text(tr('confirm_delete_download')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(tr('delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await context.read<OfflineDownloadProvider>().remove(download.id);
+    }
+  }
+
   Future<void> _play({bool download = false}) async {
+    if (!download) {
+      final local = context.read<OfflineDownloadProvider>().downloadForId(_downloadId);
+      if (local?.isComplete == true) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => OfflinePlayerScreen(download: local!),
+          ),
+        );
+        return;
+      }
+    }
     final episode = _episode;
     final series = await _quietly(_series);
     final genres = await _quietly(_genres) ?? const <Genres>[];
@@ -355,8 +417,14 @@ class _EpisodeScreenState extends State<EpisodeScreen>
     final now = widget.now?.call() ?? DateTime.now();
     final aired = hasAired(_episode, now: now);
     final airDate = DateTime.tryParse(_episode.airDate ?? '');
-    final canPlay = (dependencies?.displayWatchNowButton ?? true) && aired;
-    final canDownload = (dependencies?.displayDownloadButton ?? false) && aired;
+    final downloaded = context.watch<OfflineDownloadProvider>()
+        .downloadForId(_downloadId);
+    final isDownloaded = downloaded?.isComplete == true;
+    final isDownloading = downloaded?.isActive == true;
+    final canPlay = (dependencies?.displayWatchNowButton ?? true) &&
+        (aired || isDownloaded);
+    final canDownload = (dependencies?.displayDownloadButton ?? false) &&
+        (aired || downloaded != null);
     final resume = episodeResume(
       history.episodes,
       seriesId: _seriesId,
@@ -415,11 +483,19 @@ class _EpisodeScreenState extends State<EpisodeScreen>
             ),
           if (canDownload)
             DetailsSecondaryButton(
-              label: tr('download_action'),
-              icon: PhosphorIcons.downloadSimple(),
-              onPressed: _starting
+              label: isDownloaded
+                  ? tr('download_status_completed')
+                  : isDownloading
+                      ? tr('download_status_downloading')
+                      : tr('download_action'),
+              icon: isDownloaded
+                  ? PhosphorIcons.checkCircle()
+                  : PhosphorIcons.downloadSimple(),
+              onPressed: _starting || (isDownloading && !isDownloaded)
                   ? null
-                  : () => _run(() => _play(download: true)),
+                  : isDownloaded
+                      ? () => _showDownloadedActions(downloaded!)
+                      : () => _run(() => _play(download: true)),
             ),
           if ((_episode.overview ?? '').trim().isNotEmpty) ...<Widget>[
             const SizedBox(height: AppSpace.lg),

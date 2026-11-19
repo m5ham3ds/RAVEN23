@@ -422,6 +422,19 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
       details = await _series;
     } catch (_) {}
     if (!mounted) return;
+    if (!download) {
+      final local = context.read<OfflineDownloadProvider>().downloadForId(
+        'tv_${_item.id}_s${episode.seasonNumber ?? 0}_e${episode.episodeNumber ?? 0}',
+      );
+      if (local?.isComplete == true) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => OfflinePlayerScreen(download: local!),
+          ),
+        );
+        return;
+      }
+    }
     await playEpisode(
       context,
       series: _item,

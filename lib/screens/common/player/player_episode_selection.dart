@@ -178,6 +178,7 @@ class PlayerEpisodeSelection {
                                             seriesName: tvMetadata.seriesName,
                                             tvId: tvMetadata.tvId,
                                             airDate: episode.airDate,
+                                            episodeRuntime: episode.runtime,
                                             genreIds: tvMetadata.genreIds,
                                             isAnime: tvMetadata.isAnime,
                                             seasonEpisodes: episodes,
