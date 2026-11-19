@@ -98,6 +98,16 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun offlineExportRejectsShortSegmentsButAllowsSmallRuntimeDifferences() {
+        assertTrue(isOfflineExportDurationComplete(2_880_000L, 2_880_000L))
+        assertTrue(isOfflineExportDurationComplete(2_600_000L, 2_880_000L))
+        assertFalse(isOfflineExportDurationComplete(60_000L, 2_880_000L))
+        assertFalse(isOfflineExportDurationComplete(0L, 2_880_000L))
+        assertTrue(isOfflineExportDurationComplete(180_000L, 0L))
+        assertFalse(isOfflineExportDurationComplete(-1L, 0L))
+    }
+
+    @Test
     fun playerReflectionTargetsStillExist() {
         val store = StreamDownloadStore::class.java
         assertEquals(

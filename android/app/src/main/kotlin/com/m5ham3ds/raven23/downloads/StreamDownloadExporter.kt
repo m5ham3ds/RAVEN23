@@ -25,6 +25,19 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.CancellationException
 
+internal fun isOfflineExportDurationComplete(
+    actualDurationMs: Long,
+    expectedDurationMs: Long,
+): Boolean {
+    if (actualDurationMs <= 0L) return false
+    if (expectedDurationMs <= 0L) return true
+    val minimumDurationMs = maxOf(
+        (expectedDurationMs * 0.90).toLong(),
+        expectedDurationMs - 2L * 60L * 1000L,
+    )
+    return actualDurationMs >= minimumDurationMs
+}
+
 @UnstableApi
 class StreamDownloadExporter(
     context: Context,
@@ -152,7 +165,7 @@ class StreamDownloadExporter(
                 .apply { if (inAppMuxer) setMuxerFactory(InAppMp4Muxer.Factory()) }
                 .addListener(listener)
                 .build()
-                .also { it.start(download.request.toMediaItem(), output.absolutePath) }
+                .also { it.start(download.request.toMediaItem(), temporary.absolutePath) }
         } catch (error: Exception) {
             temporary.delete()
             finish(Result.failure(describeFailure(download, error)))
@@ -278,14 +291,7 @@ class StreamDownloadExporter(
             } else {
                 val expectedMs = StreamDownloadStore.requestMetadata(download.request)
                     .optLong("expectedDurationMs", 0L)
-                if (expectedMs <= 0L) true
-                else {
-                    val minimumDurationMs = maxOf(
-                        (expectedMs * MIN_EXPECTED_DURATION_RATIO).toLong(),
-                        expectedMs - MAX_EXPECTED_DURATION_SHORTFALL_MS,
-                    )
-                    durationMs >= minimumDurationMs
-                }
+                isOfflineExportDurationComplete(durationMs, expectedMs)
             }
         } catch (_: Exception) {
             false
@@ -309,8 +315,6 @@ class StreamDownloadExporter(
         const val TAG = "StreamDownloadExporter"
         const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
         const val MIN_VALID_MP4_BYTES = 16L * 1024
-        const val MIN_EXPECTED_DURATION_RATIO = 0.90
-        const val MAX_EXPECTED_DURATION_SHORTFALL_MS = 2L * 60L * 1000L
     }
 }
 
