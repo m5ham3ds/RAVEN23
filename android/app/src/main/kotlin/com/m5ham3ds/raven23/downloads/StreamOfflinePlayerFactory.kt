@@ -52,6 +52,7 @@ private class StreamOfflinePlayerView(
     )
     private val mainHandler = Handler(Looper.getMainLooper())
     private var eventSink: EventChannel.EventSink? = null
+    private var startupError: String? = null
     private val playerView = PlayerView(context).apply {
         setBackgroundColor(Color.BLACK)
         setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
@@ -98,7 +99,12 @@ private class StreamOfflinePlayerView(
         eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                 eventSink = events
-                emit("snapshot")
+                val startupFailure = startupError
+                if (startupFailure != null) {
+                    emit("error", startupFailure)
+                } else {
+                    emit("snapshot")
+                }
                 mainHandler.removeCallbacks(progressUpdates)
                 mainHandler.post(progressUpdates)
             }
@@ -151,8 +157,11 @@ private class StreamOfflinePlayerView(
             player.prepare()
             player.playWhenReady = true
         } catch (error: Exception) {
-            emit("error", error.message ?: "The downloaded video could not be opened.")
-            throw error
+            // Keep the PlatformView alive so its EventChannel can report a
+            // visible offline-player error instead of leaving Flutter waiting
+            // for a platform-view creation that failed before the stream bound.
+            startupError = error.message
+                ?: "The downloaded video could not be opened."
         }
     }
 
