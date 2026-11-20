@@ -24,7 +24,6 @@ import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.IOException
-import java.util.Locale
 import java.util.concurrent.CancellationException
 
 internal const val OFFLINE_EXPORT_TIMEOUT_MS = 30L * 60L * 1000L
