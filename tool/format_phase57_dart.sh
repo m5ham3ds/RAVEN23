@@ -142,6 +142,11 @@ files=(
   lib/screens/common/about.dart
   lib/screens/common/bookmark_screen.dart
   lib/screens/common/download_selection_sheets.dart
+  lib/screens/common/offline_storage_preflight.dart
+  lib/services/download_size_estimate_controller.dart
+  lib/services/offline_download_service.dart
+  lib/provider/offline_download_provider.dart
+  lib/models/offline_download.dart
   lib/screens/common/downloads_screen.dart
   lib/screens/common/offline_player_screen.dart
   lib/screens/common/embedded_web_playback_screen.dart
