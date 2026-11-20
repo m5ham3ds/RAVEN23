@@ -376,13 +376,18 @@ class StreamDownloadStore private constructor(context: Context) {
             "bytesDownloaded" to download.bytesDownloaded,
             "contentLength" to download.contentLength,
             "createdAt" to download.startTimeMs,
-            "error" to if (download.state == Download.STATE_FAILED) "The download failed. Retry to try again." else null,
+            "error" to when {
+                download.state == Download.STATE_FAILED -> "The download failed. Retry to try again."
+                download.stopReason == STORAGE_LOW_STOP_REASON -> "Paused automatically: free storage reached 200 MB. Free space and tap Resume."
+                else -> null
+            },
             "contentId" to metadata.optInt("contentId").takeIf { it > 0 },
             "seasonNumber" to metadata.optInt("seasonNumber").takeIf { it >= 0 },
             "episodeNumber" to metadata.optInt("episodeNumber").takeIf { it >= 0 },
             "offlineSubtitlePath" to metadata.optString("offlineSubtitlePath").ifBlank { null },
             "offlineSubtitleName" to metadata.optString("offlineSubtitleName").ifBlank { null },
             "expectedDurationMs" to metadata.optLong("expectedDurationMs").takeIf { it > 0L },
+            "estimatedDownloadBytes" to metadata.optLong("estimatedDownloadBytes").takeIf { it > 0L },
             "streamIdentity" to metadata.optJSONObject("streamIdentity")?.let { identity ->
                 buildMap<String, Any?> {
                     val keys = identity.keys()
@@ -409,6 +414,7 @@ class StreamDownloadStore private constructor(context: Context) {
         put("format", arguments["format"] as? String ?: "")
         put("maxVideoHeight", arguments["maxVideoHeight"] ?: JSONObject.NULL)
         put("expectedDurationMs", (arguments["expectedDurationMs"] as? Number)?.toLong() ?: 0L)
+        put("estimatedDownloadBytes", (arguments["estimatedDownloadBytes"] as? Number)?.toLong() ?: 0L)
         put("audioLanguages", JSONArray(preferredAudioLanguages(arguments)))
         (arguments["streamIdentity"] as? Map<*, *>)?.let { rawIdentity ->
             val identity = JSONObject()
