@@ -109,6 +109,7 @@ class OfflineDownload {
     this.offlineSubtitleName,
     this.audioTrackName,
     this.expectedDurationMs,
+    this.estimatedDownloadBytes,
     this.streamIdentity = const <String, Object?>{},
   });
 
@@ -133,6 +134,8 @@ class OfflineDownload {
   final String? audioTrackName;
   /// Expected media duration, in milliseconds, used to reject truncated exports.
   final int? expectedDurationMs;
+  /// Signed backend estimate for the selected download quality, in bytes.
+  final int? estimatedDownloadBytes;
   final Map<String, Object?> streamIdentity;
 
   bool get isComplete => state == OfflineDownloadState.completed;
@@ -175,6 +178,7 @@ class OfflineDownload {
       offlineSubtitleName: offlineSubtitleName,
       audioTrackName: audioTrackName,
       expectedDurationMs: expectedDurationMs,
+      estimatedDownloadBytes: estimatedDownloadBytes,
       streamIdentity: streamIdentity,
     );
   }
@@ -217,6 +221,7 @@ class OfflineDownload {
       offlineSubtitleName: value<String>('offlineSubtitleName'),
       audioTrackName: value<String>('audioTrackName'),
       expectedDurationMs: value<num>('expectedDurationMs')?.toInt(),
+      estimatedDownloadBytes: value<num>('estimatedDownloadBytes')?.toInt(),
       streamIdentity: streamIdentity,
     );
   }
@@ -257,6 +262,7 @@ class OfflineDownloadRequest {
     this.audioTrack,
     this.audioLanguages = const <String>['en'],
     this.expectedDurationMs,
+    this.estimatedDownloadBytes,
     this.subtitleTrackContent,
     this.source,
     this.streamIdentity = const <String, Object?>{},
@@ -282,6 +288,8 @@ class OfflineDownloadRequest {
   /// Language priority for automatic track selection (Japanese then English for anime).
   final List<String> audioLanguages;
   final int? expectedDurationMs;
+  /// Signed backend estimate for the selected download quality, in bytes.
+  final int? estimatedDownloadBytes;
   /// A normalized WebVTT subtitle selected from an external subtitle catalogue.
   final String? subtitleTrackContent;
   final OfflineDownloadSource? source;
@@ -304,6 +312,7 @@ class OfflineDownloadRequest {
         'audioTrackName': audioTrack?.name,
         'audioLanguages': audioLanguages,
         'expectedDurationMs': expectedDurationMs,
+        'estimatedDownloadBytes': estimatedDownloadBytes,
         'subtitleTrackContent': subtitleTrackContent,
         'source': source?.toMap(),
         'streamIdentity': streamIdentity,
