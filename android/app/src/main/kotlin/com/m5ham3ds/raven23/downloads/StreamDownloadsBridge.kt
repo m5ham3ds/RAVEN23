@@ -37,7 +37,6 @@ class StreamDownloadsBridge(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var eventSink: EventChannel.EventSink? = null
     private var polling = false
-    private var pendingSave: PendingSave? = null
     private val pendingEnqueues = mutableMapOf<String, Any>()
 
     init {
@@ -329,27 +328,6 @@ class StreamDownloadsBridge(
             return
         }
         runResult(result) { exporter.progress(id) }
-    }
-
-    private fun exportForDocument(call: MethodCall, result: MethodChannel.Result) {
-        if (pendingSave != null) {
-            result.error("SAVE_IN_PROGRESS", "A save location is already being selected.", null)
-            return
-        }
-        withExportedFile(call, result) { file ->
-            pendingSave = PendingSave(file, result)
-            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = "video/mp4"
-                putExtra(Intent.EXTRA_TITLE, file.name)
-            }
-            try {
-                activity.startActivityForResult(intent, SAVE_COPY_REQUEST)
-            } catch (error: Exception) {
-                pendingSave = null
-                result.error("FILE_PICKER_UNAVAILABLE", error.message, null)
-            }
-        }
     }
 
     private fun withExportedFile(
@@ -648,8 +626,4 @@ class StreamDownloadsBridge(
         private const val COPY_BUFFER_BYTES = 1024 * 1024
     }
 
-    private data class PendingSave(
-        val file: File,
-        val result: MethodChannel.Result,
-    )
 }
