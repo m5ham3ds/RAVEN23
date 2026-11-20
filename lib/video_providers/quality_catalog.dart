@@ -41,8 +41,12 @@ class QualityCatalogEntry {
   final bool isAdaptive;
   final int? estimatedSizeBytes;
 
-  String get sizeEstimateKey =>
-      '$sourceProviderCode:::$sourceKey:::$qualityLabel';
+  /// Includes the exact signed token so a refreshed/mutated link cannot reuse
+  /// an estimate calculated for a different media object or quality.
+  String get sizeEstimateKey {
+    final token = link.sizeToken?.trim() ?? '';
+    return '$sourceProviderCode:::$sourceKey:::$qualityLabel:::$token';
+  }
 
   QualityCatalogEntry withEstimatedSize(int? bytes) => QualityCatalogEntry(
     providerCode: providerCode,
