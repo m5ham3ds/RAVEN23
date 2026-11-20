@@ -451,7 +451,7 @@ class StreamDownloadStore private constructor(context: Context) {
 
     fun subtitleFileForExport(id: String): File? =
         listOf("vtt", "srt").asSequence()
-            .map(::subtitleFile)
+            .map { extension -> subtitleFile(id, extension) }
             .firstOrNull { it.isFile && it.length() > 0L }
 
     fun deleteSubtitle(id: String) {
