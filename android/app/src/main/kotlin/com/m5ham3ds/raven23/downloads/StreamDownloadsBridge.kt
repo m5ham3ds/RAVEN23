@@ -117,27 +117,29 @@ class StreamDownloadsBridge(
                     val isMovie = metadata.optString("mediaType").equals("movie", true)
                     val rawTitle = metadata.optString("exportTitle")
                         .ifBlank { metadata.optString("title", "RAVEN23 video") }
-                    val stem = buildExportStem(
-                        rawTitle,
+                    val baseStem = sanitizeOfflineExportTitle(rawTitle)
+                    val fileStem = buildOfflineExportStem(
+                        baseStem,
                         isMovie,
                         metadata.optInt("seasonNumber", -1),
                         metadata.optInt("episodeNumber", -1),
+                        metadata.optString("subtitle"),
                     )
-                    val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$stem"
-                    val videoUri = savePublicFile(video, stem, "video/mp4", videoFolder)
+                    val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$baseStem"
+                    val videoUri = savePublicFile(video, fileStem, "video/mp4", videoFolder)
                     val subtitle = store.subtitleFileForExport(downloadId)
                     val subtitleUri = subtitle?.let {
                         val subtitleFolder = if (isMovie) {
                             "RAVEN23/MOVIES/SUBTITLE"
                         } else {
-                            "RAVEN23/$stem/SUBTITLE"
+                            "RAVEN23/$baseStem/SUBTITLE"
                         }
                         val mime = if (it.extension.equals("srt", true)) {
                             "application/x-subrip"
                         } else {
                             "text/vtt"
                         }
-                        savePublicFile(it, stem, mime, subtitleFolder, it.extension.lowercase(Locale.ROOT))
+                        savePublicFile(it, fileStem, mime, subtitleFolder, it.extension.lowercase(Locale.ROOT))
                     }
                     mainHandler.post {
                         result.success(mapOf(
@@ -154,16 +156,38 @@ class StreamDownloadsBridge(
         }
     }
 
-    private fun buildExportStem(rawTitle: String, isMovie: Boolean, season: Int, episode: Int): String {
-        val safeTitle = rawTitle.trim()
-            .replace(Regex("[\\\\/:*?\\\"<>|\\p{Cntrl}]"), "_")
-            .replace(Regex("\\s+"), " ")
+    internal fun buildOfflineExportStem(
+        title: String,
+        isMovie: Boolean,
+        season: Int,
+        episode: Int,
+        episodeLabel: String = "",
+    ): String {
+        val seasonEpisode = if (season >= 0 && episode >= 0) {
+            "S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
+        } else {
+            ""
+        }
+        if (isMovie || seasonEpisode.isEmpty()) return title
+        val label = episodeLabel
+            .substringAfter(" • ", "")
+            .substringBefore(" • ")
+            .trim()
+            .takeIf { it.isNotEmpty() && !it.startsWith("From ", true) }
+        return listOf(title, seasonEpisode, label)
+            .filterNotNull()
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" - ")
+    }
+
+    internal fun sanitizeOfflineExportTitle(value: String): String =
+        value.trim()
+            .replace(Regex("[\\\\/:*?\\\"<>|\\\\p{Cntrl}]"), "_")
+            .replace(Regex("\\\\s+"), " ")
             .trim(' ', '.')
             .take(120)
             .ifBlank { "RAVEN23 video" }
-        return if (isMovie || season < 0 || episode < 0) safeTitle
-        else "$safeTitle - S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
-    }
 
     private fun savePublicFile(
         source: File,
