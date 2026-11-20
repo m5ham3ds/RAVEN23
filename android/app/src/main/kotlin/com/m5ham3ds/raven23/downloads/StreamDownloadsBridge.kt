@@ -266,14 +266,42 @@ class StreamDownloadsBridge(
                 MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             }
             val resolver = appContext.contentResolver
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/$relativeFolder")
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            val relativePath = "Documents/$relativeFolder"
+            val existing = resolver.query(
+                collection,
+                arrayOf(MediaStore.MediaColumns._ID),
+                "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} = ?",
+                arrayOf(fileName, relativePath),
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    android.content.ContentUris.withAppendedId(
+                        collection,
+                        cursor.getLong(0),
+                    )
+                } else {
+                    null
+                }
             }
-            val uri = resolver.insert(collection, values)
-                ?: throw IllegalStateException("Could not create Documents/$relativeFolder/$fileName")
+            val uri = existing ?: resolver.insert(
+                collection,
+                ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                },
+            ) ?: throw IllegalStateException("Could not create $relativePath/$fileName")
+            if (existing != null) {
+                resolver.update(
+                    uri,
+                    ContentValues().apply {
+                        put(MediaStore.MediaColumns.IS_PENDING, 1)
+                    },
+                    null,
+                    null,
+                )
+            }
             try {
                 val output = resolver.openOutputStream(uri, "w")
                     ?: throw IllegalStateException("Could not open $fileName for writing")
