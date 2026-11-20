@@ -108,6 +108,14 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     _nativePositionMs =
         (event['positionMs'] as num?)?.toInt() ?? _nativePositionMs;
     switch (type) {
+      case 'snapshot':
+      case 'progress':
+        // The native view sends a snapshot as soon as EventChannel attaches.
+        // It may already be READY before Flutter subscribes to later state changes.
+        _nativeReady = true;
+        if (event['isPlaying'] == true) {
+          _wellnessTracker.play();
+        }
       case 'playing':
         _wellnessTracker.play();
       case 'paused':
