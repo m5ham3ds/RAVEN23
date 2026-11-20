@@ -470,8 +470,8 @@ class UnifiedSourceService {
                 !disabledDefaults.contains(source.stableKey)),
       );
       await _priorityManager.setPriorityKeys(category, preferredKeys);
-      // Preserve the existing recovery lane. On a genuinely new install its
-      // key remains empty until the real-playback promotion policy populates it.
+      // BACKUP remains its independent automatic recovery lane; it is filled
+      // only by sustained real-playback evidence, never by this migration.
     }
     await _priorityManager.markInitialized();
     return true;
