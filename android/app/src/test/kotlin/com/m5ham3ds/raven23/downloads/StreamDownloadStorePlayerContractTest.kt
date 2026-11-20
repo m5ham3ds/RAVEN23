@@ -235,6 +235,50 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun progressiveCacheExportRequiresACompletedMp4WithMatchingByteCount() {
+        assertTrue(
+            canCopyProgressiveMp4FromCache(
+                state = Download.STATE_COMPLETED,
+                mimeType = MimeTypes.VIDEO_MP4,
+                contentLength = 120L,
+                bytesDownloaded = 120L,
+            ),
+        )
+        assertFalse(
+            canCopyProgressiveMp4FromCache(
+                state = Download.STATE_DOWNLOADING,
+                mimeType = MimeTypes.VIDEO_MP4,
+                contentLength = 120L,
+                bytesDownloaded = 120L,
+            ),
+        )
+        assertFalse(
+            canCopyProgressiveMp4FromCache(
+                state = Download.STATE_COMPLETED,
+                mimeType = MimeTypes.APPLICATION_M3U8,
+                contentLength = 120L,
+                bytesDownloaded = 120L,
+            ),
+        )
+        assertFalse(
+            canCopyProgressiveMp4FromCache(
+                state = Download.STATE_COMPLETED,
+                mimeType = MimeTypes.VIDEO_MP4,
+                contentLength = 120L,
+                bytesDownloaded = 119L,
+            ),
+        )
+        assertFalse(
+            canCopyProgressiveMp4FromCache(
+                state = Download.STATE_COMPLETED,
+                mimeType = MimeTypes.VIDEO_MP4,
+                contentLength = -1L,
+                bytesDownloaded = 120L,
+            ),
+        )
+    }
+
+    @Test
     fun playerReflectionTargetsStillExist() {
         val store = StreamDownloadStore::class.java
         assertEquals(
