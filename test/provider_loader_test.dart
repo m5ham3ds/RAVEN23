@@ -191,36 +191,34 @@ void main() {
     expect(selection?.provider, animeOnly);
   });
 
-  test('first provider success never starts backup requests', () async {
-    final firstResult = Completer<ProviderLoadResult>();
+  test('three providers start together and first success cancels queued work', () async {
+    final firstBatch = List.generate(3, (_) => Completer<ProviderLoadResult>());
     final startedProviders = <String>[];
     final completedProviders = <String>[];
-    final result = playableResult();
-
     final selectionFuture = ProviderLoader.loadFirstSuccessful(
       providers: providers,
       load: (provider) {
         startedProviders.add(provider.apiId!);
-        return firstResult.future;
+        return firstBatch[int.parse(provider.apiId!)].future;
       },
       onResult: (_, provider, __) => completedProviders.add(provider.apiId!),
     );
 
     await Future<void>.delayed(Duration.zero);
-    expect(startedProviders, ['0']);
+    expect(startedProviders, ['0', '1', '2']);
     expect(completedProviders, isEmpty);
 
-    firstResult.complete(result);
+    final result = playableResult();
+    firstBatch[1].complete(result);
     final selection = await selectionFuture;
 
-    expect(selection?.index, 0);
-    expect(selection?.provider, providers.first);
+    expect(selection?.provider, providers[1]);
     expect(selection?.result, same(result));
-    expect(startedProviders, ['0']);
-    expect(completedProviders, ['0']);
+    expect(startedProviders, ['0', '1', '2']);
+    expect(completedProviders, contains('1'));
   });
 
-  test('each fallback waits for the previous provider to fail', () async {
+  test('three-worker scan continues to the next batch after failures', () async {
     final results = List.generate(5, (_) => Completer<ProviderLoadResult>());
     final startedProviders = <String>[];
     final completedIndexes = <int>[];
@@ -235,21 +233,17 @@ void main() {
     );
 
     await Future<void>.delayed(Duration.zero);
-    expect(startedProviders, ['0']);
-
+    expect(startedProviders, ['0', '1', '2']);
     for (var index = 0; index < 3; index++) {
       results[index].complete(const ProviderLoadResult(errorMessage: 'Failed'));
-      await Future<void>.delayed(Duration.zero);
-      expect(startedProviders, [for (var i = 0; i <= index + 1; i++) '$i']);
-      expect(completedIndexes, [for (var i = 0; i <= index; i++) i]);
     }
+    await Future<void>.delayed(Duration.zero);
+    expect(startedProviders, ['0', '1', '2', '3', '4']);
 
-    results[3].complete(playableResult());
+    results[4].complete(playableResult());
     final selection = await selectionFuture;
-    expect(selection?.index, 3);
-    expect(selection?.provider, providers[3]);
-    expect(startedProviders, ['0', '1', '2', '3']);
-    expect(completedIndexes, [0, 1, 2, 3]);
+    expect(selection?.provider, providers[4]);
+    expect(completedIndexes.toSet(), containsAll(<int>[0, 1, 2, 4]));
   });
 
   test(
