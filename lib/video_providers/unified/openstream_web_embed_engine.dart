@@ -104,8 +104,9 @@ class OpenStreamWebEmbedSourceEngine extends SourceEngine {
     required MediaIdentity media,
     String? preferredAudioLanguage,
     CancelToken? cancelToken,
-  }) async {
-    if (!Platform.isAndroid) {
+  }) {
+    return _quickJsRuntime.runWithSource(source, () async {
+      if (!Platform.isAndroid) {
       return const UnifiedSourceResult(
         errorMessage:
             'OpenStream Web Embed currently requires the Android WebView bridge.',
@@ -255,6 +256,7 @@ class OpenStreamWebEmbedSourceEngine extends SourceEngine {
         httpStatusCodeClass: sourceHttpStatusClass(error),
       );
     }
+    });
   }
 
   Future<List<UnifiedStreamOption>> _resolveNativeHosters(
@@ -319,6 +321,7 @@ class OpenStreamWebEmbedSourceEngine extends SourceEngine {
           },
           timeout: const Duration(seconds: 18),
           cancelToken: cancelToken,
+          source: source,
         );
         results.addAll(
           mapQuickJsVideoSources(source, raw, idPrefix: 'openstream-hoster'),

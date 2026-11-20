@@ -140,8 +140,9 @@ class OpenStreamAnimeSourceEngine extends SourceEngine {
     required MediaIdentity media,
     String? preferredAudioLanguage,
     CancelToken? cancelToken,
-  }) async {
-    final watch = Stopwatch()..start();
+  }) {
+    return _quickJsRuntime.runWithSource(source, () async {
+      final watch = Stopwatch()..start();
     try {
       if (!supports(source)) {
         throw FormatException(
@@ -189,6 +190,7 @@ class OpenStreamAnimeSourceEngine extends SourceEngine {
         failureKind: sourceFailureKindFromException(error),
       );
     }
+    });
   }
 
   Future<_AnimeEpisodeRef?> _mapEpisode(
@@ -1159,6 +1161,7 @@ class OpenStreamAnimeSourceEngine extends SourceEngine {
                 },
                 timeout: const Duration(seconds: 18),
                 cancelToken: token,
+                source: source,
               );
               final extracted = mapQuickJsVideoSources(
                 source,

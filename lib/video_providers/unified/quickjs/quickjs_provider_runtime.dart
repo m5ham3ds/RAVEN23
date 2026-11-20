@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -14,12 +15,192 @@ import 'js_engine.dart';
 import 'quickjs_exception.dart';
 import 'quickjs_extension_settings.dart';
 
-/// Runs Zangetsu-compatible JavaScript providers in one shared runtime.
-/// Calls are serialized per source but independent providers can overlap on
-/// Android's dedicated JS isolate. Network access is mediated by Dio; scripts
-/// never receive Flutter objects or application credentials.
+/// A bounded pool of independent QuickJS runtimes for source resolution.
+///
+/// A source is pinned to one worker for the whole resolution transaction, so
+/// provider module state and extractor registrations remain stable. Every
+/// worker serializes calls to its own VM; three independent sources can run
+/// concurrently without re-entering one QuickJS instance.
 class QuickJsProviderRuntime {
   QuickJsProviderRuntime({
+    Dio? dio,
+    QuickJsExtensionSettingsStore? settingsStore,
+    SourceHostPolicy? hostPolicy,
+    SourceRepositoryArtifactStore? artifactStore,
+    int maxConcurrentRuntimes = 3,
+  }) : _workers = List<_QuickJsProviderRuntimeWorker>.generate(
+         maxConcurrentRuntimes.clamp(1, 3).toInt(),
+         (_) => _QuickJsProviderRuntimeWorker(
+           dio: dio,
+           settingsStore: settingsStore,
+           hostPolicy: hostPolicy,
+           artifactStore: artifactStore,
+         ),
+       ),
+       _availableWorkers = Queue<int>.from(
+         List<int>.generate(
+           maxConcurrentRuntimes.clamp(1, 3).toInt(),
+           (index) => index,
+         ),
+       );
+
+  final List<_QuickJsProviderRuntimeWorker> _workers;
+  final Queue<int> _availableWorkers;
+  final Queue<Completer<int>> _waitingWorkers = Queue<Completer<int>>();
+  final Map<String, _QuickJsSourceRuntimeLease> _sourceLeases =
+      <String, _QuickJsSourceRuntimeLease>{};
+  bool _disposed = false;
+
+  Future<int> _acquireWorker() {
+    if (_disposed) {
+      return Future<int>.error(
+        const JsRuntimeException('JavaScript runtime pool is closed.'),
+      );
+    }
+    if (_availableWorkers.isNotEmpty) {
+      return Future<int>.value(_availableWorkers.removeFirst());
+    }
+    final waiter = Completer<int>();
+    _waitingWorkers.addLast(waiter);
+    return waiter.future;
+  }
+
+  void _releaseWorker(int index) {
+    if (_disposed) return;
+    if (_waitingWorkers.isNotEmpty) {
+      _waitingWorkers.removeFirst().complete(index);
+    } else {
+      _availableWorkers.addLast(index);
+    }
+  }
+
+  /// Pins all calls for [source] to one VM until [operation] finishes.
+  /// Concurrent work for a different source receives a different worker.
+  Future<T> runWithSource<T>(
+    SourceManifest source,
+    Future<T> Function() operation,
+  ) async {
+    if (_disposed) {
+      throw const JsRuntimeException('JavaScript runtime pool is closed.');
+    }
+    final key = source.stableKey;
+    var lease = _sourceLeases[key];
+    final ownsLease = lease == null;
+    if (lease == null) {
+      lease = _QuickJsSourceRuntimeLease();
+      _sourceLeases[key] = lease;
+    }
+    lease.holders++;
+
+    if (ownsLease) {
+      try {
+        final workerIndex = await _acquireWorker();
+        lease.workerIndex = workerIndex;
+        lease.ready.complete(workerIndex);
+      } catch (error, stack) {
+        if (!lease.ready.isCompleted) {
+          lease.ready.completeError(error, stack);
+        }
+        if (identical(_sourceLeases[key], lease)) {
+          _sourceLeases.remove(key);
+        }
+        lease.holders--;
+        rethrow;
+      }
+    }
+
+    int? workerIndex;
+    try {
+      workerIndex = await lease.ready.future;
+      if (_disposed) {
+        throw const JsRuntimeException('JavaScript runtime pool is closed.');
+      }
+      return await operation();
+    } finally {
+      lease.holders--;
+      if (lease.holders == 0 && identical(_sourceLeases[key], lease)) {
+        _sourceLeases.remove(key);
+        if (workerIndex != null) _releaseWorker(workerIndex);
+      }
+    }
+  }
+
+  _QuickJsProviderRuntimeWorker _workerFor(SourceManifest? source) {
+    if (_disposed) {
+      throw const JsRuntimeException('JavaScript runtime pool is closed.');
+    }
+    final workerIndex =
+        source == null ? null : _sourceLeases[source.stableKey]?.workerIndex;
+    return _workers[workerIndex ?? 0];
+  }
+
+  Future<void> ensureProviderLoaded(
+    SourceManifest source, {
+    CancelToken? cancelToken,
+  }) => _workerFor(source).ensureProviderLoaded(
+    source,
+    cancelToken: cancelToken,
+  );
+
+  Future<dynamic> call(
+    SourceManifest source,
+    String method,
+    List<Object?> arguments, {
+    Duration timeout = const Duration(seconds: 65),
+    CancelToken? cancelToken,
+  }) => _workerFor(source).call(
+    source,
+    method,
+    arguments,
+    timeout: timeout,
+    cancelToken: cancelToken,
+  );
+
+  Future<dynamic> extractVideo(
+    String url, {
+    Map<String, dynamic> options = const <String, dynamic>{},
+    Duration timeout = const Duration(seconds: 25),
+    CancelToken? cancelToken,
+    SourceManifest? source,
+  }) => _workerFor(source).extractVideo(
+    url,
+    options: options,
+    timeout: timeout,
+    cancelToken: cancelToken,
+  );
+
+  @visibleForTesting
+  int? workerIndexForTesting(SourceManifest source) =>
+      _sourceLeases[source.stableKey]?.workerIndex;
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    for (final waiter in _waitingWorkers) {
+      if (!waiter.isCompleted) {
+        waiter.completeError(
+          const JsRuntimeException('JavaScript runtime pool is closed.'),
+        );
+      }
+    }
+    _waitingWorkers.clear();
+    _sourceLeases.clear();
+    for (final worker in _workers) {
+      worker.dispose();
+    }
+  }
+}
+
+class _QuickJsSourceRuntimeLease {
+  final Completer<int> ready = Completer<int>();
+  int holders = 0;
+  int? workerIndex;
+}
+
+/// One globally serialized QuickJS VM. Independent source workers are created
+/// by [QuickJsProviderRuntime]; a worker must never make concurrent VM calls.
+class _QuickJsProviderRuntimeWorker {
+  _QuickJsProviderRuntimeWorker({
     Dio? dio,
     QuickJsExtensionSettingsStore? settingsStore,
     SourceHostPolicy? hostPolicy,
@@ -54,7 +235,6 @@ class QuickJsProviderRuntime {
       <String, Set<String>>{};
   late final JsEngine _engine = JsEngine(onChannel: _onChannel);
   Future<void> _tail = Future<void>.value();
-  final Map<String, Future<void>> _sourceTails = <String, Future<void>>{};
   final Map<String, CancelToken?> _activeCancelTokens =
       <String, CancelToken?>{};
   final Set<String> _loadedSources = <String>{};
@@ -74,33 +254,6 @@ class QuickJsProviderRuntime {
         completer.completeError(error, stack);
       }
     });
-    return completer.future;
-  }
-
-  Future<T> _serializedForSource<T>(
-    String sourceId,
-    Future<T> Function() operation,
-  ) {
-    final previous = _sourceTails[sourceId] ?? Future<void>.value();
-    final completer = Completer<T>();
-    final next = previous.then((_) async {
-      try {
-        if (_disposed) {
-          throw const JsRuntimeException('JavaScript runtime is closed.');
-        }
-        completer.complete(await operation());
-      } catch (error, stack) {
-        completer.completeError(error, stack);
-      }
-    });
-    _sourceTails[sourceId] = next;
-    unawaited(
-      next.whenComplete(() {
-        if (identical(_sourceTails[sourceId], next)) {
-          _sourceTails.remove(sourceId);
-        }
-      }),
-    );
     return completer.future;
   }
 
@@ -226,11 +379,8 @@ class QuickJsProviderRuntime {
       }
     }
 
-    // JavaScriptCore may execute on the calling isolate and cannot safely be
-    // re-entered. Android runs JS off the UI isolate and supports overlap.
-    if (JsEngine.runsOffUiIsolate) {
-      return _serializedForSource(sourceId, invoke);
-    }
+    // Each worker owns a separate VM, so calls are serialized within that VM
+    // while three source workers can operate independently.
     return _serialized(invoke);
   }
 

@@ -26,8 +26,9 @@ class QuickJsSourceEngine extends SourceEngine {
     required MediaIdentity media,
     String? preferredAudioLanguage,
     CancelToken? cancelToken,
-  }) async {
-    final stopwatch = Stopwatch()..start();
+  }) {
+    return _runtime.runWithSource(source, () async {
+      final stopwatch = Stopwatch()..start();
     try {
       if (media.normalizedType != UnifiedMediaType.movie && !media.isEpisode) {
         throw const FormatException(
@@ -122,6 +123,7 @@ class QuickJsSourceEngine extends SourceEngine {
         failureKind: sourceFailureKindFromException(error),
       );
     }
+    });
   }
 
   Future<List<Map<String, dynamic>>> _search(
