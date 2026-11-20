@@ -108,7 +108,7 @@ void main() {
 
     final results = await pending;
     expect(
-      results.map((result) => result.id.split('::').last),
+      results.map((result) => result.videoSource?.id),
       <String>['first', 'second', 'third', 'fourth'],
     );
     service.dispose();
