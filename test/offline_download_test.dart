@@ -112,7 +112,27 @@ void main() {
     });
   });
 
-  group('OfflineDownload', () {
+  group('OfflineStorageSnapshot', () {
+    test('requires the estimate plus a 200 MiB safety reserve', () {
+      const reserve = OfflineStorageSnapshot.minimumReserveBytes;
+      expect(
+        const OfflineStorageSnapshot(
+          availableBytes: reserve,
+          totalBytes: 2 * 1024 * 1024 * 1024,
+        ).hasRoomFor(null),
+        isFalse,
+      );
+      expect(
+        const OfflineStorageSnapshot(
+          availableBytes: reserve + 100 * 1024 * 1024 + 1,
+          totalBytes: 2 * 1024 * 1024 * 1024,
+        ).hasRoomFor(100 * 1024 * 1024),
+        isTrue,
+      );
+    });
+  });
+
+  group('OfflineDownload', {
     test('decodes progress, metadata, and state from the platform map', () {
       final item = OfflineDownload.fromMap({
         'id': 'movie_42',
@@ -124,6 +144,7 @@ void main() {
         'progress': 47.5,
         'bytesDownloaded': 1024,
         'contentLength': 4096,
+        'estimatedDownloadBytes': 8192,
         'createdAt': 1234,
         'posterUrl': 'https://example.test/poster.jpg',
         'streamIdentity': {
@@ -142,6 +163,7 @@ void main() {
       expect(item.isComplete, isFalse);
       expect(item.createdAt.millisecondsSinceEpoch, 1234);
       expect(item.totalBytes, 4096);
+      expect(item.estimatedDownloadBytes, 8192);
       expect(item.totalBytesIsEstimated, isFalse);
     });
 
@@ -179,6 +201,7 @@ void main() {
         quality: '1080p',
         audioLanguages: ['ja', 'en'],
         expectedDurationMs: 1_320_000,
+        estimatedDownloadBytes: 80 * 1024 * 1024,
         subtitleTrackName: 'Arabic',
         subtitleTrackContent: 'WEBVTT\\n\\n00:00:01.000 --> 00:00:02.000\\nمرحبا',
       );
@@ -186,6 +209,7 @@ void main() {
       final payload = request.toMap();
       expect(payload['audioLanguages'], ['ja', 'en']);
       expect(payload['expectedDurationMs'], 1_320_000);
+      expect(payload['estimatedDownloadBytes'], 80 * 1024 * 1024);
       expect(payload['subtitleTrackName'], 'Arabic');
       expect(payload['subtitleTrackContent'], contains('WEBVTT'));
     });
@@ -483,6 +507,13 @@ class _FakeGateway implements OfflineDownloadGateway {
 
   @override
   Future<List<OfflineDownload>> getDownloads() async => items;
+
+  @override
+  Future<OfflineStorageSnapshot> getStorageSnapshot() async =>
+      const OfflineStorageSnapshot(
+        availableBytes: 4 * 1024 * 1024 * 1024,
+        totalBytes: 8 * 1024 * 1024 * 1024,
+      );
 
   @override
   Future<void> enqueue(OfflineDownloadRequest request) async {
