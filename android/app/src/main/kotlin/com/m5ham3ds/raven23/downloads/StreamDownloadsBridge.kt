@@ -1,10 +1,14 @@
 package com.m5ham3ds.raven23.downloads
 
 import android.app.Activity
+import android.content.ContentValues
 import android.content.ClipData
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.offline.Download
@@ -16,6 +20,8 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileOutputStream
+import java.util.Locale
 import java.util.concurrent.Executors
 
 @UnstableApi
@@ -79,7 +85,7 @@ class StreamDownloadsBridge(
                 result.success(file.absolutePath)
             }
             "openExternal" -> exportForExternalPlayer(call, result)
-            "saveCopy" -> exportForDocument(call, result)
+            "saveCopy" -> saveIntoRaven23Folder(call, result)
             "remove" -> withId(call, result) { id ->
                 pendingEnqueues.remove(id)
                 exporter.deleteExport(id)
@@ -95,29 +101,153 @@ class StreamDownloadsBridge(
         }
     }
 
-    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-        if (requestCode != SAVE_COPY_REQUEST) return false
-        val pending = pendingSave ?: return true
-        pendingSave = null
-        val destination = data?.data
-        if (resultCode != Activity.RESULT_OK || destination == null) {
-            pending.result.success(false)
-            return true
-        }
-        fileExecutor.execute {
-            try {
-                appContext.contentResolver.openOutputStream(destination, "w").use { output ->
-                    checkNotNull(output) { "Could not open the selected destination." }
-                    pending.file.inputStream().use { input -> input.copyTo(output) }
-                }
-                mainHandler.post { pending.result.success(true) }
-            } catch (error: Exception) {
-                mainHandler.post {
-                    pending.result.error("SAVE_COPY_FAILED", error.message, null)
+    // Retained for MainActivity compatibility; RAVEN23 export no longer launches a picker.
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean = false
+
+    /** Saves a validated MP4 directly into the public Documents/RAVEN23 tree. */
+    private fun saveIntoRaven23Folder(call: MethodCall, result: MethodChannel.Result) {
+        withValidatedExport(call, result) { video ->
+            fileExecutor.execute {
+                try {
+                    val downloadId = call.argument<String>("id")
+                        ?: throw IllegalArgumentException("A download id is required.")
+                    val download = store.getDownload(downloadId)
+                        ?: throw IllegalStateException("Download not found.")
+                    val metadata = StreamDownloadStore.requestMetadata(download.request)
+                    val isMovie = metadata.optString("mediaType").equals("movie", true)
+                    val rawTitle = metadata.optString("exportTitle")
+                        .ifBlank { metadata.optString("title", "RAVEN23 video") }
+                    val stem = buildExportStem(
+                        rawTitle,
+                        isMovie,
+                        metadata.optInt("seasonNumber", -1),
+                        metadata.optInt("episodeNumber", -1),
+                    )
+                    val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$stem"
+                    val videoUri = savePublicFile(video, stem, "video/mp4", videoFolder)
+                    val subtitle = store.subtitleFileForExport(downloadId)
+                    val subtitleUri = subtitle?.let {
+                        val subtitleFolder = if (isMovie) {
+                            "RAVEN23/MOVIES/SUBTITLE"
+                        } else {
+                            "RAVEN23/$stem/SUBTITLE"
+                        }
+                        val mime = if (it.extension.equals("srt", true)) {
+                            "application/x-subrip"
+                        } else {
+                            "text/vtt"
+                        }
+                        savePublicFile(it, stem, mime, subtitleFolder, it.extension.lowercase(Locale.ROOT))
+                    }
+                    mainHandler.post {
+                        result.success(mapOf(
+                            "saved" to true,
+                            "videoUri" to videoUri,
+                            "subtitleSaved" to (subtitleUri != null),
+                            "subtitleUri" to subtitleUri,
+                        ))
+                    }
+                } catch (error: Exception) {
+                    mainHandler.post { result.error("SAVE_COPY_FAILED", error.message, null) }
                 }
             }
         }
-        return true
+    }
+
+    private fun buildExportStem(rawTitle: String, isMovie: Boolean, season: Int, episode: Int): String {
+        val safeTitle = rawTitle.trim()
+            .replace(Regex("[\\\\/:*?\\\"<>|\\p{Cntrl}]"), "_")
+            .replace(Regex("\\s+"), " ")
+            .trim(' ', '.')
+            .take(120)
+            .ifBlank { "RAVEN23 video" }
+        return if (isMovie || season < 0 || episode < 0) safeTitle
+        else "$safeTitle - S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
+    }
+
+    private fun savePublicFile(
+        source: File,
+        stem: String,
+        mimeType: String,
+        relativeFolder: String,
+        extensionOverride: String? = null,
+    ): String {
+        val extension = extensionOverride ?: if (mimeType == "video/mp4") "mp4" else "vtt"
+        val fileName = "$stem.$extension"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val collection = if (mimeType.startsWith("video/")) {
+                MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            }
+            val resolver = appContext.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Documents/$relativeFolder")
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(collection, values)
+                ?: throw IllegalStateException("Could not create Documents/$relativeFolder/$fileName")
+            try {
+                val output = resolver.openOutputStream(uri, "w")
+                    ?: throw IllegalStateException("Could not open $fileName for writing")
+                source.inputStream().use { input -> output.use { input.copyTo(it, COPY_BUFFER_BYTES) } }
+                val ready = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                resolver.update(uri, ready, null, null)
+            } catch (error: Exception) {
+                resolver.delete(uri, null, null)
+                throw error
+            }
+            return uri.toString()
+        }
+        @Suppress("DEPRECATION")
+        val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+        val directory = File(documents, relativeFolder)
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw IllegalStateException("Could not create Documents/$relativeFolder")
+        }
+        val destination = File(directory, fileName)
+        source.inputStream().use { input ->
+            FileOutputStream(destination).use { output -> input.copyTo(output, COPY_BUFFER_BYTES) }
+        }
+        return destination.absolutePath
+    }
+
+    /** Reuses an already validated remux; only legacy/unprepared streams need conversion. */
+    private fun withValidatedExport(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        operation: (File) -> Unit,
+    ) {
+        val id = call.argument<String>("id")
+        if (id.isNullOrBlank()) {
+            result.error("INVALID_ID", "A download id is required.", null)
+            return
+        }
+        val existing = exporter.existingExport(id)
+        if (existing != null) {
+            try { operation(existing) } catch (error: Exception) {
+                result.error("EXPORT_ACTION_FAILED", error.message, null)
+            }
+            return
+        }
+        exporter.exportValidated(id) { exported ->
+            mainHandler.post {
+                exported.fold(
+                    onSuccess = { file -> try { operation(file) } catch (error: Exception) {
+                        result.error("EXPORT_ACTION_FAILED", error.message, null)
+                    } },
+                    onFailure = { error -> result.error(
+                        (error as? StreamDownloadExportException)?.code ?: "EXPORT_FAILED",
+                        error.message,
+                        causeSummary(error),
+                    ) },
+                )
+            }
+        }
     }
 
     private fun exportForExternalPlayer(call: MethodCall, result: MethodChannel.Result) {
@@ -463,7 +593,7 @@ class StreamDownloadsBridge(
         private const val METHOD_CHANNEL = "com.m5ham3ds.raven23/stream_downloads"
         private const val EVENT_CHANNEL = "com.m5ham3ds.raven23/stream_download_events"
         private const val USER_PAUSED = 1
-        private const val SAVE_COPY_REQUEST = 4_303
+        private const val COPY_BUFFER_BYTES = 1024 * 1024
     }
 
     private data class PendingSave(
