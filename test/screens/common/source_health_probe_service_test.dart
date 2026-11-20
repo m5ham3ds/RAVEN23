@@ -67,6 +67,53 @@ class _FakeQuickJsProviderRuntime extends QuickJsProviderRuntime {
 }
 
 void main() {
+  test('runs three source probes concurrently and returns input order', () async {
+    final gates = <String, Completer<SourceHealthCheckResult>>{
+      for (final id in <String>['first', 'second', 'third', 'fourth'])
+        id: Completer<SourceHealthCheckResult>(),
+    };
+    final started = <String>[];
+    final service = _OrderedSourceHealthProbeService(
+      gates: gates,
+      started: started,
+    );
+    final sources = <SourceManifest>[
+      for (final id in gates.keys)
+        SourceManifest(
+          id: id,
+          name: id,
+          repositoryUrl: 'https://example.com/index.json',
+          engine: const SourceEngineDescriptor(
+            rawType: 'javascript',
+            kind: SourceEngineKind.javascript,
+            endpoint: 'https://example.com/provider.js',
+          ),
+        ),
+    ];
+
+    final pending = service.checkVideoSources(sources);
+    await Future<void>.delayed(Duration.zero);
+    expect(started, <String>['first', 'second', 'third']);
+
+    // Complete the third and second calls before the first. This must not
+    // reorder the returned list or change the next pending input.
+    gates['third']!.complete(_healthyResult(sources[2]));
+    gates['second']!.complete(_healthyResult(sources[1]));
+    await Future<void>.delayed(Duration.zero);
+    expect(started, <String>['first', 'second', 'third', 'fourth']);
+    gates['fourth']!.complete(_healthyResult(sources[3]));
+    gates['first']!.complete(_healthyResult(sources[0]));
+
+    final results = await pending;
+    expect(results.map((result) => result.id), <String>[
+      'first',
+      'second',
+      'third',
+      'fourth',
+    ]);
+    service.dispose();
+  });
+
   test(
     'probes both movie and sub categories and captures stream diversity',
     () async {
@@ -142,6 +189,38 @@ void main() {
     },
   );
 }
+
+
+class _OrderedSourceHealthProbeService extends SourceHealthProbeService {
+  _OrderedSourceHealthProbeService({
+    required this.gates,
+    required this.started,
+  });
+
+  final Map<String, Completer<SourceHealthCheckResult>> gates;
+  final List<String> started;
+
+  @override
+  Future<SourceHealthCheckResult> checkVideoSource(SourceManifest source) {
+    started.add(source.id);
+    return gates[source.id]!.future;
+  }
+
+  @override
+  void dispose() {}
+}
+
+SourceHealthCheckResult _healthyResult(SourceManifest source) =>
+    SourceHealthCheckResult(
+      id: source.stableKey,
+      name: source.name,
+      engineLabel: 'javascript',
+      status: SourceHealthStatus.healthy,
+      reason: SourceHealthReason.streamsExtracted,
+      elapsed: Duration(milliseconds: 5),
+      extractedStreamCount: 1,
+      videoSource: source,
+    );
 
 class _SearchOnlyQuickJsProviderRuntime extends QuickJsProviderRuntime {
   @override
