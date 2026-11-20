@@ -265,6 +265,7 @@ class OfflineDownloadRequest {
     this.estimatedDownloadBytes,
     this.subtitleTrackContent,
     this.source,
+    this.exportTitle,
     this.streamIdentity = const <String, Object?>{},
   });
 
@@ -293,6 +294,8 @@ class OfflineDownloadRequest {
   /// A normalized WebVTT subtitle selected from an external subtitle catalogue.
   final String? subtitleTrackContent;
   final OfflineDownloadSource? source;
+  /// File name stem used when exporting this movie or episode to Documents/RAVEN23.
+  final String? exportTitle;
   /// Stable provenance for the exact selected stream; this is metadata only
   /// and is not used as an automatic URL-renewal resolver.
   final Map<String, Object?> streamIdentity;
@@ -322,5 +325,6 @@ class OfflineDownloadRequest {
         'subtitleTrackUrl': subtitleTrackUrl,
         'subtitleTrackName': subtitleTrackName,
         'subtitleTrackHeaders': subtitleTrackHeaders,
+        'exportTitle': exportTitle,
       };
 }
