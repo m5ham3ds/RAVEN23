@@ -29,9 +29,13 @@ abstract final class StreamSizeEstimator {
         }
       });
       pendingByToken[token] = request.then((estimate) {
-        cacheByToken[token] = estimate?.estimatedBytes;
-        onEstimate?.call(token, estimate?.estimatedBytes);
-        return estimate;
+        final rawBytes = estimate?.estimatedBytes;
+        final safeBytes = rawBytes != null && rawBytes > 0 ? rawBytes : null;
+        cacheByToken[token] = safeBytes;
+        onEstimate?.call(token, safeBytes);
+        return safeBytes == null
+            ? null
+            : StreamSizeEstimate(estimatedBytes: safeBytes);
       });
     }
 
