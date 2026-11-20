@@ -117,12 +117,12 @@ class StreamDownloadsBridge(
             return
         }
         fileExecutor.execute {
+            var videoTemp: File? = null
             try {
-                val rawTitle = StreamDownloadStore.requestMetadata(download.request)
-                    .optString("exportTitle")
-                    .ifBlank { StreamDownloadStore.requestMetadata(download.request).optString("title", "RAVEN23 video") }
                 val metadata = StreamDownloadStore.requestMetadata(download.request)
                 val isMovie = metadata.optString("mediaType").equals("movie", true)
+                val rawTitle = metadata.optString("exportTitle")
+                    .ifBlank { metadata.optString("title", "RAVEN23 video") }
                 val baseStem = sanitizeOfflineExportTitle(rawTitle)
                 val fileStem = buildOfflineExportStem(
                     baseStem,
@@ -132,59 +132,56 @@ class StreamDownloadsBridge(
                     metadata.optString("subtitle"),
                 )
                 val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$baseStem"
-                val videoTemp = File(appContext.cacheDir, "raven23-export-$downloadId.mp4")
+                videoTemp = File(appContext.cacheDir, "raven23-export-$downloadId.mp4")
                 videoTemp.delete()
                 val directCopy = store.copyCompletedProgressiveMp4To(download, videoTemp)
-                val videoSource = if (directCopy) videoTemp else exporter.existingExport(downloadId)
-                    ?: run {
-                        videoTemp.delete()
-                        throw IllegalStateException(
+                val videoSource = if (directCopy) {
+                    videoTemp
+                } else {
+                    exporter.existingExport(downloadId)
+                        ?: throw IllegalStateException(
                             "This source needs MP4 preparation before it can be saved as one file. " +
                                 "Try Open with another player first, then save again.",
                         )
+                }
+                val videoUri = savePublicFile(videoSource, fileStem, "video/mp4", videoFolder)
+                val subtitle = store.subtitleFileForExport(downloadId)
+                val subtitleUri = subtitle?.let {
+                    val subtitleFolder = if (isMovie) {
+                        "RAVEN23/MOVIES/SUBTITLE"
+                    } else {
+                        "RAVEN23/$baseStem/SUBTITLE"
                     }
-                    val metadata = StreamDownloadStore.requestMetadata(download.request)
-                    val isMovie = metadata.optString("mediaType").equals("movie", true)
-                    val rawTitle = metadata.optString("exportTitle")
-                        .ifBlank { metadata.optString("title", "RAVEN23 video") }
-                    val baseStem = sanitizeOfflineExportTitle(rawTitle)
-                    val fileStem = buildOfflineExportStem(
-                        baseStem,
-                        isMovie,
-                        metadata.optInt("seasonNumber", -1),
-                        metadata.optInt("episodeNumber", -1),
-                        metadata.optString("subtitle"),
+                    val mime = if (it.extension.equals("srt", true)) {
+                        "application/x-subrip"
+                    } else {
+                        "text/vtt"
+                    }
+                    savePublicFile(
+                        it,
+                        fileStem,
+                        mime,
+                        subtitleFolder,
+                        it.extension.lowercase(Locale.ROOT),
                     )
-                    val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$baseStem"
-                    val videoUri = savePublicFile(video, fileStem, "video/mp4", videoFolder)
-                    val subtitle = store.subtitleFileForExport(downloadId)
-                    val subtitleUri = subtitle?.let {
-                        val subtitleFolder = if (isMovie) {
-                            "RAVEN23/MOVIES/SUBTITLE"
-                        } else {
-                            "RAVEN23/$baseStem/SUBTITLE"
-                        }
-                        val mime = if (it.extension.equals("srt", true)) {
-                            "application/x-subrip"
-                        } else {
-                            "text/vtt"
-                        }
-                        savePublicFile(it, fileStem, mime, subtitleFolder, it.extension.lowercase(Locale.ROOT))
-                    }
-                    videoTemp.delete()
-                    mainHandler.post {
-                        result.success(mapOf(
+                }
+                mainHandler.post {
+                    result.success(
+                        mapOf(
                             "saved" to true,
                             "videoUri" to videoUri,
                             "subtitleSaved" to (subtitleUri != null),
                             "subtitleUri" to subtitleUri,
                             "copiedDirectlyFromCache" to directCopy,
-                        ))
-                    }
-                } catch (error: Exception) {
-                    mainHandler.post { result.error("SAVE_COPY_FAILED", error.message, null) }
+                        ),
+                    )
                 }
+            } catch (error: Exception) {
+                mainHandler.post { result.error("SAVE_COPY_FAILED", error.message, null) }
+            } finally {
+                videoTemp?.delete()
             }
+        }
     }
 
     internal fun buildOfflineExportStem(
