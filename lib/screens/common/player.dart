@@ -5983,6 +5983,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     try {
       selected = await DownloadSelectionSheets.showQualityCatalog(
         context,
+        scraperApiUrl: _resolveScraperApiUrl(),
         entries: entriesNotifier.value,
         entriesListenable: entriesNotifier,
         searchingListenable: searchingNotifier,
@@ -5998,6 +5999,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       searchingNotifier.dispose();
     }
     if (!mounted || selected == null) return;
+
+    final hasStorage = await OfflineStoragePreflight.ensureAvailable(
+      context,
+      estimatedDownloadBytes: selected.estimatedSizeBytes,
+    );
+    if (!mounted || !hasStorage) return;
 
     final url = selected.link.url?.trim() ?? '';
     if (url.isEmpty) return;
@@ -6093,6 +6100,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                     '${episode?.episodeName ?? ''} • $providerName',
           mediaType: isMovie ? 'movie' : 'episode',
           quality: resolution,
+          estimatedDownloadBytes: selected.estimatedSizeBytes,
           posterUrl: posterPath == null
               ? null
               : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
