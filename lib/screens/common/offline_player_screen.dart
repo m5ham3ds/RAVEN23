@@ -535,13 +535,13 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
                       SizedBox(
                         width: 220,
                         child: LinearProgressIndicator(
-                          value: exportProgress!.progress! / 100,
+                          value: exportProgress.progress! / 100,
                           minHeight: 3,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${exportProgress!.progress}%',
+                        '${exportProgress.progress}%',
                         style: const TextStyle(color: Colors.white70),
                       ),
                     ],

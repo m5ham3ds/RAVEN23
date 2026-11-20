@@ -225,7 +225,7 @@ class EpisodeRow extends StatelessWidget {
                             : isDownloaded
                                 ? () => Navigator.of(context).push<void>(
                                       MaterialPageRoute<void>(
-                                        builder: (_) => OfflinePlayerScreen(download: local!),
+                                        builder: (_) => OfflinePlayerScreen(download: local),
                                       ),
                                     )
                                 : onDownload,
