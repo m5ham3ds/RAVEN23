@@ -412,6 +412,7 @@ class StreamDownloadStore private constructor(context: Context) {
 
     private fun metadataJson(arguments: Map<*, *>): JSONObject = JSONObject().apply {
         put("title", arguments["title"] as? String ?: "Untitled")
+        put("exportTitle", arguments["exportTitle"] as? String ?: "")
         put("subtitle", arguments["subtitle"] as? String ?: "")
         put("mediaType", arguments["mediaType"] as? String ?: "video")
         put("quality", arguments["quality"] as? String ?: "Auto")
