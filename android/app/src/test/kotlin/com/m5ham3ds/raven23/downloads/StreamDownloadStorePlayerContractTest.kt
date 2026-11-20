@@ -195,6 +195,46 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun movieExportUsesOnlyTheMovieTitle() {
+        val bridge = StreamDownloadsBridge::class.java
+        val method = bridge.getDeclaredMethod(
+            "buildOfflineExportStem",
+            String::class.java,
+            Boolean::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
+            String::class.java,
+        )
+        method.isAccessible = true
+        assertEquals("Dune Part Two", method.invoke(null, "Dune Part Two", true, -1, -1, ""))
+    }
+
+    @Test
+    fun episodeExportIncludesSeasonEpisodeAndEpisodeName() {
+        val stem = buildOfflineExportStem(
+            title = "ONE PIECE",
+            isMovie = false,
+            season = 2,
+            episode = 7,
+            episodeLabel = "S02 • E07 The Adventure Begins • From Server",
+        )
+        assertEquals("ONE PIECE - S02E07 - The Adventure Begins", stem)
+    }
+
+    @Test
+    fun episodeFolderStemRemainsTheSeriesTitle() {
+        assertEquals("ONE PIECE", sanitizeOfflineExportTitle("ONE PIECE"))
+    }
+
+    @Test
+    fun exportTitleSanitizerRemovesUnsafePathCharacters() {
+        assertEquals(
+            "One Piece Season 2",
+            sanitizeOfflineExportTitle("One/ Piece: Season 2"),
+        )
+    }
+
+    @Test
     fun playerReflectionTargetsStillExist() {
         val store = StreamDownloadStore::class.java
         assertEquals(
