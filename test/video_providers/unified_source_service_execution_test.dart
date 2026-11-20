@@ -467,6 +467,45 @@ void main() {
   });
 
   test(
+    'first-run priority setup leaves automatic BACKUP recovery lane untouched',
+    () async {
+      final preferences = await SharedPreferences.getInstance();
+      final priorityManager = SourcePriorityManager(preferences: preferences);
+      const category = SourcePriorityCategory.movies;
+      final primary = <String>[
+        'https://repo.example/index.json::primary-a',
+        'https://repo.example/index.json::primary-b',
+      ];
+      final backup = <String>[
+        'https://repo.example/index.json::automatic-backup-fast',
+        'https://repo.example/index.json::automatic-backup-next',
+      ];
+      await priorityManager.setPriorityKeys(category, primary);
+      await priorityManager.setBackupKeys(category, backup);
+      await priorityManager.markInitialized();
+
+      final repositoryManager = SourceRepositoryManager();
+      final engine = _FakeEngine((source, _, __, ___) async => _empty());
+      final service = UnifiedSourceService(
+        repositories: repositoryManager,
+        engines: SourceEngineRegistry(engines: <SourceEngine>[engine]),
+        priorityManager: priorityManager,
+      );
+      final snapshot = _snapshot(<SourceManifest>[
+        _source('primary-a'),
+        _source('primary-b'),
+        _source('automatic-backup-fast'),
+        _source('automatic-backup-next'),
+      ]);
+
+      await service.configureRecommendedSources(snapshot);
+
+      expect(await priorityManager.getPriorityKeys(category), primary);
+      expect(await priorityManager.getBackupKeys(category), backup);
+    },
+  );
+
+  test(
     'cancellation suppresses callbacks and discards late source results',
     () async {
       final response = Completer<UnifiedSourceResult>();
