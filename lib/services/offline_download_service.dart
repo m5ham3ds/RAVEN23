@@ -10,6 +10,7 @@ import '../models/offline_download.dart';
 abstract interface class OfflineDownloadGateway {
   Stream<List<OfflineDownload>> get downloadEvents;
   Future<List<OfflineDownload>> getDownloads();
+  Future<OfflineStorageSnapshot> getStorageSnapshot();
   Future<void> enqueue(OfflineDownloadRequest request);
   Future<void> pause(String id);
   Future<void> resume(String id);
@@ -19,6 +20,31 @@ abstract interface class OfflineDownloadGateway {
   Future<String> prepareForPlayback(String id);
   Future<void> openExternal(String id);
   Future<bool> saveCopy(String id);
+}
+
+class OfflineStorageSnapshot {
+  const OfflineStorageSnapshot({
+    required this.availableBytes,
+    required this.totalBytes,
+  });
+
+  static const int minimumReserveBytes = 200 * 1024 * 1024;
+
+  final int availableBytes;
+  final int totalBytes;
+
+  bool hasRoomFor(int? estimatedDownloadBytes) {
+    final estimate = estimatedDownloadBytes != null && estimatedDownloadBytes > 0
+        ? estimatedDownloadBytes
+        : 0;
+    return availableBytes > estimate + minimumReserveBytes;
+  }
+
+  factory OfflineStorageSnapshot.fromMap(Map<Object?, Object?> map) =>
+      OfflineStorageSnapshot(
+        availableBytes: (map['availableBytes'] as num?)?.toInt() ?? 0,
+        totalBytes: (map['totalBytes'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class OfflineExportProgress {
@@ -58,6 +84,11 @@ String offlineEnqueueErrorMessage(Object error, {required String title}) {
     return 'This title already has a download with a different source or quality. '
         'Manage it in Downloads.';
   }
+  if (error is PlatformException && error.code == 'STORAGE_LOW') {
+    return error.message?.trim().isNotEmpty == true
+        ? error.message!.trim()
+        : 'Not enough free storage. Free space and check again before resuming.';
+  }
   if (error is PlatformException && error.code == 'PREPARE_FAILED') {
     return 'Could not reach this stream to download it. '
         'Try another quality or provider.';
@@ -89,6 +120,14 @@ class OfflineDownloadService implements OfflineDownloadGateway {
   Future<List<OfflineDownload>> getDownloads() async {
     final raw = await _methods.invokeListMethod<Object?>('getDownloads');
     return _decodeDownloads(raw ?? const []);
+  }
+
+  @override
+  Future<OfflineStorageSnapshot> getStorageSnapshot() async {
+    final raw = await _methods.invokeMapMethod<Object?, Object?>(
+      'getStorageSnapshot',
+    );
+    return OfflineStorageSnapshot.fromMap(raw ?? const {});
   }
 
   @override
