@@ -107,12 +107,10 @@ void main() {
     gates['first']!.complete(_healthyResult(sources[0]));
 
     final results = await pending;
-    expect(results.map((result) => result.id), <String>[
-      'first',
-      'second',
-      'third',
-      'fourth',
-    ]);
+    expect(
+      results.map((result) => result.id.split('::').last),
+      <String>['first', 'second', 'third', 'fourth'],
+    );
     service.dispose();
   });
 
