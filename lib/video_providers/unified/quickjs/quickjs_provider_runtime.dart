@@ -773,7 +773,6 @@ class _QuickJsProviderRuntimeWorker {
 
   void dispose() {
     _disposed = true;
-    _sourceTails.clear();
     _activeCancelTokens.clear();
     _activeExtractorCancelToken = null;
     _sensitiveSettingsBySource.clear();

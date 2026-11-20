@@ -74,13 +74,19 @@ void main() {
   );
 
   test(
-    'a saturated QuickJS queue does not block another engine worker',
+    'three QuickJS sources run concurrently and release the next engine worker',
     () async {
       final quickJsGate = Completer<UnifiedSourceResult>();
+      final allQuickJsStarted = Completer<void>();
       final stremioStarted = Completer<void>();
       var activeQuickJs = 0;
+      var peakQuickJs = 0;
       final quickJsEngine = _FakeEngine((source, _, __, ___) async {
         activeQuickJs++;
+        if (activeQuickJs > peakQuickJs) peakQuickJs = activeQuickJs;
+        if (activeQuickJs == 3 && !allQuickJsStarted.isCompleted) {
+          allQuickJsStarted.complete();
+        }
         try {
           return await quickJsGate.future;
         } finally {
@@ -108,9 +114,12 @@ void main() {
         ]),
       );
 
-      await stremioStarted.future.timeout(const Duration(seconds: 2));
-      expect(activeQuickJs, 1);
+      await allQuickJsStarted.future.timeout(const Duration(seconds: 2));
+      expect(activeQuickJs, 3);
+      expect(peakQuickJs, 3);
+
       quickJsGate.complete(_empty());
+      await stremioStarted.future.timeout(const Duration(seconds: 2));
       await search.timeout(const Duration(seconds: 2));
     },
   );
@@ -433,7 +442,7 @@ void main() {
       ]),
     );
 
-    expect(maximumActive, 2);
+    expect(maximumActive, 3);
   });
 
   test('metrics retain only coarse HTTP status class', () async {
