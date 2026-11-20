@@ -44,6 +44,9 @@ class StreamDownloadsBridge(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "getDownloads" -> runResult(result) { downloadMaps() }
+            "getStorageSnapshot" -> runResult(result) {
+                mapOf("availableBytes" to appContext.filesDir.usableSpace, "totalBytes" to appContext.filesDir.totalSpace)
+            }
             "getAudioTracks" -> {
                 val arguments = call.arguments as? Map<*, *>
                 if (arguments == null) {
@@ -69,25 +72,8 @@ class StreamDownloadsBridge(
                     false,
                 )
             }
-            "resume" -> withId(call, result) { id ->
-                DownloadService.sendSetStopReason(
-                    appContext,
-                    StreamDownloadService::class.java,
-                    id,
-                    Download.STOP_REASON_NONE,
-                    false,
-                )
-            }
-            "retry" -> withId(call, result) { id ->
-                val request = store.originalRequest(id)
-                    ?: throw IllegalArgumentException("Download not found: $id")
-                DownloadService.sendAddDownload(
-                    appContext,
-                    StreamDownloadService::class.java,
-                    request,
-                    true,
-                )
-            }
+            "resume" -> resumeDownload(call, result)
+            "retry" -> retryDownload(call, result)
             "getExportProgress" -> exportProgress(call, result)
             "prepareForPlayback" -> withExportedFile(call, result) { file ->
                 result.success(file.absolutePath)
@@ -231,6 +217,16 @@ class StreamDownloadsBridge(
             result.error("INVALID_ID", "A download id is required.", null)
             return
         }
+        val requestedEstimate = (arguments["estimatedDownloadBytes"] as? Number)?.toLong()
+        val availableBeforePrepare = appContext.filesDir.usableSpace
+        if (!hasEnoughStorageToStart(availableBeforePrepare, requestedEstimate)) {
+            result.error(
+                "STORAGE_LOW",
+                storageMessage(availableBeforePrepare, requestedEstimate),
+                null,
+            )
+            return
+        }
         if (pendingEnqueues.containsKey(id)) {
             result.error("ENQUEUE_IN_PROGRESS", "This download is already being prepared.", null)
             return
@@ -255,6 +251,12 @@ class StreamDownloadsBridge(
             }
             // Resume the original Media3 job. Never merge stream keys from a
             // refreshed manifest, or overwrite its recovery/cache history.
+            val existingEstimate = stored.optLong("estimatedDownloadBytes").takeIf { it > 0L }
+            val available = appContext.filesDir.usableSpace
+            if (!hasEnoughStorageToResume(available, existingEstimate, existing.bytesDownloaded)) {
+                result.error("STORAGE_LOW", storageMessage(available, existingEstimate, existing.bytesDownloaded), null)
+                return
+            }
             runResult(result) {
                 DownloadService.sendAddDownload(appContext, StreamDownloadService::class.java,
                     checkNotNull(store.originalRequest(id)), true)
@@ -274,6 +276,13 @@ class StreamDownloadsBridge(
                 prepared.fold(
                     onSuccess = { request ->
                         try {
+                            val metadata = StreamDownloadStore.requestMetadata(request)
+                            val estimate = metadata.optLong("estimatedDownloadBytes").takeIf { it > 0L }
+                            val available = appContext.filesDir.usableSpace
+                            if (!hasEnoughStorageToStart(available, estimate)) {
+                                result.error("STORAGE_LOW", storageMessage(available, estimate), null)
+                                return@fold
+                            }
                             DownloadService.sendAddDownload(
                                 appContext,
                                 StreamDownloadService::class.java,
@@ -292,6 +301,85 @@ class StreamDownloadsBridge(
                 )
             }
         }
+    }
+
+    private fun resumeDownload(call: MethodCall, result: MethodChannel.Result) {
+        val id = call.argument<String>("id")
+        if (id.isNullOrBlank()) {
+            result.error("INVALID_ID", "A download id is required.", null)
+            return
+        }
+        val download = store.getDownload(id)
+        if (download == null) {
+            result.error("DOWNLOAD_ERROR", "Download not found: $id", null)
+            return
+        }
+        val metadata = StreamDownloadStore.requestMetadata(download.request)
+        val estimate = metadata.optLong("estimatedDownloadBytes").takeIf { it > 0L }
+        val available = appContext.filesDir.usableSpace
+        if (!hasEnoughStorageToResume(available, estimate, download.bytesDownloaded)) {
+            result.error("STORAGE_LOW", storageMessage(available, estimate, download.bytesDownloaded), null)
+            return
+        }
+        runResult(result) {
+            DownloadService.sendSetStopReason(
+                appContext,
+                StreamDownloadService::class.java,
+                id,
+                Download.STOP_REASON_NONE,
+                false,
+            )
+            null
+        }
+    }
+
+    private fun retryDownload(call: MethodCall, result: MethodChannel.Result) {
+        val id = call.argument<String>("id")
+        if (id.isNullOrBlank()) {
+            result.error("INVALID_ID", "A download id is required.", null)
+            return
+        }
+        val download = store.getDownload(id)
+        val request = store.originalRequest(id)
+        if (download == null || request == null) {
+            result.error("DOWNLOAD_ERROR", "Download not found: $id", null)
+            return
+        }
+        val metadata = StreamDownloadStore.requestMetadata(request)
+        val estimate = metadata.optLong("estimatedDownloadBytes").takeIf { it > 0L }
+        val available = appContext.filesDir.usableSpace
+        if (!hasEnoughStorageToResume(available, estimate, download.bytesDownloaded)) {
+            result.error("STORAGE_LOW", storageMessage(available, estimate, download.bytesDownloaded), null)
+            return
+        }
+        runResult(result) {
+            DownloadService.sendAddDownload(
+                appContext,
+                StreamDownloadService::class.java,
+                request,
+                true,
+            )
+            null
+        }
+    }
+
+    private fun storageMessage(
+        available: Long,
+        estimate: Long?,
+        alreadyDownloaded: Long = 0L,
+    ): String {
+        val remainingEstimate = estimate?.let {
+            (it - alreadyDownloaded.coerceAtLeast(0L)).coerceAtLeast(0L)
+        } ?: 0L
+        val required = OFFLINE_STORAGE_RESERVE_BYTES + remainingEstimate
+        val shortfall = (required - available).coerceAtLeast(1L)
+        return "Not enough free storage. Available: " +
+            android.text.format.Formatter.formatShortFileSize(appContext, available) +
+            "; required for the remaining download and the 200 MB safety reserve: " +
+            android.text.format.Formatter.formatShortFileSize(appContext, required) +
+            ". Free about " +
+            android.text.format.Formatter.formatShortFileSize(appContext, shortfall) +
+            " and tap Resume or Recheck."
     }
 
     private fun withId(
