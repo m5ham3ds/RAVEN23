@@ -15,6 +15,7 @@ import '../../services/analytics_service.dart';
 import '../../services/offline_download_service.dart';
 import '../../ui_components/app_ui_components.dart';
 import 'offline_player_screen.dart';
+import 'offline_storage_preflight.dart';
 import '../../widgets/hosted_ads_banner.dart';
 import '../../widgets/playback_action.dart';
 
@@ -276,6 +277,17 @@ class _DownloadCard extends StatelessWidget {
                           ],
                         ],
                       ),
+                      if (download.error?.isNotEmpty == true) ...[
+                        const SizedBox(height: 5),
+                        Text(
+                          download.error!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: colors.error,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -461,11 +473,63 @@ class _DownloadActions extends StatelessWidget {
               await provider.pause(download.id);
               if (context.mounted) _track(context, 'pause', 'success');
             case _DownloadAction.resume:
-              await provider.resume(download.id);
-              if (context.mounted) _track(context, 'resume', 'success');
+              {
+                final remainingBytes = download.estimatedDownloadBytes == null
+                    ? null
+                    : (download.estimatedDownloadBytes! - download.bytesDownloaded)
+                        .clamp(0, 1 << 62)
+                        .toInt();
+                final enoughSpace = await OfflineStoragePreflight.ensureAvailable(
+                  context,
+                  estimatedDownloadBytes: remainingBytes,
+                  isResume: true,
+                );
+                if (!enoughSpace || !context.mounted) break;
+                try {
+                  await provider.resume(download.id);
+                  if (context.mounted) _track(context, 'resume', 'success');
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(error is PlatformException
+                            ? error.message ?? 'Not enough storage to resume.'
+                            : 'Could not resume this download.'),
+                      ),
+                    );
+                  }
+                }
+                break;
+              }
             case _DownloadAction.retry:
-              await provider.retry(download.id);
-              if (context.mounted) _track(context, 'retry', 'success');
+              {
+                final remainingBytes = download.estimatedDownloadBytes == null
+                    ? null
+                    : (download.estimatedDownloadBytes! - download.bytesDownloaded)
+                        .clamp(0, 1 << 62)
+                        .toInt();
+                final enoughSpace = await OfflineStoragePreflight.ensureAvailable(
+                  context,
+                  estimatedDownloadBytes: remainingBytes,
+                  isResume: true,
+                );
+                if (!enoughSpace || !context.mounted) break;
+                try {
+                  await provider.retry(download.id);
+                  if (context.mounted) _track(context, 'retry', 'success');
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(error is PlatformException
+                            ? error.message ?? 'Not enough storage to retry.'
+                            : 'Could not retry this download.'),
+                      ),
+                    );
+                  }
+                }
+                break;
+              }
             case _DownloadAction.openExternal:
               if (context.mounted) await _openExternal(context, provider);
             case _DownloadAction.saveCopy:
