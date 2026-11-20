@@ -110,9 +110,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     switch (type) {
       case 'snapshot':
       case 'progress':
-        // The native view sends a snapshot as soon as EventChannel attaches.
-        // It may already be READY before Flutter subscribes to later state changes.
-        _nativeReady = true;
+        // Snapshot/progress only proves that the EventChannel is attached.
+        // The native view becomes ready only after Media3 reaches STATE_READY.
         if (event['isPlaying'] == true) {
           _wellnessTracker.play();
         }
