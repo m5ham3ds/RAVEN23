@@ -7,7 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:raven23/functions/function.dart';
-import 'package/raven23/functions/offline_download_ids.dart';
+import 'package:raven23/functions/offline_download_ids.dart';
 import 'package:raven23/functions/network.dart';
 import 'package:raven23/functions/video_utils.dart';
 import 'package:raven23/functions/player_route_handoff.dart';
