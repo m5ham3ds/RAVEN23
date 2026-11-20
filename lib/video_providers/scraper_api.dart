@@ -518,8 +518,10 @@ class StreamSizeEstimate {
 
   factory StreamSizeEstimate.fromJson(Map<String, dynamic> json) {
     final rawBytes = json['estimatedBytes'];
+    final bytes = rawBytes is num ? rawBytes.toInt() : null;
+    // Never turn malformed, zero or negative API values into a displayed size.
     return StreamSizeEstimate(
-      estimatedBytes: rawBytes is num ? rawBytes.toInt() : null,
+      estimatedBytes: bytes != null && bytes > 0 ? bytes : null,
     );
   }
 }
