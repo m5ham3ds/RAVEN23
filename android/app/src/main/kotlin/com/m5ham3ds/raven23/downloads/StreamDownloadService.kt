@@ -28,7 +28,7 @@ class StreamDownloadService : DownloadService(
 ) {
     private val rateSamples = mutableMapOf<String, RateSample>()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var lowStoragePauseScheduled = false
+    private val lowStoragePauseScheduled = mutableSetOf<String>()
 
     override fun onCreate() {
         createNotificationChannel()
@@ -93,15 +93,15 @@ class StreamDownloadService : DownloadService(
     private fun pauseIfStorageIsLow(downloads: List<Download>) {
         val available = filesDir.usableSpace
         if (!shouldPauseForLowStorage(available)) {
-            lowStoragePauseScheduled = false
+            lowStoragePauseScheduled.clear()
             return
         }
-        if (lowStoragePauseScheduled) return
         val activeIds = downloads
             .filter { it.state == Download.STATE_DOWNLOADING }
             .map { it.request.id }
+            .filterNot { it in lowStoragePauseScheduled }
         if (activeIds.isEmpty()) return
-        lowStoragePauseScheduled = true
+        lowStoragePauseScheduled.addAll(activeIds)
         mainHandler.post {
             activeIds.forEach { id ->
                 DownloadService.sendSetStopReason(
