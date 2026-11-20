@@ -867,6 +867,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
       if (local == null) return const SizedBox.shrink();
       return DetailsPlayButton(
         label: tr('play'),
+        resume: null,
         busy: _starting,
         onPressed: () => _run(() async {
           await Navigator.of(context).push<void>(
