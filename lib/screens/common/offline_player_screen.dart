@@ -496,6 +496,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
   Widget build(BuildContext context) {
     final exportProgress =
         context.watch<OfflineDownloadProvider>().exportFor(widget.download.id);
+    final progressPercent = exportProgress?.progress;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -530,18 +531,18 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
                       tr('preparing_offline_video'),
                       style: const TextStyle(color: Colors.white70),
                     ),
-                    if (exportProgress?.progress != null) ...<Widget>[
+                    if (progressPercent != null) ...<Widget>[
                       const SizedBox(height: 12),
                       SizedBox(
                         width: 220,
                         child: LinearProgressIndicator(
-                          value: exportProgress.progress! / 100,
+                          value: progressPercent / 100,
                           minHeight: 3,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${exportProgress.progress}%',
+                        '$progressPercent%',
                         style: const TextStyle(color: Colors.white70),
                       ),
                     ],
