@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.ClipData
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
@@ -37,6 +38,7 @@ class StreamDownloadsBridge(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var eventSink: EventChannel.EventSink? = null
     private var polling = false
+    private var pendingLegacySave: PendingLegacySave? = null
     private val pendingEnqueues = mutableMapOf<String, Any>()
 
     init {
@@ -103,8 +105,40 @@ class StreamDownloadsBridge(
     // Retained for MainActivity compatibility; RAVEN23 export no longer launches a picker.
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean = false
 
+    fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
+        if (requestCode != LEGACY_WRITE_PERMISSION_REQUEST) return false
+        val pending = pendingLegacySave ?: return true
+        pendingLegacySave = null
+        if (grantResults.firstOrNull() != PackageManager.PERMISSION_GRANTED) {
+            pending.result.error("STORAGE_PERMISSION_DENIED", "RAVEN23 needs file-write permission to save into Documents on this Android version.", null)
+            return true
+        }
+        writeLegacySave(pending.call, pending.result)
+        return true
+    }
+
+
+
     /** Saves a validated MP4 directly into the public Documents/RAVEN23 tree. */
     private fun saveIntoRaven23Folder(call: MethodCall, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            activity.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (pendingLegacySave != null) {
+                result.error("SAVE_IN_PROGRESS", "A video save is already waiting for permission.", null)
+                return
+            }
+            pendingLegacySave = PendingLegacySave(call, result)
+            activity.requestPermissions(
+                arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                LEGACY_WRITE_PERMISSION_REQUEST,
+            )
+            return
+        }
+        writeLegacySave(call, result)
+    }
+
+    private fun writeLegacySave(call: MethodCall, result: MethodChannel.Result) {
         val downloadId = call.argument<String>("id")
         if (downloadId.isNullOrBlank()) {
             result.error("INVALID_ID", "A download id is required.", null)
@@ -624,6 +658,13 @@ class StreamDownloadsBridge(
         private const val EVENT_CHANNEL = "com.m5ham3ds.raven23/stream_download_events"
         private const val USER_PAUSED = 1
         private const val COPY_BUFFER_BYTES = 1024 * 1024
+        private const val LEGACY_WRITE_PERMISSION_REQUEST = 4_304
     }
+
+    private data class PendingLegacySave(
+        val call: MethodCall,
+        val result: MethodChannel.Result,
+    )
+
 
 }
