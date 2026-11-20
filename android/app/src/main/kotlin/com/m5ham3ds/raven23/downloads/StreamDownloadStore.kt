@@ -348,6 +348,40 @@ class StreamDownloadStore private constructor(context: Context) {
         .setUpstreamDataSourceFactory(null)
         .setCacheWriteDataSinkFactory(null)
 
+    fun copyCompletedProgressiveMp4To(
+        download: Download,
+        destination: File,
+    ): Boolean {
+        if (download.state != Download.STATE_COMPLETED) return false
+        if (download.request.mimeType != MimeTypes.VIDEO_MP4) return false
+        val length = download.contentLength
+        if (length <= 0L || length != download.bytesDownloaded) return false
+        val dataSource = readOnlyCacheFactory(download.request).createDataSource()
+        val dataSpec = DataSpec.Builder()
+            .setUri(download.request.uri)
+            .setLength(length)
+            .build()
+        return try {
+            DataSourceInputStream(dataSource, dataSpec).use { input ->
+                destination.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(1024 * 1024)
+                    var copied = 0L
+                    while (copied < length) {
+                        val read = input.read(buffer, 0, minOf(buffer.size.toLong(), length - copied).toInt())
+                        if (read <= 0) return false
+                        output.write(buffer, 0, read)
+                        copied += read
+                    }
+                    output.flush()
+                }
+            }
+            destination.isFile && destination.length() == length
+        } catch (_: Exception) {
+            destination.delete()
+            false
+        }
+    }
+
     fun downloadToMap(download: Download): Map<String, Any?> {
         val metadata = requestMetadata(download.request)
         val state = when (download.state) {
