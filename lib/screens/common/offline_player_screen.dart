@@ -48,6 +48,12 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
   var _playerReady = false;
   String? _preparationError;
   bool _completed = false;
+  StreamSubscription<dynamic>? _nativeEvents;
+  bool _nativeViewCreated = false;
+  bool _nativeReady = false;
+  String? _nativeError;
+  int _nativeDurationMs = 0;
+  int _nativePositionMs = 0;
   late final WellnessPlaybackTracker _wellnessTracker;
   late final String _wellnessSessionId;
 
@@ -77,7 +83,54 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
-    unawaited(_initializePlayer());
+    if (!Platform.isAndroid) unawaited(_initializePlayer());
+  }
+
+  void _onNativePlatformViewCreated(int viewId) {
+    _nativeViewCreated = true;
+    _nativeEvents = EventChannel(
+      'raven23/offline_player_events/$viewId',
+    ).receiveBroadcastStream().listen(
+      _onNativePlayerEvent,
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() => _nativeError = error.toString());
+      },
+    );
+  }
+
+  void _onNativePlayerEvent(dynamic raw) {
+    if (!mounted || raw is! Map) return;
+    final event = Map<Object?, Object?>.from(raw);
+    final type = event['event'] as String? ?? '';
+    _nativeDurationMs =
+        (event['durationMs'] as num?)?.toInt() ?? _nativeDurationMs;
+    _nativePositionMs =
+        (event['positionMs'] as num?)?.toInt() ?? _nativePositionMs;
+    switch (type) {
+      case 'playing':
+        _wellnessTracker.play();
+      case 'paused':
+      case 'buffering':
+        _wellnessTracker.pause();
+      case 'ready':
+        _nativeReady = true;
+        _nativeError = null;
+        if (event['isPlaying'] == true) {
+          _wellnessTracker.play();
+        } else {
+          _wellnessTracker.pause();
+        }
+      case 'ended':
+        _completed = true;
+        _wellnessTracker.pause();
+        unawaited(_persistWellnessSession(syncImmediately: true));
+      case 'error':
+        _nativeError = event['error']?.toString() ?? tr('offline_play_failed_hint');
+      default:
+        break;
+    }
+    setState(() {});
   }
 
   Future<void> _initializePlayer() async {
@@ -283,8 +336,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       subtitle: widget.download.subtitle,
       seasonNumber: widget.download.seasonNumber,
       episodeNumber: widget.download.episodeNumber,
-      durationMs: value?.duration?.inMilliseconds ?? 0,
-      progressEndMs: value?.position.inMilliseconds ?? 0,
+      durationMs: value?.duration?.inMilliseconds ?? _nativeDurationMs,
+      progressEndMs: value?.position.inMilliseconds ?? _nativePositionMs,
       completed: _completed,
       posterPath: widget.download.posterUrl,
       provider: 'Downloaded',
@@ -479,7 +532,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       controller.removeEventsListener(_onPlayerEvent);
       controller.dispose();
     }
-    if (_initialized && _controller != null) {
+    _nativeEvents?.cancel();
+    if (_initialized && (_controller != null || _nativeViewCreated)) {
       _wellnessTracker.pause();
       unawaited(_persistWellnessSession(syncImmediately: true));
     }
@@ -494,9 +548,9 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final exportProgress =
-        context.watch<OfflineDownloadProvider>().exportFor(widget.download.id);
-    final progressPercent = exportProgress?.progress;
+    final progressPercent = Platform.isAndroid
+        ? null
+        : context.watch<OfflineDownloadProvider>().exportFor(widget.download.id)?.progress;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -507,7 +561,30 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (_playerReady && _controller != null)
+            if (Platform.isAndroid)
+              Stack(
+                children: [
+                  AndroidView(
+                    viewType: 'com.m5ham3ds.raven23/offline_player',
+                    creationParams: <String, Object?>{'id': widget.download.id},
+                    onPlatformViewCreated: _onNativePlatformViewCreated,
+                  ),
+                  if (_nativeError != null)
+                    Positioned.fill(
+                      child: _OfflinePlaybackError(
+                        message: _nativeError!,
+                        onClose: () => Navigator.pop(context),
+                      ),
+                    )
+                  else if (!_nativeReady)
+                    const Positioned.fill(
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                ],
+              )
+            else if (_playerReady && _controller != null)
               PlayerTheme(
                 onVideo: true,
                 child: BetterPlayer(controller: _controller!, key: _playerKey),
