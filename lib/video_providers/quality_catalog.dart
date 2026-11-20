@@ -18,6 +18,7 @@ class QualityCatalogEntry {
     required this.qualityLabel,
     this.adaptiveTargetHeight,
     this.isAdaptive = false,
+    this.estimatedSizeBytes,
   });
 
   final String providerCode;
@@ -38,6 +39,22 @@ class QualityCatalogEntry {
   /// master URL. Provider-owned Auto rows are never exposed in the catalogue.
   final int? adaptiveTargetHeight;
   final bool isAdaptive;
+  final int? estimatedSizeBytes;
+
+  String get sizeEstimateKey =>
+      '$sourceProviderCode:::$sourceKey:::$qualityLabel';
+
+  QualityCatalogEntry withEstimatedSize(int? bytes) => QualityCatalogEntry(
+    providerCode: providerCode,
+    sourceProviderCode: sourceProviderCode,
+    sourceKey: sourceKey,
+    link: link,
+    height: height,
+    qualityLabel: qualityLabel,
+    adaptiveTargetHeight: adaptiveTargetHeight,
+    isAdaptive: isAdaptive,
+    estimatedSizeBytes: bytes,
+  );
 
   /// The stream host label shown below the quality. When a source has no host
   /// label, fall back to its stable provider identity rather than hiding where
