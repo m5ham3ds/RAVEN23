@@ -13,6 +13,7 @@ import '../../functions/language_names.dart';
 import '../../video_providers/common.dart';
 import '../../video_providers/names.dart';
 import '../../video_providers/quality_catalog.dart';
+import '../../services/download_size_estimate_controller.dart';
 import 'player/player_sheet_ui.dart';
 
 /// The choices before a download or a manual playback: which provider, then
@@ -166,16 +167,36 @@ abstract final class DownloadSelectionSheets {
   /// Shows the same per-server, per-quality catalogue used by the player.
   /// New scan results can be published while the sheet is open, so a user can
   /// pick a cached quality immediately without waiting for remaining sources.
+  /// Shows the shared quality catalogue and fills real size estimates from
+  /// the backend's signed size token while the sheet remains open.
   static Future<QualityCatalogEntry?> showQualityCatalog(
     BuildContext context, {
     required List<QualityCatalogEntry> entries,
+    required String scraperApiUrl,
     ValueListenable<List<QualityCatalogEntry>>? entriesListenable,
     ValueListenable<bool>? searchingListenable,
   }) {
+    final estimator = DownloadSizeEstimateController(scraperApiUrl);
+    void observeLatestEntries() {
+      estimator.observe(entriesListenable?.value ?? entries);
+    }
+
+    observeLatestEntries();
+    entriesListenable?.addListener(observeLatestEntries);
+
+    String sizeText(QualityCatalogEntry entry, Map<String, int?> sizes) {
+      final token = entry.link.sizeToken?.trim() ?? '';
+      if (token.isEmpty) return tr('size_unknown');
+      if (!sizes.containsKey(entry.sizeEstimateKey)) return 'Calculating…';
+      final bytes = sizes[entry.sizeEstimateKey];
+      return bytes == null ? tr('size_unknown') : '~${_formatBytes(bytes)}';
+    }
+
     Widget buildCatalog(
       BuildContext sheetContext,
       List<QualityCatalogEntry> currentEntries,
       bool searching,
+      Map<String, int?> sizes,
     ) {
       final concreteEntries = PlaybackQualityCatalog.bestPerQuality(
         entries: currentEntries.where(
@@ -210,9 +231,7 @@ abstract final class DownloadSelectionSheets {
                               children: [
                                 const SizedBox.square(
                                   dimension: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
                                 const SizedBox(height: 12),
                                 Text(tr('loading_video_sources')),
@@ -232,7 +251,18 @@ abstract final class DownloadSelectionSheets {
                         return PlayerChoiceCard(
                           title: entry.qualityLabel,
                           subtitle: entry.selectionSubtitle,
-                          onTap: () => Navigator.pop(sheetContext, entry),
+                          trailing: Text(
+                            sizeText(entry, sizes),
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                          onTap: () async {
+                            final estimate = await estimator.estimate(entry);
+                            if (!sheetContext.mounted) return;
+                            Navigator.pop(
+                              sheetContext,
+                              entry.withEstimatedSize(estimate),
+                            );
+                          },
                         );
                       },
                     ),
@@ -245,30 +275,41 @@ abstract final class DownloadSelectionSheets {
     Widget buildWithSearchState(
       BuildContext sheetContext,
       List<QualityCatalogEntry> currentEntries,
+      Map<String, int?> sizes,
     ) {
       final listenable = searchingListenable;
       return listenable == null
-          ? buildCatalog(sheetContext, currentEntries, false)
+          ? buildCatalog(sheetContext, currentEntries, false, sizes)
           : ValueListenableBuilder<bool>(
               valueListenable: listenable,
               builder: (_, searching, __) =>
-                  buildCatalog(sheetContext, currentEntries, searching),
+                  buildCatalog(sheetContext, currentEntries, searching, sizes),
             );
     }
 
-    return showPlayerSheet<QualityCatalogEntry>(
+    final result = showPlayerSheet<QualityCatalogEntry>(
       context: context,
-      builder: (sheetContext) {
-        final listenable = entriesListenable;
-        return listenable == null
-            ? buildWithSearchState(sheetContext, entries)
-            : ValueListenableBuilder<List<QualityCatalogEntry>>(
-                valueListenable: listenable,
-                builder: (_, currentEntries, __) =>
-                    buildWithSearchState(sheetContext, currentEntries),
-              );
-      },
+      builder: (sheetContext) => ValueListenableBuilder<Map<String, int?>>(
+        valueListenable: estimator.estimates,
+        builder: (_, sizes, __) {
+          final listenable = entriesListenable;
+          if (listenable == null) {
+            return buildWithSearchState(sheetContext, entries, sizes);
+          }
+          return ValueListenableBuilder<List<QualityCatalogEntry>>(
+            valueListenable: listenable,
+            builder: (_, currentEntries, __) {
+              estimator.observe(currentEntries);
+              return buildWithSearchState(sheetContext, currentEntries, sizes);
+            },
+          );
+        },
+      ),
     );
+    return result.whenComplete(() {
+      entriesListenable?.removeListener(observeLatestEntries);
+      estimator.dispose();
+    });
   }
 
   static Future<String?> showResolution(
