@@ -214,6 +214,28 @@ void main() {
       expect(payload['subtitleTrackContent'], contains('WEBVTT'));
     });
 
+    test('serializes the canonical export title independently of display subtitle', () {
+      const request = OfflineDownloadRequest(
+        id: 'tv_7_s1_e2',
+        url: 'https://example.test/master.m3u8',
+        format: 'hls',
+        title: 'ONE PIECE',
+        subtitle: 'S02 • E07 The Adventure Begins • From Server Alpha',
+        exportTitle: 'ONE PIECE',
+        mediaType: 'episode',
+        quality: '1080p',
+        seasonNumber: 2,
+        episodeNumber: 7,
+      );
+
+      final payload = request.toMap();
+      expect(payload['title'], 'ONE PIECE');
+      expect(payload['exportTitle'], 'ONE PIECE');
+      expect(payload['seasonNumber'], 2);
+      expect(payload['episodeNumber'], 7);
+      expect(payload['subtitle'], contains('The Adventure Begins'));
+    });
+
     test('encodes every source field needed by the native downloader', () {
       const request = OfflineDownloadRequest(
         id: 'tv_7_s1_e2',
