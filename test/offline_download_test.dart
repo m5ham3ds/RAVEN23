@@ -132,7 +132,7 @@ void main() {
     });
   });
 
-  group('OfflineDownload', {
+  group('OfflineDownload', () {
     test('decodes progress, metadata, and state from the platform map', () {
       final item = OfflineDownload.fromMap({
         'id': 'movie_42',
