@@ -100,6 +100,15 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun offlineExportWatchdogHasABoundedDeadline() {
+        assertFalse(isOfflineExportTimedOut(1_000L, 1_000L, 30_000L))
+        assertFalse(isOfflineExportTimedOut(1_000L, 30_999L, 30_000L))
+        assertTrue(isOfflineExportTimedOut(1_000L, 31_000L, 30_000L))
+        assertFalse(isOfflineExportTimedOut(31_000L, 30_000L, 30_000L))
+        assertFalse(isOfflineExportTimedOut(1_000L, 31_000L, 0L))
+    }
+
+    @Test
     fun offlineExportRejectsShortSegmentsButAllowsSmallRuntimeDifferences() {
         assertTrue(isOfflineExportDurationComplete(2_880_000L, 2_880_000L))
         assertTrue(isOfflineExportDurationComplete(2_770_000L, 2_880_000L))

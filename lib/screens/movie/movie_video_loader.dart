@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:raven23/functions/function.dart';
+import 'package/raven23/functions/offline_download_ids.dart';
 import 'package:raven23/functions/network.dart';
 import 'package:raven23/functions/video_utils.dart';
 import 'package:raven23/functions/player_route_handoff.dart';
@@ -553,6 +554,8 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
   /// installed source in one pass, then expose the shared one-row-per-quality
   /// catalogue (the same catalogue the player uses).
   Future<void> _scanAllSourcesAndQueueDownload() async {
+    await _ensureExpectedMovieRuntime();
+    if (!mounted) return;
     final eligible = videoProviders
         .where((provider) => provider.supportsMedia(_playbackMediaIdentity))
         .toList(growable: false);
@@ -928,6 +931,34 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     );
   }
 
+  Future<void> _ensureExpectedMovieRuntime() async {
+    if ((_metadata.runtime ?? 0) > 0 || _metadata.movieId == null) return;
+    try {
+      final settingsProvider = Provider.of<SettingsProvider>(
+        context,
+        listen: false,
+      );
+      final dependencies = Provider.of<AppDependencyProvider>(
+        context,
+        listen: false,
+      );
+      final details = await fetchMovieDetails(
+        Endpoints.movieDetailsUrl(
+          _metadata.movieId!,
+          settingsProvider.appLanguage,
+        ),
+        settingsProvider.enableProxy,
+        dependencies.tmdbProxy,
+      );
+      if ((details.runtime ?? 0) > 0) _metadata.runtime = details.runtime;
+      _metadata.genreIds ??= details.genreIds;
+      _metadata.originalLanguage ??= details.originalLanguage;
+      _metadata.isAnime = _metadata.isAnime || details.isLikelyAnime;
+    } catch (error) {
+      debugPrint('[OfflineDownload][RUNTIME_LOOKUP_FAILED] $error');
+    }
+  }
+
   Future<void> _enqueueUnifiedDownload(
     Map<String, ProviderLoadResult> resultsByProvider, {
     ValueListenable<List<QualityCatalogEntry>>? entriesListenable,
@@ -1014,7 +1045,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     try {
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
-          id: 'movie_${_metadata.movieId}',
+          id: movieOfflineDownloadId(_metadata.movieId!),
           url: url,
           format: format,
           title: _metadata.movieName ?? 'Movie',
@@ -1174,7 +1205,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
       if (!mounted) return;
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
-          id: 'movie_${_metadata.movieId}',
+          id: movieOfflineDownloadId(_metadata.movieId!),
           url: url,
           format: format,
           title: _metadata.movieName ?? 'Movie',

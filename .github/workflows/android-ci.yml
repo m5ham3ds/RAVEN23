@@ -342,6 +342,11 @@ jobs:
             test/mobile/mobile_nav_bar_test.dart
             test/pill_button_test.dart
             test/playback_action_test.dart
+            test/offline_download_test.dart
+            test/offline_download_ids_test.dart
+            test/playback_stream_cache_test.dart
+            test/video_providers/unified/episode_identity_normalizer_test.dart
+            test/video_providers/unified_source_service_execution_test.dart
             test/quality_catalog_test.dart
             test/video_utils_download_format_test.dart
             test/video_providers/legacy_provider_adapter_test.dart
@@ -470,6 +475,7 @@ jobs:
                   'refreshedLinksRespectDeclaredContainerForOpaqueSignedUrls',
                   'unsupportedProgressiveContainerIsRejected',
                   'offlineExportRejectsShortSegmentsButAllowsSmallRuntimeDifferences',
+                  'offlineExportWatchdogHasABoundedDeadline',
                   'vixSrcRefreshBuildsNewSignedMasterPlaylistUrlFromEmbed',
                   'vixSrcRefreshResolvesRelativeAndProtocolRelativeEmbedUrls',
                   'playerReflectionTargetsStillExist',

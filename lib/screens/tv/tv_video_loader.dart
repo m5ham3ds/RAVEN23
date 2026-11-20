@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:raven23/functions/function.dart';
+import 'package/raven23/functions/offline_download_ids.dart';
 import 'package:raven23/functions/network.dart';
 import 'package:raven23/functions/video_utils.dart';
 import 'package:raven23/functions/player_route_handoff.dart';
@@ -233,8 +234,12 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
   Future<void> loadVideo() async {
     if (!mounted) return;
     try {
+      final seasonDetailsFetch =
+          widget.download ? _fetchSeasonEpisodes() : null;
       await _loadProviders();
       if (widget.download) {
+        await seasonDetailsFetch;
+        if (!mounted) return;
         await _scanAllSourcesAndQueueDownload();
         return;
       }
@@ -1006,7 +1011,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     try {
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
-          id: 'tv_${widget.metadata.tvId}_s${season}_e${episode}',
+          id: episodeOfflineDownloadId(
+            widget.metadata.tvId!,
+            season,
+            episode,
+          ),
           url: url,
           format: format,
           title: widget.metadata.seriesName ?? 'TV episode',
@@ -1171,7 +1180,11 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       if (!mounted) return;
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
-          id: 'tv_${widget.metadata.tvId}_s${season}_e$episode',
+          id: episodeOfflineDownloadId(
+            widget.metadata.tvId!,
+            season,
+            episode,
+          ),
           url: url,
           format: format,
           title: widget.metadata.seriesName ?? 'TV episode',
@@ -1333,6 +1346,12 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
             widget.metadata.seasonEpisodes?.isNotEmpty == true &&
             widget.metadata.seasonEpisodes!.every(
               (episode) => episode.seasonNumber == selectedSeason,
+            ) &&
+            widget.metadata.seasonEpisodes!.any(
+              (episode) =>
+                  episode.seasonNumber == selectedSeason &&
+                  episode.episodeNumber == widget.metadata.episodeNumber &&
+                  (episode.runtime ?? 0) > 0,
             );
         if (!hasSelectedSeasonEpisodes) {
           final seasonDetails = await fetchTVDetails(
@@ -1355,7 +1374,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
                     seasonNumber: selectedSeason,
                     stillPath: episode.stillPath,
                     airDate: episode.airDate,
-                    runtime: null,
+                    runtime: episode.runtime,
                     overview: episode.overview,
                     voteAverage: episode.voteAverage,
                   ),

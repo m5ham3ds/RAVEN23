@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../catalog/details_play.dart';
 import '../catalog/media_item.dart';
 import '../data/ads/content_ads.dart';
-import '../functions/function.dart';
+import '../functions/offline_download_ids.dart';
+import '../provider/offline_download_provider.dart';
+import '../screens/common/offline_player_screen.dart';
 import '../models/tv.dart';
 import '../models/tv_stream_metadata.dart';
 import '../screens/tv/tv_video_loader.dart';
@@ -26,15 +28,20 @@ Future<bool> playEpisode(
   bool download = false,
   bool isAnime = false,
 }) async {
-  if (!await checkConnection()) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('check_connection'))),
-      );
-    }
-    return false;
-  }
   if (!context.mounted) return false;
+  if (!download) {
+    final local = context.read<OfflineDownloadProvider?>()?.downloadForId(
+      episodeOfflineDownloadId(series.id, episode.seasonNumber, episode.episodeNumber),
+    );
+    if (local?.isComplete == true) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => OfflinePlayerScreen(download: local!),
+        ),
+      );
+      return false;
+    }
+  }
   if (!await AdsterraPlaybackAdsService.instance.beforeLoader(context,
           download: download, content: AdContent.of(series)) ||
       !context.mounted) {

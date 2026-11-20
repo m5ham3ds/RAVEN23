@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.format.Formatter
 import android.util.Log
 import androidx.media3.common.Format
@@ -24,6 +25,17 @@ import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.CancellationException
+
+internal const val OFFLINE_EXPORT_TIMEOUT_MS = 30L * 60L * 1000L
+
+internal fun isOfflineExportTimedOut(
+    startedAtMs: Long,
+    nowMs: Long,
+    timeoutMs: Long,
+): Boolean =
+    timeoutMs > 0L &&
+        nowMs >= startedAtMs &&
+        nowMs - startedAtMs >= timeoutMs
 
 internal fun isOfflineExportDurationComplete(
     actualDurationMs: Long,
@@ -52,6 +64,8 @@ class StreamDownloadExporter(
     private var activeTransformer: Transformer? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private val callbacks = mutableListOf<(Result<File>) -> Unit>()
+    private var exportStartedAtMs = 0L
+    private var exportTimeoutRunnable: Runnable? = null
 
     fun export(downloadId: String, callback: (Result<File>) -> Unit) {
         val download = store.getDownload(downloadId)
@@ -96,6 +110,8 @@ class StreamDownloadExporter(
 
         activeExportId = downloadId
         callbacks.add(callback)
+        exportStartedAtMs = SystemClock.elapsedRealtime()
+        scheduleExportTimeout(downloadId, temporary)
         startTransformer(download, temporary, output, inAppMuxer = false)
     }
 
@@ -121,6 +137,7 @@ class StreamDownloadExporter(
         )
         val listener = object : Transformer.Listener {
             override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                if (activeExportId != downloadId) return
                 val validationError = validateExport(download, temporary)
                 if (validationError != null) {
                     temporary.delete()
@@ -148,6 +165,7 @@ class StreamDownloadExporter(
                 exportResult: ExportResult,
                 exportException: ExportException,
             ) {
+                if (activeExportId != downloadId) return
                 temporary.delete()
                 Log.e(
                     TAG,
@@ -179,8 +197,39 @@ class StreamDownloadExporter(
                 .also { it.start(download.request.toMediaItem(), temporary.absolutePath) }
         } catch (error: Exception) {
             temporary.delete()
-            finish(Result.failure(describeFailure(download, error)))
+            if (activeExportId == downloadId) {
+                finish(Result.failure(describeFailure(download, error)))
+            }
         }
+    }
+
+    private fun scheduleExportTimeout(downloadId: String, temporary: File) {
+        val timeout = Runnable {
+            if (activeExportId != downloadId) return@Runnable
+            if (!isOfflineExportTimedOut(
+                    exportStartedAtMs,
+                    SystemClock.elapsedRealtime(),
+                    OFFLINE_EXPORT_TIMEOUT_MS,
+                )
+            ) {
+                return@Runnable
+            }
+            val transformer = activeTransformer
+            temporary.delete()
+            finish(
+                Result.failure(
+                    StreamDownloadExportException(
+                        code = "EXPORT_TIMEOUT",
+                        message = "Preparing this downloaded video took too long. " +
+                            "The original download is still saved; try again.",
+                        cause = null,
+                    ),
+                ),
+            )
+            transformer?.cancel()
+        }
+        exportTimeoutRunnable = timeout
+        mainHandler.postDelayed(timeout, OFFLINE_EXPORT_TIMEOUT_MS)
     }
 
     fun deleteExport(downloadId: String) {
@@ -220,6 +269,9 @@ class StreamDownloadExporter(
     }
 
     private fun finish(result: Result<File>) {
+        exportTimeoutRunnable?.let(mainHandler::removeCallbacks)
+        exportTimeoutRunnable = null
+        exportStartedAtMs = 0L
         val completedCallbacks = callbacks.toList()
         callbacks.clear()
         activeTransformer = null

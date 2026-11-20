@@ -506,6 +506,12 @@ class _FakeGateway implements OfflineDownloadGateway {
       const OfflineExportProgress(state: 'idle');
 
   @override
+  Future<String> prepareForPlayback(String id) async {
+    operations.add('prepareForPlayback:$id');
+    return '/tmp/$id.mp4';
+  }
+
+  @override
   Future<void> openExternal(String id) async =>
       operations.add('openExternal:$id');
 

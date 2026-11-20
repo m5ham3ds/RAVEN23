@@ -312,7 +312,7 @@ Future<Response<String>> _vixResponse(String api) =>
       options: Options(
         responseType: ResponseType.plain,
         headers: _vixSrcHeaders,
-        receiveTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 8),
         validateStatus: (_) => true,
         extra: {'cachePolicy': CachePolicy.noStore, 'retryLimit': 0},
       ),

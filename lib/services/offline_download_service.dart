@@ -16,6 +16,7 @@ abstract interface class OfflineDownloadGateway {
   Future<void> retry(String id);
   Future<void> remove(String id);
   Future<OfflineExportProgress> getExportProgress(String id);
+  Future<String> prepareForPlayback(String id);
   Future<void> openExternal(String id);
   Future<bool> saveCopy(String id);
 }
@@ -120,6 +121,7 @@ class OfflineDownloadService implements OfflineDownloadGateway {
   /// Returns a persistent local MP4 prepared from the completed Media3 cache.
   /// The regular BetterPlayer can then play the exact same file source on
   /// Android as it does on the other platforms, instead of using a second UI.
+  @override
   Future<String> prepareForPlayback(String id) async {
     final path = await _methods.invokeMethod<String>(
       'prepareForPlayback',

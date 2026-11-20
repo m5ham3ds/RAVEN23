@@ -76,6 +76,9 @@ class OfflineDownloadProvider extends ChangeNotifier {
   Future<void> remove(String id) => _perform(() => _service.remove(id));
   Future<OfflineExportProgress> getExportProgress(String id) =>
       _service.getExportProgress(id);
+
+  Future<String> prepareForPlayback(String id) =>
+      _runExport(id, () => _service.prepareForPlayback(id));
   Future<void> openExternal(String id) =>
       _runExport(id, () => _service.openExternal(id));
   Future<bool> saveCopy(String id) =>

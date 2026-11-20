@@ -275,7 +275,7 @@ class _HeroCardState extends State<HeroCard> {
                           child: Row(
                             children: <Widget>[
                               if (widget.primaryAction != null ||
-                                  MobilePlayback.canPlay(context)) ...<Widget>[
+                                  MobilePlayback.canPlay(context, _item)) ...<Widget>[
                                 Expanded(
                                   child: PillButton(
                                     onArtwork: true,

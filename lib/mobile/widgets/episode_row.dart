@@ -11,6 +11,10 @@ import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
 import '../../design/skeleton.dart';
 import '../../models/tv.dart';
+import '../../models/offline_download.dart';
+import '../../functions/offline_download_ids.dart';
+import '../../provider/offline_download_provider.dart';
+import '../../screens/common/offline_player_screen.dart';
 import '../../widgets/playback_action.dart';
 import 'media_art.dart';
 import 'page_kit.dart';
@@ -63,7 +67,26 @@ class EpisodeRow extends StatelessWidget {
     final locale = Localizations.localeOf(context).toString();
     final airDate = DateTime.tryParse(episode.airDate ?? '');
     final runtime = episode.runtime;
-    final playable = aired && canPlay;
+    final downloads =
+        context.watch<OfflineDownloadProvider?>()?.downloads ??
+        const <OfflineDownload>[];
+    final local = findCompletedEpisodeDownload(
+      downloads,
+      seriesId: series.id,
+      seasonNumber: episode.seasonNumber ?? 0,
+      episodeNumber: episode.episodeNumber ?? 0,
+    );
+    final isDownloaded = local != null;
+    final isDownloading = downloads.any(
+      (item) =>
+          item.id == episodeOfflineDownloadId(
+            series.id,
+            episode.seasonNumber,
+            episode.episodeNumber,
+          ) &&
+          item.isActive,
+    );
+    final playable = aired && (canPlay || isDownloaded);
     final number = episode.episodeNumber;
     final title = episode.name?.trim() ?? '';
     final facts = aired
@@ -81,7 +104,9 @@ class EpisodeRow extends StatelessWidget {
             },
           );
     final progress = this.progress;
-    final downloadable = canDownload && aired && onDownload != null;
+    final downloadable = aired &&
+        onDownload != null &&
+        (canDownload || isDownloaded || isDownloading);
     final row = AppPressFeedback(
       child: InkWell(
         onTap: busy ? null : (playable ? start : onOpen),
@@ -188,10 +213,29 @@ class EpisodeRow extends StatelessWidget {
                   if (downloadable)
                     AppPressFeedback(
                       child: IconButton(
-                        tooltip: tr('download_episode'),
+                        tooltip: isDownloaded
+                            ? tr('download_status_completed')
+                            : isDownloading
+                                ? tr('download_status_downloading')
+                                : tr('download_episode'),
                         color: palette.foreground,
-                        onPressed: busy ? null : onDownload,
-                        icon: Icon(PhosphorIcons.downloadSimple(), size: 22),
+                        onPressed: busy || isDownloading
+                            ? null
+                            : isDownloaded
+                                ? () => Navigator.of(context).push<void>(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => OfflinePlayerScreen(download: local!),
+                                      ),
+                                    )
+                                : onDownload,
+                        icon: isDownloaded
+                            ? Icon(PhosphorIcons.checkCircle(), size: 22)
+                            : isDownloading
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(PhosphorIcons.downloadSimple(), size: 22),
                       ),
                     ),
                 ],

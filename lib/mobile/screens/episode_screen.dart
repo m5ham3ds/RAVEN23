@@ -9,6 +9,7 @@ import '../../catalog/details_controller.dart';
 import '../../data/ads/content_ads.dart';
 import '../../catalog/details_play.dart';
 import '../../catalog/media_item.dart';
+import '../../functions/offline_download_ids.dart';
 import '../../catalog/season_source.dart';
 import '../../design/app_palette.dart';
 import '../../design/app_tokens.dart';
@@ -195,7 +196,7 @@ class _EpisodeScreenState extends State<EpisodeScreen>
   }
 
   String get _downloadId =>
-      'tv_${_seriesId}_s${_seasonNumber ?? 0}_e${_number ?? 0}';
+      episodeOfflineDownloadId(_seriesId, _seasonNumber, _number);
 
   Future<void> _showDownloadedActions(OfflineDownload download) async {
     final action = await showModalBottomSheet<String>(
@@ -271,6 +272,8 @@ class _EpisodeScreenState extends State<EpisodeScreen>
         originalLanguage: widget.series.series?.originalLanguage,
       ),
       download: download,
+      isAnime: widget.series.series?.isLikelyAnime == true ||
+          series?.isLikelyAnime == true,
     );
   }
 

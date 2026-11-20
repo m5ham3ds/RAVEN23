@@ -6,11 +6,14 @@ import 'package:provider/provider.dart';
 import '../catalog/details_controller.dart';
 import '../api/endpoints.dart';
 import '../functions/network.dart';
+import '../functions/offline_download_ids.dart';
+import '../models/offline_download.dart';
+import '../provider/offline_download_provider.dart';
+import '../screens/common/offline_player_screen.dart';
 import '../catalog/episode_choice.dart';
 import '../catalog/media_item.dart';
 import '../data/ads/content_ads.dart';
 import '../catalog/up_next.dart';
-import '../functions/function.dart';
 import '../models/movie.dart';
 import '../models/movie_stream_metadata.dart';
 import '../models/recently_watched.dart';
@@ -26,9 +29,19 @@ import '../screens/tv/tv_video_loader.dart';
 
 /// Opening and playing titles from the phone's browse pages.
 abstract final class MobilePlayback {
-  /// Whether Play is offered at all; the remote config can turn it off.
-  static bool canPlay(BuildContext context) =>
-      context.read<AppDependencyProvider?>()?.displayWatchNowButton ?? true;
+  /// Remote playback can be disabled without hiding completed local media.
+  static bool canPlay(BuildContext context, [MediaItem? item]) {
+    if (context.read<AppDependencyProvider?>()?.displayWatchNowButton ?? true) {
+      return true;
+    }
+    if (item == null) return false;
+    final downloads =
+        context.read<OfflineDownloadProvider?>()?.downloads ??
+        const <OfflineDownload>[];
+    return item.kind == MediaKind.movie
+        ? findCompletedOfflineDownload(downloads, movieOfflineDownloadId(item.id)) != null
+        : latestCompletedEpisodeDownload(downloads, seriesId: item.id) != null;
+  }
 
   /// Where [item] would pick up, from what the viewer has watched.
   static ResumePoint? resumeFor(BuildContext context, MediaItem item) {
@@ -86,34 +99,85 @@ abstract final class MobilePlayback {
     MediaItem item, {
     bool Function()? onReady,
   }) async {
-    if (!canPlay(context)) {
-      if (onReady?.call() == false) return;
+    if (!context.mounted) return;
+    final recent = context.read<RecentProvider?>();
+    final recentEpisodes = recent?.episodes ?? const <RecentEpisode>[];
+    final downloads =
+        context.read<OfflineDownloadProvider?>()?.downloads ??
+        const <OfflineDownload>[];
+
+    if (item.kind == MediaKind.movie) {
+      final local = findCompletedOfflineDownload(downloads, movieOfflineDownloadId(item.id));
+      if (local != null) {
+        if (onReady?.call() == false || !context.mounted) return;
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => OfflinePlayerScreen(download: local),
+          ),
+        );
+        return;
+      }
+    } else {
+      final next = upNextFor(
+        item,
+        episodes: recentEpisodes,
+        upNext: recent?.upNext ?? const <UpNext>[],
+      );
+      RecentEpisode? latestRecent = item.recentEpisode;
+      if (latestRecent == null) {
+        for (final candidate in recentEpisodes) {
+          if (candidate.seriesId == item.id && !candidate.isDeleted) {
+            latestRecent = candidate;
+            break;
+          }
+        }
+      }
+      final targetSeason =
+          next?.season ?? item.upNext?.season ?? latestRecent?.seasonNum;
+      final targetEpisode =
+          next?.episode ?? item.upNext?.episode ?? latestRecent?.episodeNum;
+      final remoteEnabled =
+          context.read<AppDependencyProvider?>()?.displayWatchNowButton ?? true;
+      final exactLocal =
+          targetSeason != null && targetEpisode != null
+              ? findCompletedEpisodeDownload(
+                  downloads,
+                  seriesId: item.id,
+                  seasonNumber: targetSeason,
+                  episodeNumber: targetEpisode,
+                )
+              : null;
+      final local = exactLocal ??
+          ((!remoteEnabled || targetSeason == null || targetEpisode == null)
+              ? latestCompletedEpisodeDownload(downloads, seriesId: item.id)
+              : null);
+      if (local != null) {
+        if (onReady?.call() == false || !context.mounted) return;
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => OfflinePlayerScreen(download: local),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (!canPlay(context, item)) {
+      if (onReady?.call() == false || !context.mounted) return;
       return openDetails(context, item);
     }
     final resume = resumeFor(context, item);
-    if (!await _online(context) || !context.mounted) return;
     if (item.kind == MediaKind.movie) {
       return _playMovie(context, item,
           elapsed: resume?.elapsed, onReady: onReady);
     }
-    final recent = context.read<RecentProvider?>();
     final next = upNextFor(
       item,
-      episodes: recent?.episodes ?? const <RecentEpisode>[],
+      episodes: recentEpisodes,
       upNext: recent?.upNext ?? const <UpNext>[],
     );
     return _playSeries(context, item, next == null ? resume : null, next,
         onReady: onReady);
-  }
-
-  static Future<bool> _online(BuildContext context) async {
-    if (await checkConnection()) return true;
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('check_connection'))),
-      );
-    }
-    return false;
   }
 
   static Future<void> _playMovie(
@@ -203,6 +267,21 @@ abstract final class MobilePlayback {
       );
       if (choice == null || !context.mounted) return;
       if (onReady?.call() == false) return;
+      final local = context
+          .read<OfflineDownloadProvider?>()
+          ?.downloadForId(episodeOfflineDownloadId(
+            item.id,
+            choice.episode.seasonNumber,
+            choice.episode.episodeNumber,
+          ));
+      if (local?.isComplete == true) {
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => OfflinePlayerScreen(download: local!),
+          ),
+        );
+        return;
+      }
       if (!await AdsterraPlaybackAdsService.instance
               .beforeLoader(context, content: AdContent.of(item)) ||
           !context.mounted) {
@@ -224,6 +303,7 @@ abstract final class MobilePlayback {
               seriesName: item.title,
               tvId: item.id,
               airDate: episode.airDate,
+              episodeRuntime: episode.runtime,
               seasonEpisodes: choice.seasonEpisodes
                   .where((episode) => episode.episodeId != null)
                   .map(EpisodeMetadata.fromEpisodeList)

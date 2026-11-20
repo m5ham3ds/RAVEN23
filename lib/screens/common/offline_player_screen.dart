@@ -20,7 +20,6 @@ import '../../provider/app_dependency_provider.dart';
 import '../../provider/offline_download_provider.dart';
 import '../../provider/settings_provider.dart';
 import '../../provider/wellness_provider.dart';
-import '../../services/offline_download_service.dart';
 import 'player/player_external_subtitles.dart';
 import 'player/player_feedback_ui.dart';
 import 'player/player_sheet_ui.dart';
@@ -46,7 +45,6 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
   final GlobalKey _playerKey = GlobalKey();
   final PlayerExternalSubtitles _externalSubtitles = PlayerExternalSubtitles();
   var _initialized = false;
-  var _preparing = true;
   var _playerReady = false;
   String? _preparationError;
   bool _completed = false;
@@ -210,7 +208,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
 
       // This uses the same cache-backed exporter already used by Save a copy
       // and Open in external player. The exported MP4 remains reusable.
-      final localPath = await OfflineDownloadService.instance
+      final localPath = await context
+          .read<OfflineDownloadProvider>()
           .prepareForPlayback(widget.download.id);
       if (!mounted) {
         controller.removeEventsListener(_onPlayerEvent);
@@ -230,15 +229,16 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _preparing = false;
         _playerReady = true;
         _preparationError = null;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _preparing = false;
-        _preparationError = error.toString();
+        _preparationError = error is PlatformException &&
+                error.message?.trim().isNotEmpty == true
+            ? error.message!.trim()
+            : error.toString();
       });
     }
   }
@@ -494,6 +494,8 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final exportProgress =
+        context.watch<OfflineDownloadProvider>().exportFor(widget.download.id);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -511,7 +513,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
               )
             else if (_preparationError != null)
               _OfflinePlaybackError(
-                message: tr('offline_play_failed_hint'),
+                message: _preparationError ?? tr('offline_play_failed_hint'),
                 onClose: () => Navigator.pop(context),
               )
             else
@@ -525,9 +527,24 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      _preparing ? tr('loading_video_sources') : tr('loading_video_sources'),
+                      tr('preparing_offline_video'),
                       style: const TextStyle(color: Colors.white70),
                     ),
+                    if (exportProgress?.progress != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: 220,
+                        child: LinearProgressIndicator(
+                          value: exportProgress!.progress! / 100,
+                          minHeight: 3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${exportProgress!.progress}%',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -1176,6 +1176,7 @@
   "ins_show_less": "Show less",
   "offline_play_failed": "This download couldn't be played",
   "offline_play_failed_hint": "The file may be incomplete or damaged. Delete it and download it again.",
+  "preparing_offline_video": "Preparing offline video",
   "up_next": "Up next",
   "player_next_up": "Next: {title}",
   "player_reload": "Reload",

@@ -22,6 +22,7 @@ import '../../design/media_badge.dart';
 import '../../design/skeleton.dart';
 import '../../design/title_logo.dart';
 import '../../functions/function.dart';
+import '../../functions/offline_download_ids.dart';
 import '../../models/credits.dart';
 import '../../models/genres.dart';
 import '../../models/images.dart';
@@ -424,7 +425,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
     if (!mounted) return;
     if (!download) {
       final local = context.read<OfflineDownloadProvider>().downloadForId(
-        'tv_${_item.id}_s${episode.seasonNumber ?? 0}_e${episode.episodeNumber ?? 0}',
+        episodeOfflineDownloadId(_item.id, episode.seasonNumber, episode.episodeNumber),
       );
       if (local?.isComplete == true) {
         await Navigator.of(context).push<void>(
@@ -825,12 +826,16 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
 
   Widget _playButton(BuildContext context, WatchHistory history) {
     final dependencies = context.watch<AppDependencyProvider?>();
-    if (!(dependencies?.displayWatchNowButton ?? true)) {
-      return const SizedBox.shrink();
-    }
+    final remotePlaybackEnabled = dependencies?.displayWatchNowButton ?? true;
+    final downloads = context.watch<OfflineDownloadProvider>();
     if (_isMovie) {
-      // A movie with no release date isn't out, and isn't offered.
-      if (DateTime.tryParse(_item.releaseDate ?? '') == null) {
+      final local = downloads.downloadForId(movieOfflineDownloadId(_item.id));
+      final locallyPlayable = local?.isComplete == true;
+      if (!remotePlaybackEnabled && !locallyPlayable) {
+        return const SizedBox.shrink();
+      }
+      if (!locallyPlayable &&
+          DateTime.tryParse(_item.releaseDate ?? '') == null) {
         return const SizedBox.shrink();
       }
       final plan = detailsPlayFor(_item, history);
@@ -841,7 +846,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
         onPressed: () => _run(() async {
           final downloaded = context
               .read<OfflineDownloadProvider>()
-              .downloadForId('movie_${_item.id}');
+              .downloadForId(movieOfflineDownloadId(_item.id));
           if (downloaded?.isComplete == true) {
             await Navigator.of(context).push<void>(
               MaterialPageRoute<void>(
@@ -851,6 +856,24 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
             return;
           }
           await _playMovie(elapsed: plan.resume?.elapsed);
+        }),
+      );
+    }
+    if (!remotePlaybackEnabled) {
+      final local = latestCompletedEpisodeDownload(
+        downloads.downloads,
+        seriesId: _item.id,
+      );
+      if (local == null) return const SizedBox.shrink();
+      return DetailsPlayButton(
+        label: tr('play'),
+        busy: _starting,
+        onPressed: () => _run(() async {
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => OfflinePlayerScreen(download: local),
+            ),
+          );
         }),
       );
     }
@@ -939,7 +962,7 @@ class _TitleDetailsScreenState extends State<TitleDetailsScreen> {
   Widget _downloadButton(BuildContext context) {
     final dependencies = context.watch<AppDependencyProvider?>();
     final download = context.watch<OfflineDownloadProvider>()
-        .downloadForId('movie_${_item.id}');
+        .downloadForId(movieOfflineDownloadId(_item.id));
     final released = DateTime.tryParse(_item.releaseDate ?? '') != null;
     if (!(dependencies?.displayDownloadButton ?? false) ||
         (!released && download == null)) {
