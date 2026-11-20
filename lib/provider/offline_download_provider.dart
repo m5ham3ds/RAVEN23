@@ -24,6 +24,9 @@ class OfflineDownloadProvider extends ChangeNotifier {
   String? get error => _error;
   OfflineExportProgress? exportFor(String id) => _exports[id];
 
+  Future<OfflineStorageSnapshot> getStorageSnapshot() =>
+      _service.getStorageSnapshot();
+
   OfflineDownload? downloadForId(String id) {
     for (final download in _downloads) {
       if (download.id == id) return download;
