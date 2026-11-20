@@ -6021,6 +6021,39 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     final movie = widget.movieMetadata;
     final episode = widget.tvMetadata;
     final isMovie = widget.mediaType == MediaType.movie;
+    if (isMovie && (movie?.runtime ?? 0) <= 0 && movie?.movieId != null) {
+      try {
+        final settingsProvider = context.read<SettingsProvider>();
+        final dependencies = context.read<AppDependencyProvider>();
+        final details = await fetchMovieDetails(
+          Endpoints.movieDetailsUrl(
+            movie!.movieId!,
+            settingsProvider.appLanguage,
+          ),
+          settingsProvider.enableProxy,
+          dependencies.tmdbProxy,
+        );
+        if ((details.runtime ?? 0) > 0) movie.runtime = details.runtime;
+      } catch (error) {
+        debugPrint('[OfflineDownload][PLAYER_RUNTIME_LOOKUP_FAILED] $error');
+      }
+      if (!mounted) return;
+    }
+    final expectedRuntimeMinutes = isMovie
+        ? movie?.runtime
+        : episode?.currentEpisodeRuntime;
+    if (expectedRuntimeMinutes == null || expectedRuntimeMinutes <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'A trusted video duration is not available yet. Refresh the title details and try downloading again.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     final season = episode?.seasonNumber ?? 0;
     final episodeNumber = episode?.episodeNumber ?? 0;
     final posterPath = isMovie ? movie?.posterPath : episode?.posterPath;

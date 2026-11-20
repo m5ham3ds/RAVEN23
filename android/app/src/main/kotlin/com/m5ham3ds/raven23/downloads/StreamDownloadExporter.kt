@@ -41,14 +41,19 @@ internal fun isOfflineExportDurationComplete(
     actualDurationMs: Long,
     expectedDurationMs: Long,
 ): Boolean {
-    if (actualDurationMs <= 0L) return false
-    if (expectedDurationMs <= 0L) return true
+    // A readable container cannot prove completeness without a trusted runtime.
+    if (actualDurationMs <= 0L || expectedDurationMs <= 0L) return false
     val minimumDurationMs = maxOf(
         (expectedDurationMs * 0.90).toLong(),
         expectedDurationMs - 2L * 60L * 1000L,
     )
     return actualDurationMs >= minimumDurationMs
 }
+
+internal fun isOfflineExportTrackSetComplete(
+    hasVideo: Boolean,
+    hasAudio: Boolean,
+): Boolean = hasVideo && hasAudio
 
 @UnstableApi
 class StreamDownloadExporter(
@@ -337,7 +342,8 @@ class StreamDownloadExporter(
             "The offline video is incomplete. Expected about ${expectedMs / 60000L} minutes; " +
                 "the exported file is shorter or unreadable. Retry the download before playing it."
         } else {
-            "The offline video file is incomplete or unreadable. Retry the download before playing it."
+            "This saved download has no trusted source duration, so RAVEN23 cannot verify that it is complete. " +
+                "Refresh the title details and download it again before offline playback."
         }
         return StreamDownloadExportException("EXPORT_INCOMPLETE", message, null)
     }
@@ -356,7 +362,18 @@ class StreamDownloadExporter(
             val height = retriever.extractMetadata(
                 MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT,
             )?.toIntOrNull() ?: 0
-            if (durationMs <= 0L || width <= 0 || height <= 0) {
+            val hasVideo = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO,
+            ) == "yes"
+            val hasAudio = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO,
+            ) == "yes"
+            if (
+                durationMs <= 0L ||
+                width <= 0 ||
+                height <= 0 ||
+                !isOfflineExportTrackSetComplete(hasVideo, hasAudio)
+            ) {
                 false
             } else {
                 val expectedMs = StreamDownloadStore.requestMetadata(download.request)
@@ -385,7 +402,7 @@ class StreamDownloadExporter(
         const val TAG = "StreamDownloadExporter"
         const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
         const val MIN_VALID_MP4_BYTES = 16L * 1024
-        const val EXPORT_VALIDATION_VERSION = "1"
+        const val EXPORT_VALIDATION_VERSION = "2"
     }
 }
 

@@ -118,11 +118,11 @@ if (typeof globalThis.btoa !== 'function') {
   };
 }
 
-globalThis.__fetch = function(src, url, opts) {
+globalThis.__fetch = function(src, url, opts, ownerSourceId) {
   opts = opts || {};
   var id = __nextFetchId();
   var payload = {
-    __src: src, id: id, url: url,
+    __src: src, __sourceId: ownerSourceId || null, id: id, url: url,
     method: (opts.method || 'GET').toUpperCase(),
     headers: opts.headers || {},
     body: opts.body == null ? null : (typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body)),
@@ -175,7 +175,7 @@ globalThis.__console = function(src, level, args) {
 
 // Shared extractor dispatcher. Parses the host from `embedUrl` and routes
 // to the registered extractor's extract(url, opts).
-globalThis.extractVideo = function(embedUrl, opts) {
+globalThis.extractVideo = function(embedUrl, opts, sourceId) {
   var m = String(embedUrl).match(/^https?:\/\/([^\/]+)/i);
   var host = m ? m[1].toLowerCase().replace(/^www[.]/, '') : '';
   var ex = globalThis.__extractors[host];
@@ -192,7 +192,15 @@ globalThis.extractVideo = function(embedUrl, opts) {
     }
   }
   if (!ex) return Promise.reject('No extractor for host: ' + host);
-  try { return Promise.resolve(ex.extract(embedUrl, opts || {})); }
+  try {
+    var extractorOptions = opts || {};
+    if (sourceId) {
+      extractorOptions = Object.assign({}, extractorOptions, {
+        __ravenSourceId: sourceId
+      });
+    }
+    return Promise.resolve(ex.extract(embedUrl, extractorOptions));
+  }
   catch (e) { return Promise.reject(String((e && e.message) || e)); }
 };
 globalThis.__callExtractorT = function(url, optsJson, ms) {
@@ -348,7 +356,9 @@ String wrapProviderSource(String sourceId, String providerJs) {
     __settings['$src'] = values;
   };
   var fetch = function(url, opts) { return globalThis.__fetch(__SOURCE_ID, url, opts); };
-  var extractVideo = function(url, opts) { return globalThis.extractVideo(url, opts); };
+  var extractVideo = function(url, opts) {
+    return globalThis.extractVideo(url, opts, __SOURCE_ID);
+  };
   var console = {
     log:   function() { globalThis.__console(__SOURCE_ID, 'log', arguments); },
     warn:  function() { globalThis.__console(__SOURCE_ID, 'warn', arguments); },
@@ -385,7 +395,14 @@ String wrapExtractorSource(String extractorId, String extractorJs) {
   return '''
 (function(){
   var __EX_ID = '$src';
-  var fetch = function(url, opts) { return globalThis.__fetch('ex:' + __EX_ID, url, opts); };
+  var fetch = function(url, opts) {
+    return globalThis.__fetch(
+      'ex:' + __EX_ID,
+      url,
+      opts,
+      opts && opts.__ravenSourceId ? opts.__ravenSourceId : null
+    );
+  };
   var extractVideo = function(url, opts) { return globalThis.extractVideo(url, opts); };
   var console = {
     log:   function() { globalThis.__console('ex:' + __EX_ID, 'log', arguments); },

@@ -556,6 +556,12 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
   Future<void> _scanAllSourcesAndQueueDownload() async {
     await _ensureExpectedMovieRuntime();
     if (!mounted) return;
+    if ((_metadata.runtime ?? 0) <= 0) {
+      _showErrorSheet(
+        'The movie runtime could not be verified. Refresh its TMDB details and try the download again.',
+      );
+      return;
+    }
     final eligible = videoProviders
         .where((provider) => provider.supportsMedia(_playbackMediaIdentity))
         .toList(growable: false);

@@ -11,7 +11,6 @@ import '../../video_providers/unified/source_manifest.dart';
 import '../../video_providers/unified/source_priority_manager.dart';
 import '../../video_providers/unified/unified_source_service.dart';
 import 'source_health_probe_service.dart';
-import 'source_health_priority_ranker.dart';
 
 /// App-wide owner of the installed-source catalogue and health-check session.
 /// Screens only subscribe to this controller; leaving a route never cancels
@@ -238,7 +237,6 @@ class SourceHealthSessionController extends ChangeNotifier {
           .map((result) => result.videoSource!)
           .toList(growable: false);
       if (pendingSources.isEmpty) {
-        await _applyMeasuredPrimaryOrdering();
         videoPhaseComplete = true;
         _notifyAndPersist();
         return;
@@ -346,39 +344,10 @@ class SourceHealthSessionController extends ChangeNotifier {
         _notifyAndPersist();
       },
     );
-    await _applyMeasuredPrimaryOrdering();
     videoPhaseComplete = true;
     videoProgress = videoResults.length;
     videoProgressTotal = videoResults.length;
     _notifyAndPersist();
-  }
-
-  Future<void> _applyMeasuredPrimaryOrdering() async {
-    // Test evidence only fills the tail after the explicit fixed prefix.
-    // BACKUP remains reserved for real playback-confirmed providers.
-    for (final category in SourcePriorityCategory.values) {
-      final currentPrimary = await _priorityManager.getPriorityKeys(category);
-      final backup = await _priorityManager.getBackupKeys(category);
-      final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
-        category: category,
-        currentPrimaryKeys: currentPrimary,
-        backupKeys: backup,
-        results: videoResults,
-      );
-      if (ranked.length == currentPrimary.length &&
-          _sameOrder(ranked, currentPrimary)) {
-        continue;
-      }
-      await _priorityManager.setPriorityKeys(category, ranked);
-    }
-  }
-
-  bool _sameOrder(List<String> first, List<String> second) {
-    if (first.length != second.length) return false;
-    for (var index = 0; index < first.length; index++) {
-      if (first[index] != second[index]) return false;
-    }
-    return true;
   }
 
   Future<void> _runMihonPhase({required bool resume}) async {

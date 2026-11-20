@@ -177,13 +177,13 @@ abstract final class DownloadSelectionSheets {
       List<QualityCatalogEntry> currentEntries,
       bool searching,
     ) {
-      final concreteEntries = currentEntries
-          .where(
-            (entry) =>
-                !entry.isAdaptive || entry.adaptiveTargetHeight != null,
-          )
-          .where((entry) => !_isProviderAutoLabel(entry.qualityLabel))
-          .toList(growable: false);
+      final concreteEntries = PlaybackQualityCatalog.bestPerQuality(
+        entries: currentEntries.where(
+          (entry) =>
+              (!entry.isAdaptive || entry.adaptiveTargetHeight != null) &&
+              !_isProviderAutoLabel(entry.qualityLabel),
+        ),
+      );
       return PlayerSheetScaffold(
         title: tr('download_choose_resolution'),
         subtitle: tr('download_resolution_description'),

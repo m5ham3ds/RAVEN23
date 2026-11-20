@@ -14,9 +14,10 @@ import 'js_engine.dart';
 import 'quickjs_exception.dart';
 import 'quickjs_extension_settings.dart';
 
-/// Runs Zangetsu-compatible JavaScript video providers in a single serialized
-/// QuickJS runtime. Network access is mediated by Dio; scripts never receive
-/// Flutter objects or application credentials.
+/// Runs Zangetsu-compatible JavaScript providers in one shared runtime.
+/// Calls are serialized per source but independent providers can overlap on
+/// Android's dedicated JS isolate. Network access is mediated by Dio; scripts
+/// never receive Flutter objects or application credentials.
 class QuickJsProviderRuntime {
   QuickJsProviderRuntime({
     Dio? dio,
@@ -53,10 +54,13 @@ class QuickJsProviderRuntime {
       <String, Set<String>>{};
   late final JsEngine _engine = JsEngine(onChannel: _onChannel);
   Future<void> _tail = Future<void>.value();
+  final Map<String, Future<void>> _sourceTails = <String, Future<void>>{};
+  final Map<String, CancelToken?> _activeCancelTokens =
+      <String, CancelToken?>{};
   final Set<String> _loadedSources = <String>{};
   bool _extractorsLoaded = false;
   bool _disposed = false;
-  CancelToken? _activeCancelToken;
+  CancelToken? _activeExtractorCancelToken;
 
   Future<T> _serialized<T>(Future<T> Function() operation) {
     final completer = Completer<T>();
@@ -70,6 +74,33 @@ class QuickJsProviderRuntime {
         completer.completeError(error, stack);
       }
     });
+    return completer.future;
+  }
+
+  Future<T> _serializedForSource<T>(
+    String sourceId,
+    Future<T> Function() operation,
+  ) {
+    final previous = _sourceTails[sourceId] ?? Future<void>.value();
+    final completer = Completer<T>();
+    final next = previous.then((_) async {
+      try {
+        if (_disposed) {
+          throw const JsRuntimeException('JavaScript runtime is closed.');
+        }
+        completer.complete(await operation());
+      } catch (error, stack) {
+        completer.completeError(error, stack);
+      }
+    });
+    _sourceTails[sourceId] = next;
+    unawaited(
+      next.whenComplete(() {
+        if (identical(_sourceTails[sourceId], next)) {
+          _sourceTails.remove(sourceId);
+        }
+      }),
+    );
     return completer.future;
   }
 
@@ -157,13 +188,12 @@ class QuickJsProviderRuntime {
   }) async {
     await ensureProviderLoaded(source, cancelToken: cancelToken);
     final sourceId = _runtimeSourceId(source);
-    return _serialized(() async {
-      _activeCancelToken = cancelToken;
+    Future<dynamic> invoke() async {
+      _activeCancelTokens[sourceId] = cancelToken;
       try {
         await _engine.ready;
 
-        // Settings are discovered from the provider's own getSettings() contract.
-        // A malformed/absent schema never blocks ordinary provider operations.
+        // Each provider keeps its own settings namespace and sensitivity list.
         if (method != 'getSettings') {
           final schema = await _settingsSchemaFor(sourceId);
           if (schema != null && schema.fields.isNotEmpty) {
@@ -190,12 +220,18 @@ class QuickJsProviderRuntime {
             }
           }
         }
-
         return _invokeProviderInside(sourceId, method, arguments, timeout);
       } finally {
-        _activeCancelToken = null;
+        _activeCancelTokens.remove(sourceId);
       }
-    });
+    }
+
+    // JavaScriptCore may execute on the calling isolate and cannot safely be
+    // re-entered. Android runs JS off the UI isolate and supports overlap.
+    if (JsEngine.runsOffUiIsolate) {
+      return _serializedForSource(sourceId, invoke);
+    }
+    return _serialized(invoke);
   }
 
   Future<QuickJsSettingsSchema?> _settingsSchemaFor(String sourceId) async {
@@ -252,7 +288,7 @@ class QuickJsProviderRuntime {
   }) async {
     await _validateHttpUrl(url);
     return _serialized(() async {
-      _activeCancelToken = cancelToken;
+      _activeExtractorCancelToken = cancelToken;
       try {
         await _engine.ready;
         await _loadBundledExtractors();
@@ -272,7 +308,7 @@ class QuickJsProviderRuntime {
           throw const FormatException('Host extractor returned invalid JSON.');
         }
       } finally {
-        _activeCancelToken = null;
+        _activeExtractorCancelToken = null;
       }
     });
   }
@@ -312,6 +348,8 @@ class QuickJsProviderRuntime {
       final payload = _payloadMap(raw);
       id = payload['id']?.toString();
       final url = payload['url']?.toString() ?? '';
+      final bridgeSourceId = payload['__src']?.toString() ?? '';
+      final ownerSourceId = payload['__sourceId']?.toString();
       final method = (payload['method'] ?? 'GET').toString().toUpperCase();
       if (!const <String>{
         'GET',
@@ -337,7 +375,11 @@ class QuickJsProviderRuntime {
         method: method,
         data: body,
         headers: headers,
-        cancelToken: _activeCancelToken,
+        cancelToken: ownerSourceId != null && ownerSourceId.isNotEmpty
+            ? _activeCancelTokens[ownerSourceId]
+            : bridgeSourceId.startsWith('ex:')
+            ? _activeExtractorCancelToken
+            : _activeCancelTokens[bridgeSourceId],
         followRedirects: payload['followRedirects'] != false,
         receiveTimeout: Duration(milliseconds: timeoutMs),
         sendTimeout: Duration(milliseconds: timeoutMs),
@@ -581,6 +623,9 @@ class QuickJsProviderRuntime {
 
   void dispose() {
     _disposed = true;
+    _sourceTails.clear();
+    _activeCancelTokens.clear();
+    _activeExtractorCancelToken = null;
     _sensitiveSettingsBySource.clear();
     _settingsSchemaCache.clear();
     _engine.dispose();

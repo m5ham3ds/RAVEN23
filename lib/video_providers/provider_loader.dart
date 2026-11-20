@@ -347,18 +347,15 @@ class ProviderScanSession {
     final workers = maxConcurrency
         .clamp(1, providers.isEmpty ? 1 : providers.length)
         .toInt();
-    final reserveFallbackWorker = _fallbackProviders.isNotEmpty && workers > 1;
-    final primaryWorkers = reserveFallbackWorker ? workers - 1 : workers;
     final fallbackTimer =
         fallbackHeadStart <= Duration.zero || _fallbackProviders.isEmpty
         ? null
         : Timer(fallbackHeadStart, _releaseFallbacks);
+    // All workers start from the primary queue in its supplied order. They
+    // may claim deferred fallbacks after the gate opens; no worker is reserved
+    // or left idle while primary sources are available.
     final tasks = <Future<void>>[
-      for (var index = 0; index < primaryWorkers; index++) _worker(),
-      // Reserve one worker inside the configured concurrency budget for
-      // deferred fallbacks. With a one-worker scan, the normal worker handles
-      // fallbacks after the direct queue completes or the gate opens.
-      if (reserveFallbackWorker) _worker(fallbackOnly: true),
+      for (var index = 0; index < workers; index++) _worker(),
     ];
     await Future.wait(tasks);
     // Do not leave a delayed fallback gate alive after the scan has finished.

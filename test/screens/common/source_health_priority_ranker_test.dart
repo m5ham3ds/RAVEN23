@@ -56,125 +56,110 @@ SourceHealthCheckResult _result(
 }
 
 void main() {
-  test('keeps the first twelve Movies/Series PRIMARY entries fixed', () {
-    final prefix = List<String>.generate(12, (index) => 'fixed-$index');
+  test('keeps every existing Movies PRIMARY entry in its exact order', () {
+    final primary = <String>[
+      for (var i = 0; i < 12; i++) 'movie-default-$i',
+      'custom-source-z',
+      'custom-source-a',
+      'custom-source-m',
+    ];
+
     final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
       category: SourcePriorityCategory.movies,
-      currentPrimaryKeys: <String>[...prefix, 'old-tail'],
-      backupKeys: const <String>[],
+      currentPrimaryKeys: primary,
+      backupKeys: const <String>['backup-source'],
       results: <SourceHealthCheckResult>[
         _result(
-          'quality-rich',
+          'new-fastest-source',
           category: 'movies',
-          qualities: const <String>['720p', '1080p'],
+          qualities: const <String>['360p', '720p', '1080p', '2160p'],
+          elapsedMs: 1,
         ),
         _result(
-          'quick',
+          'custom-source-a',
           category: 'movies',
           qualities: const <String>['720p'],
-          elapsedMs: 20,
-        ),
-        _result(
-          'no-stream',
-          category: 'movies',
-          qualities: const <String>[],
-          streamCount: 0,
         ),
       ],
     );
 
-    expect(ranked.take(12), prefix);
-    expect(ranked.skip(12), <String>[_key('quality-rich'), _key('quick')]);
-    expect(ranked, isNot(contains(_key('no-stream'))));
+    expect(ranked, primary);
+    expect(ranked, isNot(contains(_key('new-fastest-source'))));
+    expect(ranked, isNot(contains('backup-source')));
   });
 
-  test('keeps the first fourteen Anime PRIMARY entries fixed', () {
-    final prefix = List<String>.generate(14, (index) => 'anime-fixed-$index');
+  test('keeps the complete Anime PRIMARY order including its custom tail', () {
+    final primary = <String>[
+      for (var i = 0; i < 14; i++) 'anime-default-$i',
+      'anime-custom-z',
+      'anime-custom-a',
+    ];
+
     final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
       category: SourcePriorityCategory.anime,
-      currentPrimaryKeys: <String>[...prefix, 'old-anime-tail'],
+      currentPrimaryKeys: primary,
       backupKeys: const <String>[],
       results: <SourceHealthCheckResult>[
         _result(
-          'anime-fast',
+          'anime-fastest-new-source',
           category: 'anime',
-          qualities: const <String>['720p'],
-          elapsedMs: 10,
+          qualities: const <String>['720p', '1080p'],
+          elapsedMs: 1,
         ),
       ],
     );
 
-    expect(ranked.take(14), prefix);
-    expect(ranked.skip(14), <String>[_key('anime-fast')]);
+    expect(ranked, primary);
   });
 
-  test('ranks quality diversity first and latency as a later tie-breaker', () {
+  test('does not append a successful BACKUP or unknown catalogue source', () {
+    final primary = <String>['first', 'custom-tail'];
+
     final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
       category: SourcePriorityCategory.series,
-      currentPrimaryKeys: const <String>[],
-      backupKeys: const <String>[],
+      currentPrimaryKeys: primary,
+      backupKeys: <String>[_key('backup-provider')],
       results: <SourceHealthCheckResult>[
-        _result(
-          'slow-rich',
-          category: 'series',
-          qualities: const <String>['480p', '720p', '1080p'],
-          elapsedMs: 800,
-        ),
-        _result(
-          'fast-rich',
-          category: 'series',
-          qualities: const <String>['480p', '720p', '1080p'],
-          elapsedMs: 60,
-        ),
-        _result(
-          'fast-limited',
-          category: 'series',
-          qualities: const <String>['720p'],
-          elapsedMs: 5,
-        ),
+        _result('backup-provider', category: 'series', qualities: const ['720p']),
+        _result('new-provider', category: 'series', qualities: const ['1080p']),
       ],
+    );
+
+    expect(ranked, primary);
+  });
+
+  test('removes only explicitly blocked Hentai identities without sorting', () {
+    final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
+      category: SourcePriorityCategory.movies,
+      currentPrimaryKeys: const <String>[
+        'first-custom',
+        'hentai-old-provider',
+        'second-custom',
+        'third-custom',
+      ],
+      backupKeys: const <String>[],
+      results: const <SourceHealthCheckResult>[],
     );
 
     expect(ranked, <String>[
-      _key('fast-rich'),
-      _key('slow-rich'),
-      _key('fast-limited'),
+      'first-custom',
+      'second-custom',
+      'third-custom',
     ]);
   });
 
-  test('does not rank manually selected BACKUP providers', () {
-    final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
-      category: SourcePriorityCategory.series,
-      currentPrimaryKeys: const <String>['fixed'],
-      backupKeys: <String>[_key('backup-provider')],
-      results: <SourceHealthCheckResult>[
-        _result(
-          'backup-provider',
-          category: 'series',
-          qualities: const <String>['720p', '1080p'],
-        ),
-        _result(
-          'primary-candidate',
-          category: 'series',
-          qualities: const <String>['720p'],
-        ),
-      ],
+  test('keeps the documented default prefix lengths', () {
+    expect(
+      SourceHealthPriorityRanker.fixedPrefixLength(SourcePriorityCategory.movies),
+      12,
     );
-
-    expect(ranked, <String>['fixed', _key('primary-candidate')]);
+    expect(
+      SourceHealthPriorityRanker.fixedPrefixLength(SourcePriorityCategory.series),
+      12,
+    );
+    expect(
+      SourceHealthPriorityRanker.fixedPrefixLength(SourcePriorityCategory.anime),
+      14,
+    );
   });
-
-  test(
-    'does not erase an existing safe tail when no stream evidence exists',
-    () {
-      final ranked = SourceHealthPriorityRanker.rankPrimaryKeys(
-        category: SourcePriorityCategory.movies,
-        currentPrimaryKeys: const <String>['first', 'safe-tail', 'hentai-old'],
-        backupKeys: const <String>[],
-        results: const <SourceHealthCheckResult>[],
-      );
-
-      expect(ranked, <String>['first', 'safe-tail']);
-    },
-  );
 }

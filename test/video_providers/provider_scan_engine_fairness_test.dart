@@ -8,42 +8,44 @@ import 'package:raven23/video_providers/unified/source_manifest.dart';
 
 void main() {
   test(
-    'a saturated QuickJS queue does not block a ready Stremio provider',
+    'starts three QuickJS providers concurrently within the global scan budget',
     () async {
       final quickJsGate = Completer<ProviderLoadResult>();
-      final stremioStarted = Completer<void>();
+      final threeQuickJsStarted = Completer<void>();
       var activeQuickJs = 0;
+      var peakQuickJs = 0;
       final providers = <VideoProvider>[
         _source('quickjs-a', SourceEngineKind.javascript),
         _source('quickjs-b', SourceEngineKind.javascript),
         _source('quickjs-c', SourceEngineKind.javascript),
-        _source('stremio-ready', SourceEngineKind.stremio),
+        _source('stremio-next', SourceEngineKind.stremio),
       ];
       final session = ProviderScanSession(
         providers: providers,
         maxConcurrency: 3,
         stopAfterStandardQualities: false,
         load: (provider) async {
-          final kind = provider.sourceManifest!.engine.kind;
-          if (kind == SourceEngineKind.javascript) {
+          if (provider.sourceManifest!.engine.kind ==
+              SourceEngineKind.javascript) {
             activeQuickJs++;
+            if (activeQuickJs > peakQuickJs) peakQuickJs = activeQuickJs;
+            if (activeQuickJs == 3 && !threeQuickJsStarted.isCompleted) {
+              threeQuickJsStarted.complete();
+            }
             try {
               return await quickJsGate.future;
             } finally {
               activeQuickJs--;
             }
           }
-          if (provider.codeName.endsWith('stremio-ready') &&
-              !stremioStarted.isCompleted) {
-            stremioStarted.complete();
-          }
           return const ProviderLoadResult();
         },
       );
 
       session.start();
-      await stremioStarted.future.timeout(const Duration(seconds: 2));
-      expect(activeQuickJs, 1);
+      await threeQuickJsStarted.future.timeout(const Duration(seconds: 2));
+      expect(activeQuickJs, 3);
+      expect(peakQuickJs, 3);
 
       quickJsGate.complete(const ProviderLoadResult());
       await session.completed.timeout(const Duration(seconds: 2));

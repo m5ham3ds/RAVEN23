@@ -359,6 +359,9 @@ jobs:
             test/video_providers/source_priority_manager_test.dart
             test/video_providers/source_priority_policy_test.dart
             test/video_providers/source_catalog_safety_policy_test.dart
+            test/video_providers/source_execution_policy_concurrency_test.dart
+            test/video_providers/provider_scan_engine_fairness_test.dart
+            test/quality_catalog_unique_display_test.dart
             test/screens/common/source_health_probe_service_test.dart
             test/screens/common/source_health_priority_ranker_test.dart
             test/video_providers/stream_host_priority_manager_test.dart

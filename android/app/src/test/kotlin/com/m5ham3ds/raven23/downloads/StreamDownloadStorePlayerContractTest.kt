@@ -114,8 +114,16 @@ class StreamDownloadStorePlayerContractTest {
         assertTrue(isOfflineExportDurationComplete(2_770_000L, 2_880_000L))
         assertFalse(isOfflineExportDurationComplete(60_000L, 2_880_000L))
         assertFalse(isOfflineExportDurationComplete(0L, 2_880_000L))
-        assertTrue(isOfflineExportDurationComplete(180_000L, 0L))
+        assertFalse(isOfflineExportDurationComplete(180_000L, 0L))
         assertFalse(isOfflineExportDurationComplete(-1L, 0L))
+    }
+
+    @Test
+    fun offlineExportRequiresBothVideoAndAudioTracks() {
+        assertTrue(isOfflineExportTrackSetComplete(true, true))
+        assertFalse(isOfflineExportTrackSetComplete(true, false))
+        assertFalse(isOfflineExportTrackSetComplete(false, true))
+        assertFalse(isOfflineExportTrackSetComplete(false, false))
     }
 
     @Test

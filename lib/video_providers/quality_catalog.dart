@@ -6,9 +6,8 @@ import 'unified/stream_host_priority_manager.dart';
 /// A concrete stream option shown by the app-wide quality picker.
 ///
 /// Each entry keeps the exact owning provider and original link metadata.
-/// Different servers remain separate choices even when they offer the same
-/// height; duplicates are collapsed only when they refer to the same exact
-/// provider source key and rendition.
+/// The source catalogue retains same-height alternatives; user-facing menus
+/// use bestPerQuality() to show one stable server for each resolution.
 class QualityCatalogEntry {
   const QualityCatalogEntry({
     required this.providerCode,
@@ -320,6 +319,134 @@ abstract final class PlaybackQualityCatalog {
       return left.qualityLabel.compareTo(right.qualityLabel);
     });
     return List<QualityCatalogEntry>.unmodifiable(unique);
+  }
+
+  /// User-facing projection: exactly one selectable server per concrete
+  /// resolution. The full collect() result remains source-specific for
+  /// diagnostics and recovery.
+  ///
+  /// The active exact source wins. Otherwise measured playback success,
+  /// failure ratio and startup latency decide; configured host order is the
+  /// deterministic fallback when no useful metrics are available.
+  static List<QualityCatalogEntry> bestPerQuality({
+    required Iterable<QualityCatalogEntry> entries,
+    String? activeProviderCode,
+    String? activeSourceKey,
+    String? activeStreamUrl,
+    List<String>? preferredServerOrder,
+  }) {
+    final hostOrder =
+        preferredServerOrder ?? StreamHostPriorityManager.instance.currentOrder;
+    final bestByQuality = <String, QualityCatalogEntry>{};
+
+    for (final entry in entries) {
+      final key = _displayQualityIdentity(entry);
+      final previous = bestByQuality[key];
+      if (previous == null) {
+        bestByQuality[key] = entry;
+        continue;
+      }
+
+      final entryIsActive = _isActiveSource(
+        entry,
+        providerCode: activeProviderCode,
+        sourceKey: activeSourceKey,
+        streamUrl: activeStreamUrl,
+      );
+      final previousIsActive = _isActiveSource(
+        previous,
+        providerCode: activeProviderCode,
+        sourceKey: activeSourceKey,
+        streamUrl: activeStreamUrl,
+      );
+      if (entryIsActive != previousIsActive) {
+        if (entryIsActive) bestByQuality[key] = entry;
+        continue;
+      }
+
+      if (_compareStableServer(entry, previous, hostOrder) < 0) {
+        bestByQuality[key] = entry;
+      }
+    }
+
+    final unique = bestByQuality.values.toList(growable: false);
+    unique.sort((left, right) {
+      final leftHeight = left.height ?? left.adaptiveTargetHeight;
+      final rightHeight = right.height ?? right.adaptiveTargetHeight;
+      if (leftHeight != rightHeight) {
+        if (leftHeight == null) return 1;
+        if (rightHeight == null) return -1;
+        return rightHeight.compareTo(leftHeight);
+      }
+      return left.qualityLabel.compareTo(right.qualityLabel);
+    });
+    return List<QualityCatalogEntry>.unmodifiable(unique);
+  }
+
+  static String _displayQualityIdentity(QualityCatalogEntry entry) {
+    final height = entry.height ?? entry.adaptiveTargetHeight;
+    if (height != null && height > 0) return 'height:$height';
+    final label = entry.qualityLabel
+        .trim()
+        .toLowerCase()
+        .split(' · ')
+        .first
+        .replaceAll(RegExp(r'\\s+'), ' ');
+    return 'label:${label.isEmpty ? 'unknown quality' : label}';
+  }
+
+  static int _compareStableServer(
+    QualityCatalogEntry left,
+    QualityCatalogEntry right,
+    List<String> hostOrder,
+  ) {
+    final manager = StreamHostPriorityManager.instance;
+    final leftMetrics =
+        manager.metricsFor(left.link.server ?? left.sourceDisplayName) ??
+        const <String, Object?>{};
+    final rightMetrics =
+        manager.metricsFor(right.link.server ?? right.sourceDisplayName) ??
+        const <String, Object?>{};
+
+    int metric(Map<String, Object?> values, String key) =>
+        (values[key] as num?)?.toInt() ?? 0;
+    double average(Map<String, Object?> values) =>
+        (values['averageStartupMs'] as num?)?.toDouble() ?? 120000;
+
+    final leftSuccesses = metric(leftMetrics, 'successes');
+    final rightSuccesses = metric(rightMetrics, 'successes');
+    if ((leftSuccesses > 0) != (rightSuccesses > 0)) {
+      return leftSuccesses > 0 ? -1 : 1;
+    }
+
+    if (leftSuccesses > 0 && rightSuccesses > 0) {
+      final leftFailures = metric(leftMetrics, 'failures');
+      final rightFailures = metric(rightMetrics, 'failures');
+      final leftRatio = leftFailures / (leftSuccesses + leftFailures);
+      final rightRatio = rightFailures / (rightSuccesses + rightFailures);
+      final reliability = leftRatio.compareTo(rightRatio);
+      if (reliability != 0) return reliability;
+
+      final latency = average(leftMetrics).compareTo(average(rightMetrics));
+      if (latency != 0) return latency;
+
+      final successCount = rightSuccesses.compareTo(leftSuccesses);
+      if (successCount != 0) return successCount;
+    } else {
+      final leftFailures = metric(leftMetrics, 'failures');
+      final rightFailures = metric(rightMetrics, 'failures');
+      if ((leftFailures == 0) != (rightFailures == 0)) {
+        return leftFailures == 0 ? -1 : 1;
+      }
+      if (leftFailures != rightFailures) {
+        return leftFailures.compareTo(rightFailures);
+      }
+    }
+
+    final leftRank = _rankHost(left.link.server, hostOrder);
+    final rightRank = _rankHost(right.link.server, hostOrder);
+    if (leftRank != rightRank) return leftRank.compareTo(rightRank);
+    return left.sourceDisplayName.compareTo(right.sourceDisplayName);
   }
 
   static int _rankHost(String? server, List<String> order) {

@@ -6,16 +6,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'source_manifest.dart';
 
-/// Per-engine limits prevent a slow/serialized runtime from consuming every
-/// worker while still allowing independent HTTP engines to overlap.
+/// Per-engine caps share the global three-source scan budget. Supported
+/// engines can use all three slots by default.
 class SourceExecutionPolicy {
   const SourceExecutionPolicy({
     this.maxConcurrentSources = 3,
-    this.quickJsConcurrency = 1,
-    this.animeConcurrency = 2,
-    this.stremioConcurrency = 2,
-    this.vidkingConcurrency = 2,
-    this.webEmbedConcurrency = 1,
+    this.quickJsConcurrency = 3,
+    this.animeConcurrency = 3,
+    this.stremioConcurrency = 3,
+    this.vidkingConcurrency = 3,
+    this.webEmbedConcurrency = 3,
     this.fallbackHeadStart = const Duration(seconds: 8),
     this.circuitFailureThreshold = 5,
     this.circuitCooldown = const Duration(minutes: 2),
@@ -51,6 +51,7 @@ class SourceExecutionPolicy {
       case SourceEngineKind.httpJson:
       case SourceEngineKind.legacyScraperApi:
       case SourceEngineKind.native:
+        return maxConcurrentSources;
       case SourceEngineKind.unsupported:
         return 1;
     }
