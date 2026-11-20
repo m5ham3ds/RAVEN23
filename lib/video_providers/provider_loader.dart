@@ -771,14 +771,9 @@ abstract final class ProviderLoader {
     );
   }
 
-  /// Resolves providers in a strict, deterministic queue. Exactly one
-  /// provider is started at a time; direct providers, VixSrc and deferred
-  /// Web Embed fallbacks all follow the order supplied by the caller.
-  /// Repository media labels do not filter providers: every installed VOD
-  /// source is attempted in the supplied order. The first result with a
-  /// direct media link wins. An embedded HTML page is retained as a fallback
-  /// while later providers are checked for a direct stream, then returned if
-  /// none exists.
+  /// Compatibility API for legacy callers. The current implementation uses
+  /// the same three-worker scan session as both playback and downloads; only
+  /// the public name is retained for older call sites and tests.
   static Future<ProviderSelection?> loadFirstSuccessful({
     required List<VideoProvider> providers,
     required Future<ProviderLoadResult> Function(VideoProvider provider) load,
@@ -786,68 +781,18 @@ abstract final class ProviderLoader {
     ProviderStartCallback? onStart,
     MediaIdentity? unifiedMediaIdentity,
   }) async {
-    ProviderSelection? firstEmbedded;
-    for (var index = 0; index < providers.length; index++) {
-      final provider = providers[index];
-      if (unifiedMediaIdentity != null &&
-          !provider.supportsMedia(unifiedMediaIdentity)) {
-        debugPrint(
-          '[PlaybackSources][SKIPPED] provider=${provider.displayName} '
-          'reason=dedicated-live-tv-adapter',
-        );
-        continue;
-      }
-      try {
-        onStart?.call(index, provider);
-      } catch (_) {
-        // UI progress must not interrupt the source queue.
-      }
-
-      ProviderLoadResult providerResult;
-      try {
-        providerResult = await load(provider);
-      } catch (error) {
-        providerResult = ProviderLoadResult(errorMessage: error.toString());
-      }
-
-      try {
-        onResult?.call(index, provider, providerResult);
-      } catch (_) {
-        // One screen callback must not abort subsequent provider attempts.
-      }
-
-      final links = providerResult.videoLinks ?? const <RegularVideoLinks>[];
-      final directLinks = links
-          .where((link) => !link.isEmbeddedPlayer)
-          .toList(growable: false);
-      if (providerResult.success && directLinks.isNotEmpty) {
-        debugPrint(
-          '[PlaybackSources][SELECTED] provider=${provider.displayName} '
-          'index=$index directLinks=${directLinks.length}',
-        );
-        return ProviderSelection(
-          index: index,
-          provider: provider,
-          result: providerResult,
-        );
-      }
-      if (providerResult.success &&
-          links.any((link) => link.isEmbeddedPlayer) &&
-          firstEmbedded == null) {
-        firstEmbedded = ProviderSelection(
-          index: index,
-          provider: provider,
-          result: providerResult,
-        );
-      }
-    }
-    if (firstEmbedded != null) {
-      debugPrint(
-        '[PlaybackSources][EMBED_FALLBACK] provider=${firstEmbedded.provider.displayName} '
-        'index=${firstEmbedded.index}',
-      );
-    }
-    return firstEmbedded;
+    final scan = startScan(
+      providers: providers,
+      load: load,
+      onResult: onResult,
+      onStart: onStart,
+      unifiedMediaIdentity: unifiedMediaIdentity,
+      maxConcurrency: 3,
+      continueAfterFirstPlayable: false,
+      stopAfterStandardQualities: false,
+      fallbackHeadStart: Duration.zero,
+    );
+    return scan.firstPlayable;
   }
 
   static Future<ProviderLoaderResult> loadMovieFromProvider({
