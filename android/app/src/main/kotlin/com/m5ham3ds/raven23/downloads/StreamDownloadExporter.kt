@@ -417,6 +417,7 @@ class StreamDownloadExporter(
         }.getOrDefault(false)
         return output.takeIf { validMarker && isValidExport(download, it) }
     }
+
     private companion object {
         const val TAG = "StreamDownloadExporter"
         const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
