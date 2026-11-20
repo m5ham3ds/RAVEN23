@@ -535,6 +535,28 @@ class _DownloadActions extends StatelessWidget {
             case _DownloadAction.saveCopy:
               if (context.mounted) await _saveCopy(context, provider);
             case _DownloadAction.delete:
+              if (!context.mounted) break;
+              final confirmDelete = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('Delete download?'),
+                  content: Text(
+                    'Remove "${download.title}" and its offline video data from this device? '
+                    'This cannot be undone.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmDelete != true || !context.mounted) break;
               await provider.remove(download.id);
               if (context.mounted) _track(context, 'delete', 'success');
             case null:
@@ -563,11 +585,38 @@ class _DownloadActions extends StatelessWidget {
     BuildContext context,
     OfflineDownloadProvider provider,
   ) async {
+    final titleFolder = download.title
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .trim();
+    final folder = download.mediaType == 'movie'
+        ? 'Documents/RAVEN23/MOVIES'
+        : 'Documents/RAVEN23/$titleFolder';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Save video to your phone?'),
+        content: Text(
+          'The video will be saved in $folder. '
+          'The selected subtitle will be saved beside it in the SUBTITLE folder.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
     await _runExportAction(
       context,
       analyticsAction: 'save_copy',
       operation: () => provider.saveCopy(download.id),
-      successMessage: 'Video copy saved',
+      successMessage: 'Video and selected subtitle saved to Documents/RAVEN23',
     );
   }
 
@@ -695,7 +744,7 @@ class _DownloadActionsSheet extends StatelessWidget {
               _DownloadActionTile(
                 icon: PhosphorIcons.folderOpen(PhosphorIconsStyle.bold),
                 title: 'Save a copy',
-                subtitle: 'Choose a folder using your device file explorer',
+                subtitle: 'Save directly to Documents/RAVEN23 on this device',
                 onTap: () => Navigator.pop(context, _DownloadAction.saveCopy),
               ),
               const SizedBox(height: 10),
