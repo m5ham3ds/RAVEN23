@@ -348,31 +348,17 @@ class UnifiedSourceService {
       if (snapshot.catalog.isEmpty || snapshot.errors.isNotEmpty) return false;
       var changed = false;
 
-      // Older builds automatically placed every installed manifest in
-      // BACKUP. Seed missing lanes as empty now. If an existing lane exactly
-      // matches the old auto-generated full catalogue, clear that default;
-      // preserve a list that differs because the user curated it manually.
+      // BACKUP is an intentional automatic recovery lane. Never erase or
+      // reseed it during refresh/migration: preserve both populated and
+      // explicitly empty user state. Newly verified playback may continue to
+      // populate its auto-managed portion through SourcePriorityManager.
       for (final category in SourcePriorityCategory.values) {
-        final primary = await _priorityManager.getPriorityKeys(category);
         changed =
             await _priorityManager.seedBackupKeysIfMissing(
               category,
               const <String>[],
             ) ||
             changed;
-        final backup = await _priorityManager.getBackupKeys(category);
-        final oldAutomaticBackup = snapshot.sources
-            .where(
-              (source) =>
-                  !primary.contains(source.stableKey) &&
-                  !source.requiresLiveTvAdapter,
-            )
-            .map((source) => source.stableKey)
-            .toList(growable: false);
-        if (backup.isNotEmpty && _sameStringOrder(backup, oldAutomaticBackup)) {
-          await _priorityManager.setBackupKeys(category, const <String>[]);
-          changed = true;
-        }
         await _priorityManager.preserveExistingBackupOrderIfNeeded(category);
       }
 
@@ -444,11 +430,9 @@ class UnifiedSourceService {
                   !disabledDefaults.contains(source.stableKey)),
         );
         final desiredKeys = desiredPrimary.toSet();
-        final existingBackup = await _priorityManager.getBackupKeys(category);
-        await _priorityManager.setBackupKeys(
-          category,
-          existingBackup.where((key) => !desiredKeys.contains(key)),
-        );
+        // Default-order migration may replace an exact untouched PRIMARY
+        // fingerprint only. BACKUP belongs to the recovery subsystem and is
+        // never rewritten as a side effect of PRIMARY migration.
         await _priorityManager.setPriorityKeys(category, desiredPrimary);
         changed = true;
       }
@@ -486,9 +470,8 @@ class UnifiedSourceService {
                 !disabledDefaults.contains(source.stableKey)),
       );
       await _priorityManager.setPriorityKeys(category, preferredKeys);
-      // Remaining sources are still eligible for the runtime's final scan
-      // tier, but are not labelled BACKUP until a real playback succeeds.
-      await _priorityManager.setBackupKeys(category, const <String>[]);
+      // Preserve the existing recovery lane. On a genuinely new install its
+      // key remains empty until the real-playback promotion policy populates it.
     }
     await _priorityManager.markInitialized();
     return true;
