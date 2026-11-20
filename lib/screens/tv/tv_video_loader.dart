@@ -1030,6 +1030,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           url: url,
           format: format,
           title: widget.metadata.seriesName ?? 'TV episode',
+          exportTitle: widget.metadata.seriesName ?? 'TV episode',
           subtitle:
               'S${season.toString().padLeft(2, '0')} • E${episode.toString().padLeft(2, '0')} ${widget.metadata.episodeName ?? ''}',
           mediaType: 'episode',
@@ -1210,6 +1211,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           url: url,
           format: format,
           title: widget.metadata.seriesName ?? 'TV episode',
+          exportTitle: widget.metadata.seriesName ?? 'TV episode',
           subtitle:
               'S${season.toString().padLeft(2, '0')} • E${episode.toString().padLeft(2, '0')} '
               '${widget.metadata.episodeName ?? ''} • ${selected.sourceDisplayName}',
