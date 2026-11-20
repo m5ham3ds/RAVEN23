@@ -429,7 +429,6 @@ class UnifiedSourceService {
               (source.installedByDefault &&
                   !disabledDefaults.contains(source.stableKey)),
         );
-        final desiredKeys = desiredPrimary.toSet();
         // Default-order migration may replace an exact untouched PRIMARY
         // fingerprint only. BACKUP belongs to the recovery subsystem and is
         // never rewritten as a side effect of PRIMARY migration.
