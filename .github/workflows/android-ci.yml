@@ -484,6 +484,10 @@ jobs:
                   'vixSrcRefreshResolvesRelativeAndProtocolRelativeEmbedUrls',
                   'playerReflectionTargetsStillExist',
                   'offlineExportRequiresBothVideoAndAudioTracks',
+                  'initialDownloadMustFitEstimateAndTwoHundredMiBReserve',
+                  'activeDownloadPausesWhenStorageReachesTwoHundredMiB',
+                  'resumeRequiresSpaceForOnlyTheEstimatedRemainingBytes',
+                  'unknownSizeStillRequiresTheTwoHundredMiBReserve',
               },
           }
           log_path = Path('../build-artifacts/android-mihon-abi-test.log')
@@ -1042,7 +1046,7 @@ jobs:
               '- Dependency resolution: `flutter pub get`.',
               '- Formatting: scoped Manga/Home/Anime/Mihon, PHASE63 work-detail/reader/translation, source-priority, mobile-navigation, playback-quality and press-feedback Dart targets via `bash tool/format_phase57_dart.sh --fix` / `--check` (173 files).',
               '- Static analysis: `flutter analyze --no-fatal-infos`; it starts only after dependency resolution and formatting succeed.',
-              '- Required pre-build tests: thirty-two focused Manga/Home/Anime/Mihon/mobile-navigation/reader/source-priority/playback-quality and full-source-catalog Flutter test files, plus the Android `MihonExtensionLoaderAbiTest` (3 ABI cases) and `StreamDownloadStorePlayerContractTest` (9 Media3/download contract cases). Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
+              '- Required pre-build tests: thirty-two focused Manga/Home/Anime/Mihon/mobile-navigation/reader/source-priority/playback-quality and full-source-catalog Flutter test files, plus the Android `MihonExtensionLoaderAbiTest` (3 ABI cases) and `StreamDownloadStorePlayerContractTest` (13 Media3/download/storage contract cases). Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
               '- Live Laravel smoke/E2E tests are not pre-build gates; their source files are preserved for explicit manual/staging validation after APK creation. The write-enabled E2E test still requires a disposable staging backend and explicit write consent.',
               '- Wrapper generation: `gradle wrapper --gradle-version 8.14 --distribution-type all`.',
               '- APK build: `flutter build apk --${BUILD_MODE} --flavor prod --target lib/main.dart --target-platform android-arm64 -Pdisable-abi-filtering=true --dart-define=ENABLE_FIREBASE=false --dart-define=LOCAL_DEV_MODE=false --dart-define=RAVEN23_AUTH_ONLY=true --dart-define=LARAVEL_API_URL=https://raven23-backend.onrender.com`.',
@@ -1112,8 +1116,8 @@ jobs:
               test/home_screen_test.dart
               --covers: Progressive Home/Movies/Series/Anime first paint, partial offline cache, empty/error states, Manga All aggregation and shared rows
 
-              Android gate: `:app:testProdReleaseUnitTest` for `MihonExtensionLoaderAbiTest` (3 cases) and `StreamDownloadStorePlayerContractTest` (9 cases)
-              --covers: Float widening (1.6f), exact supported versions (1.4/1.6), unsupported/non-finite values; MP4/WebM progressive MIME mapping, opaque signed-link container preservation, unsupported format rejection, and player reflection contracts
+              Android gate: `:app:testProdReleaseUnitTest` for `MihonExtensionLoaderAbiTest` (3 cases) and `StreamDownloadStorePlayerContractTest` (13 cases)
+              --covers: Float widening (1.6f), exact supported versions (1.4/1.6), unsupported/non-finite values; MP4/WebM progressive MIME mapping, opaque signed-link container preservation, unsupported format rejection, 200 MiB storage pause/resume checks, and player reflection contracts
 
               All other test sources remain in the repository for manual/deeper regression; CI does not delete or disable them.
               '''),
