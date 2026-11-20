@@ -3853,8 +3853,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   List<QualityCatalogEntry> get _qualityCatalogEntries =>
-      PlaybackQualityCatalog.collect(
-        linksByProvider: _rawVideoLinksByProvider,
+      PlaybackQualityCatalog.bestPerQuality(
+        entries: PlaybackQualityCatalog.collect(
+          linksByProvider: _rawVideoLinksByProvider,
+          activeProviderCode: _currentProviderCode,
+          activeSourceKey: _activeStreamQualityKey,
+          activeStreamUrl: _activeStreamUrl,
+          preferredServerOrder: StreamHostPriorityManager.instance.currentOrder,
+        ),
         activeProviderCode: _currentProviderCode,
         activeSourceKey: _activeStreamQualityKey,
         activeStreamUrl: _activeStreamUrl,

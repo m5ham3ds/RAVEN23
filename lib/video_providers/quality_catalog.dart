@@ -391,7 +391,7 @@ abstract final class PlaybackQualityCatalog {
         .toLowerCase()
         .split(' · ')
         .first
-        .replaceAll(RegExp(r'\\s+'), ' ');
+        .replaceAll(RegExp(r'\s+'), ' ');
     return 'label:${label.isEmpty ? 'unknown quality' : label}';
   }
 
