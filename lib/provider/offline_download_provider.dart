@@ -84,8 +84,7 @@ class OfflineDownloadProvider extends ChangeNotifier {
       _runExport(id, () => _service.prepareForPlayback(id));
   Future<void> openExternal(String id) =>
       _runExport(id, () => _service.openExternal(id));
-  Future<bool> saveCopy(String id) =>
-      _runExport(id, () => _service.saveCopy(id));
+  Future<bool> saveCopy(String id) => _service.saveCopy(id);
 
   Future<T> _runExport<T>(String id, Future<T> Function() operation) async {
     _exports[id] = const OfflineExportProgress(state: 'starting');
