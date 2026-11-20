@@ -475,6 +475,62 @@ void main() {
     },
   );
 
+
+  test('size estimate identity includes the exact signed token', () {
+    final first = PlaybackQualityCatalog.collect(
+      linksByProvider: <String, List<RegularVideoLinks>>{
+        'jett': <RegularVideoLinks>[
+          RegularVideoLinks(
+            url: 'https://jett.example/opaque',
+            quality: '1080p',
+            server: 'Jett',
+            providerCode: 'jett',
+            sizeToken: 'signed-token-A',
+          ),
+        ],
+      },
+      now: now,
+    ).single;
+    final refreshed = PlaybackQualityCatalog.collect(
+      linksByProvider: <String, List<RegularVideoLinks>>{
+        'jett': <RegularVideoLinks>[
+          RegularVideoLinks(
+            url: 'https://jett.example/opaque',
+            quality: '1080p',
+            server: 'Jett',
+            providerCode: 'jett',
+            sizeToken: 'signed-token-B',
+          ),
+        ],
+      },
+      now: now,
+    ).single;
+
+    expect(first.sourceProviderCode, refreshed.sourceProviderCode);
+    expect(first.sourceKey, refreshed.sourceKey);
+    expect(first.qualityLabel, refreshed.qualityLabel);
+    expect(first.sizeEstimateKey, isNot(refreshed.sizeEstimateKey));
+  });
+
+  test('missing signed size token remains explicitly unknown', () {
+    final entry = PlaybackQualityCatalog.collect(
+      linksByProvider: <String, List<RegularVideoLinks>>{
+        'jett': <RegularVideoLinks>[
+          RegularVideoLinks(
+            url: 'https://jett.example/1080.mp4',
+            quality: '1080p',
+            server: 'Jett',
+            providerCode: 'jett',
+          ),
+        ],
+      },
+      now: now,
+    ).single;
+
+    expect(entry.link.sizeToken, isNull);
+    expect(entry.estimatedSizeBytes, isNull);
+  });
+
   test('keeps embedded pages out of the quality list', () {
     final catalog = PlaybackQualityCatalog.collect(
       linksByProvider: <String, List<RegularVideoLinks>>{
