@@ -665,6 +665,4 @@ class StreamDownloadsBridge(
         val call: MethodCall,
         val result: MethodChannel.Result,
     )
-
-
 }
