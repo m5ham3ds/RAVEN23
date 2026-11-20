@@ -217,16 +217,6 @@ class StreamDownloadsBridge(
             result.error("INVALID_ID", "A download id is required.", null)
             return
         }
-        val requestedEstimate = (arguments["estimatedDownloadBytes"] as? Number)?.toLong()
-        val availableBeforePrepare = appContext.filesDir.usableSpace
-        if (!hasEnoughStorageToStart(availableBeforePrepare, requestedEstimate)) {
-            result.error(
-                "STORAGE_LOW",
-                storageMessage(availableBeforePrepare, requestedEstimate),
-                null,
-            )
-            return
-        }
         if (pendingEnqueues.containsKey(id)) {
             result.error("ENQUEUE_IN_PROGRESS", "This download is already being prepared.", null)
             return
@@ -262,6 +252,16 @@ class StreamDownloadsBridge(
                     checkNotNull(store.originalRequest(id)), true)
                 null
             }
+            return
+        }
+        val requestedEstimate = (arguments["estimatedDownloadBytes"] as? Number)?.toLong()
+        val availableBeforePrepare = appContext.filesDir.usableSpace
+        if (!hasEnoughStorageToStart(availableBeforePrepare, requestedEstimate)) {
+            result.error(
+                "STORAGE_LOW",
+                storageMessage(availableBeforePrepare, requestedEstimate),
+                null,
+            )
             return
         }
         val token = Any()
