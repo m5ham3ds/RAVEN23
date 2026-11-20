@@ -45,6 +45,7 @@ import 'package:flutter/material.dart';
 import '../../screens/common/player.dart';
 import '../../screens/common/embedded_web_playback_screen.dart';
 import '../../screens/common/download_selection_sheets.dart';
+import '../../screens/common/offline_storage_preflight.dart';
 import '../../screens/common/manual_source_picker.dart';
 import '../../tv/player/tv_player_screen.dart';
 
@@ -984,6 +985,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
     }
     final selected = await DownloadSelectionSheets.showQualityCatalog(
       context,
+      scraperApiUrl: _scraperApiUrl,
       entries: entries,
       entriesListenable: entriesListenable,
       searchingListenable: searchingListenable,
@@ -999,6 +1001,15 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
       return;
     }
 
+    final hasStorage = await OfflineStoragePreflight.ensureAvailable(
+      context,
+      estimatedDownloadBytes: selected.estimatedSizeBytes,
+    );
+    if (!mounted) return;
+    if (!hasStorage) {
+      Navigator.pop(context, false);
+      return;
+    }
     final url = selected.link.url?.trim() ?? '';
     if (url.isEmpty) {
       _showErrorSheet('The selected quality returned an empty video URL.');
@@ -1060,6 +1071,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
               : 'From ${sourceProvider!.displayName}',
           mediaType: 'movie',
           quality: quality,
+          estimatedDownloadBytes: selected.estimatedSizeBytes,
           posterUrl: posterPath == null
               ? null
               : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
@@ -1160,6 +1172,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
 
     final selected = await DownloadSelectionSheets.showQualityCatalog(
       context,
+      scraperApiUrl: _scraperApiUrl,
       entries: entries,
     );
     if (!mounted) return;
@@ -1174,6 +1187,15 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
       return;
     }
 
+    final hasStorage = await OfflineStoragePreflight.ensureAvailable(
+      context,
+      estimatedDownloadBytes: selected.estimatedSizeBytes,
+    );
+    if (!mounted) return;
+    if (!hasStorage) {
+      Navigator.pop(context, false);
+      return;
+    }
     final url = selected.link.url?.trim() ?? '';
     if (url.isEmpty) {
       _showErrorSheet('The selected quality returned an empty video URL.');
@@ -1218,6 +1240,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           subtitle: 'From ${selected.sourceDisplayName}',
           mediaType: 'movie',
           quality: selected.qualityLabel,
+          estimatedDownloadBytes: selected.estimatedSizeBytes,
           posterUrl: _metadata.posterPath == null
               ? null
               : '${TMDB_BASE_IMAGE_URL}w500${_metadata.posterPath}',
