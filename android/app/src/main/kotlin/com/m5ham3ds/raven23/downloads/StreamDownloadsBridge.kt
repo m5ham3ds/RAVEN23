@@ -106,13 +106,43 @@ class StreamDownloadsBridge(
 
     /** Saves a validated MP4 directly into the public Documents/RAVEN23 tree. */
     private fun saveIntoRaven23Folder(call: MethodCall, result: MethodChannel.Result) {
-        withValidatedExport(call, result) { video ->
-            fileExecutor.execute {
-                try {
-                    val downloadId = call.argument<String>("id")
-                        ?: throw IllegalArgumentException("A download id is required.")
-                    val download = store.getDownload(downloadId)
-                        ?: throw IllegalStateException("Download not found.")
+        val downloadId = call.argument<String>("id")
+        if (downloadId.isNullOrBlank()) {
+            result.error("INVALID_ID", "A download id is required.", null)
+            return
+        }
+        val download = store.getDownload(downloadId)
+        if (download == null || download.state != Download.STATE_COMPLETED) {
+            result.error("DOWNLOAD_NOT_COMPLETE", "Wait until this download finishes before saving it.", null)
+            return
+        }
+        fileExecutor.execute {
+            try {
+                val rawTitle = StreamDownloadStore.requestMetadata(download.request)
+                    .optString("exportTitle")
+                    .ifBlank { StreamDownloadStore.requestMetadata(download.request).optString("title", "RAVEN23 video") }
+                val metadata = StreamDownloadStore.requestMetadata(download.request)
+                val isMovie = metadata.optString("mediaType").equals("movie", true)
+                val baseStem = sanitizeOfflineExportTitle(rawTitle)
+                val fileStem = buildOfflineExportStem(
+                    baseStem,
+                    isMovie,
+                    metadata.optInt("seasonNumber", -1),
+                    metadata.optInt("episodeNumber", -1),
+                    metadata.optString("subtitle"),
+                )
+                val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$baseStem"
+                val videoTemp = File(appContext.cacheDir, "raven23-export-$downloadId.mp4")
+                videoTemp.delete()
+                val directCopy = store.copyCompletedProgressiveMp4To(download, videoTemp)
+                val videoSource = if (directCopy) videoTemp else exporter.existingExport(downloadId)
+                    ?: run {
+                        videoTemp.delete()
+                        throw IllegalStateException(
+                            "This source needs MP4 preparation before it can be saved as one file. " +
+                                "Try Open with another player first, then save again.",
+                        )
+                    }
                     val metadata = StreamDownloadStore.requestMetadata(download.request)
                     val isMovie = metadata.optString("mediaType").equals("movie", true)
                     val rawTitle = metadata.optString("exportTitle")
@@ -141,19 +171,20 @@ class StreamDownloadsBridge(
                         }
                         savePublicFile(it, fileStem, mime, subtitleFolder, it.extension.lowercase(Locale.ROOT))
                     }
+                    videoTemp.delete()
                     mainHandler.post {
                         result.success(mapOf(
                             "saved" to true,
                             "videoUri" to videoUri,
                             "subtitleSaved" to (subtitleUri != null),
                             "subtitleUri" to subtitleUri,
+                            "copiedDirectlyFromCache" to directCopy,
                         ))
                     }
                 } catch (error: Exception) {
                     mainHandler.post { result.error("SAVE_COPY_FAILED", error.message, null) }
                 }
             }
-        }
     }
 
     internal fun buildOfflineExportStem(
