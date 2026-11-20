@@ -1,6 +1,6 @@
 # PHASE63.34 — Partial Offline Playback
 
-Status: Design recorded; implementation deliberately not enabled
+Status: Design only; implementation remains deliberately disabled as of 2026-11-20. Do not remove the completed-download guard until every acceptance test below is implemented and passes.
 User scenario: Watch the already-downloaded portion of a movie or episode while the remaining download continues.
 
 ## Why a download percentage is not a playable-time percentage
@@ -35,4 +35,10 @@ Removing the completed-state guard or opening the partial cache directly in the 
 - Downloading continues without corrupting or evicting the segments used by playback.
 - Completed-download export validation remains unchanged and still requires a complete audio/video track set and a trusted source duration.
 
-Until these conditions are met, partial downloads remain visible as downloading but are not offered as playable files.
+## 2026-11-20 implementation revalidation
+
+The current Android `StreamOfflinePlayerView` still enforces `Download.STATE_COMPLETED` before creating a Media3 cache-backed player. The app's download cache is a Media3 `SimpleCache` rooted at `filesDir/offline_streams`; the player uses a read-only cache datasource with no upstream. The current Flutter offline-player route is for completed downloads only and does not expose a verified playable-prefix timeline.
+
+This design was rechecked during the source-scan/quality-estimation work. No partial-playback code was enabled because the repository still has no cache-range timeline verifier for HLS, DASH, or progressive MP4, no moving playable-boundary bridge to the existing BetterPlayer UI, and no tests for concurrent cache reads/writes while the download continues. Merely removing the completed-state guard would violate cache-only playback and could fail at the first missing segment.
+
+Until these conditions are met, partial downloads remain visible as downloading but are not offered as playable files. This is a known, explicitly recorded limitation, not a completed feature.
