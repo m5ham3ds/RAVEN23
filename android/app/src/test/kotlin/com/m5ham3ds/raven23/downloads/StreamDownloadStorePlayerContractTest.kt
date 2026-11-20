@@ -161,6 +161,40 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun initialDownloadMustFitEstimateAndTwoHundredMiBReserve() {
+        val reserve = OFFLINE_STORAGE_RESERVE_BYTES
+        val estimate = 50L * 1024L * 1024L
+        assertFalse(hasEnoughStorageToStart(reserve, null))
+        assertFalse(hasEnoughStorageToStart(reserve + estimate, estimate))
+        assertTrue(hasEnoughStorageToStart(reserve + estimate + 1L, estimate))
+    }
+
+    @Test
+    fun activeDownloadPausesWhenStorageReachesTwoHundredMiB() {
+        val reserve = OFFLINE_STORAGE_RESERVE_BYTES
+        assertTrue(shouldPauseForLowStorage(reserve))
+        assertTrue(shouldPauseForLowStorage(reserve - 1L))
+        assertFalse(shouldPauseForLowStorage(reserve + 1L))
+    }
+
+    @Test
+    fun resumeRequiresSpaceForOnlyTheEstimatedRemainingBytes() {
+        val reserve = OFFLINE_STORAGE_RESERVE_BYTES
+        val total = 500L * 1024L * 1024L
+        val downloaded = 350L * 1024L * 1024L
+        val remaining = total - downloaded
+        assertFalse(hasEnoughStorageToResume(reserve + remaining, total, downloaded))
+        assertTrue(hasEnoughStorageToResume(reserve + remaining + 1L, total, downloaded))
+    }
+
+    @Test
+    fun unknownSizeStillRequiresTheTwoHundredMiBReserve() {
+        val reserve = OFFLINE_STORAGE_RESERVE_BYTES
+        assertFalse(hasEnoughStorageToResume(reserve, null, 0L))
+        assertTrue(hasEnoughStorageToResume(reserve + 1L, null, 0L))
+    }
+
+    @Test
     fun playerReflectionTargetsStillExist() {
         val store = StreamDownloadStore::class.java
         assertEquals(
