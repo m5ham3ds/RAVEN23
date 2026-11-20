@@ -1066,6 +1066,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           url: url,
           format: format,
           title: _metadata.movieName ?? 'Movie',
+          exportTitle: _metadata.movieName ?? 'Movie',
           subtitle: sourceProvider?.displayName == null
               ? null
               : 'From ${sourceProvider!.displayName}',
@@ -1237,6 +1238,7 @@ class _MovieVideoLoaderState extends State<_MovieVideoLoader> {
           url: url,
           format: format,
           title: _metadata.movieName ?? 'Movie',
+          exportTitle: _metadata.movieName ?? 'Movie',
           subtitle: 'From ${selected.sourceDisplayName}',
           mediaType: 'movie',
           quality: selected.qualityLabel,
