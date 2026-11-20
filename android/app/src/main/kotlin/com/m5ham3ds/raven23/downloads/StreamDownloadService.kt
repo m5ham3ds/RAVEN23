@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.UnstableApi
@@ -25,6 +27,8 @@ class StreamDownloadService : DownloadService(
     1_000L,
 ) {
     private val rateSamples = mutableMapOf<String, RateSample>()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var lowStoragePauseScheduled = false
 
     override fun onCreate() {
         createNotificationChannel()
@@ -40,6 +44,7 @@ class StreamDownloadService : DownloadService(
         downloads: MutableList<Download>,
         notMetRequirements: Int,
     ): Notification {
+        pauseIfStorageIsLow(downloads)
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -83,6 +88,31 @@ class StreamDownloadService : DownloadService(
             .setShowWhen(false)
             .setProgress(100, progress ?: 0, progress == null)
             .build()
+    }
+
+    private fun pauseIfStorageIsLow(downloads: List<Download>) {
+        val available = filesDir.usableSpace
+        if (!shouldPauseForLowStorage(available)) {
+            lowStoragePauseScheduled = false
+            return
+        }
+        if (lowStoragePauseScheduled) return
+        val activeIds = downloads
+            .filter { it.state == Download.STATE_DOWNLOADING }
+            .map { it.request.id }
+        if (activeIds.isEmpty()) return
+        lowStoragePauseScheduled = true
+        mainHandler.post {
+            activeIds.forEach { id ->
+                DownloadService.sendSetStopReason(
+                    applicationContext,
+                    StreamDownloadService::class.java,
+                    id,
+                    STORAGE_LOW_STOP_REASON,
+                    false,
+                )
+            }
+        }
     }
 
     private fun singleDownloadDetails(
