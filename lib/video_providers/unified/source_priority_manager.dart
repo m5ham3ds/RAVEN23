@@ -11,10 +11,11 @@ enum SourcePriorityCategory { movies, series, anime }
 enum SourcePriorityLane { primary, backup }
 
 /// Persists stable source identities, not list indexes or repository names.
-/// Primary order is user-owned. Backup combines manually pinned entries with
-/// sources promoted after sustained real playback; automatic entries can be
-/// re-ranked by measured playback reliability and startup time. Removing a
-/// source from either lane never uninstalls it from the repository catalogue.
+/// PRIMARY is the user's fixed, authoritative default/manual execution order.
+/// BACKUP is a separate automatic recovery lane: sustained, real playback
+/// evidence may add a working source and rank automatically-added entries by
+/// reliability/latency, but it must never alter PRIMARY or manual BACKUP picks.
+/// Health scans and extraction-only success are not playback verification.
 class SourcePriorityManager {
   SourcePriorityManager({SharedPreferences? preferences})
     : _preferences = preferences;
@@ -89,11 +90,10 @@ class SourcePriorityManager {
     await _pinBackupOrder(category, await getBackupKeys(category));
   }
 
-  /// Classifies a pre-existing BACKUP lane once during upgrade. Existing
-  /// entries are treated as user-curated unless the upgrade logic has already
-  /// identified and cleared the exact old auto-generated catalogue list.
-  /// This prevents future playback metrics from silently reordering a list
-  /// that the user had arranged before this version.
+  /// Classifies the existing BACKUP lane once during upgrade. Existing entries
+  /// are preserved exactly as found; newly auto-promoted entries are kept in a
+  /// separate unpinned portion so measured reliability can rank only that
+  /// automatically-managed portion.
   Future<void> preserveExistingBackupOrderIfNeeded(
     SourcePriorityCategory category,
   ) async {
@@ -126,9 +126,9 @@ class SourcePriorityManager {
     );
   }
 
-  /// Initializes a missing BACKUP lane without overwriting a user list.
-  /// Passing an empty iterable keeps unverified catalogue entries out of the
-  /// visible BACKUP lane until a real playback-success promotion is recorded.
+  /// Initializes a missing BACKUP lane without overwriting an existing lane.
+  /// Callers may seed the app's established automatic recovery candidates here;
+  /// this method never writes to PRIMARY and never reseeds an existing BACKUP.
   Future<bool> seedBackupKeysIfMissing(
     SourcePriorityCategory category,
     Iterable<String> keys,
@@ -168,12 +168,11 @@ class SourcePriorityManager {
   Future<bool> addPriorityKey(SourcePriorityCategory category, String key) =>
       addKey(category, SourcePriorityLane.primary, key);
 
-  /// Promotes a source to BACKUP only after the caller confirms sustained
-  /// real playback. [startupMs] is the measured delay until the first play
-  /// event, not an estimate from repository metadata or a health probe.
-  /// Verified additions are ranked by observed failure ratio, then average
-  /// startup latency. Explicitly curated BACKUP entries are pinned and never
-  /// moved by automatic measurement updates.
+  /// Adds a source to the automatic BACKUP recovery lane only after sustained
+  /// real playback. [startupMs] is measured until the first play event, never
+  /// inferred from a health probe or extracted link. PRIMARY is not touched.
+  /// Manual BACKUP entries remain pinned; automatically-added BACKUP entries
+  /// can be ranked by observed reliability and startup latency.
   Future<bool> promoteVerifiedPlayback(
     SourcePriorityCategory category,
     String stableSourceKey, {
@@ -214,8 +213,8 @@ class SourcePriorityManager {
     return added;
   }
 
-  /// Persists a real player-start failure for later reliability ranking. This
-  /// never inserts a source into BACKUP by itself.
+  /// Persists a real player-start failure for later recovery ranking. A
+  /// failure alone never inserts a source into BACKUP or changes PRIMARY.
   Future<void> recordPlaybackFailure(
     SourcePriorityCategory category,
     String stableSourceKey,
