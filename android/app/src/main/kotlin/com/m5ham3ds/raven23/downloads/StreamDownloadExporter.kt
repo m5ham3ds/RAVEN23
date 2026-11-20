@@ -24,6 +24,7 @@ import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.IOException
+import java.util.Locale
 import java.util.concurrent.CancellationException
 
 internal const val OFFLINE_EXPORT_TIMEOUT_MS = 30L * 60L * 1000L
@@ -389,15 +390,34 @@ class StreamDownloadExporter(
 
     private fun outputFile(download: Download): File {
         val metadata = StreamDownloadStore.requestMetadata(download.request)
-        val title = metadata.optString("title", "RAVEN23 video")
-            .replace(Regex("[^a-zA-Z0-9._ -]"), "_")
+        val rawTitle = metadata.optString("title", "RAVEN23 video")
+            .trim()
+            .ifBlank { "RAVEN23 video" }
+        val title = rawTitle
+            .replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_")
+            .replace(Regex("\\s+"), " ")
             .trim(' ', '.')
-            .take(80)
+            .take(96)
             .ifBlank { "RAVEN23 video" }
         val suffix = Integer.toHexString(download.request.id.hashCode())
         return File(exportDirectory, "$title-$suffix.mp4")
     }
 
+    /** Reuses a validated MP4 when available, otherwise creates one from the
+     * completed Media3 cache. This is the only path that needs a remux. */
+    fun exportValidated(downloadId: String, callback: (Result<File>) -> Unit) =
+        export(downloadId, callback)
+
+    fun existingExport(downloadId: String): File? {
+        val download = store.getDownload(downloadId) ?: return null
+        if (download.state != Download.STATE_COMPLETED) return null
+        val output = outputFile(download)
+        val marker = validationMarker(output)
+        val validMarker = runCatching {
+            marker.isFile && marker.readText().trim() == EXPORT_VALIDATION_VERSION
+        }.getOrDefault(false)
+        return output.takeIf { validMarker && isValidExport(download, it) }
+    }
     private companion object {
         const val TAG = "StreamDownloadExporter"
         const val EXPORT_HEADROOM_BYTES = 64L * 1024 * 1024
