@@ -220,8 +220,13 @@ class OfflineDownloadService implements OfflineDownloadGateway {
       _methods.invokeMethod<void>('openExternal', {'id': id});
 
   @override
-  Future<bool> saveCopy(String id) async =>
-      await _methods.invokeMethod<bool>('saveCopy', {'id': id}) ?? false;
+  Future<bool> saveCopy(String id) async {
+    final result = await _methods.invokeMapMethod<Object?, Object?>(
+      'saveCopy',
+      {'id': id},
+    );
+    return result?['saved'] == true;
+  }
 
   List<OfflineDownload> _decodeDownloads(Object? event) {
     if (event is! List) return const [];
