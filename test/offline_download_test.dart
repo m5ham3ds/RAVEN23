@@ -270,6 +270,33 @@ void main() {
     });
   });
 
+  testWidgets('native save result map is decoded as a successful copy', (tester) async {
+    const channel = MethodChannel('com.m5ham3ds.raven23/stream_downloads');
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'saveCopy') {
+        return <String, Object?>{
+          'saved': true,
+          'videoUri': 'content://media/external/video/media/1',
+          'subtitleSaved': true,
+          'subtitleUri': 'content://media/external/file/2',
+          'copiedDirectlyFromCache': true,
+        };
+      }
+      return null;
+    });
+    expect(
+      await OfflineDownloadService.instance.saveCopy('movie_1'),
+      isTrue,
+    );
+    expect(calls.single.method, 'saveCopy');
+    expect(calls.single.arguments, {'id': 'movie_1'});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+  });
+
   test('streaming and downloads share provider header inference', () {
     expect(
       VideoUtils.inferVideoHeaders(
