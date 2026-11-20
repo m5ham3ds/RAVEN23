@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-build-${{ github.workflow }}-${{ github.ref }}
+  group: android-build-${{ github.workflow }}-${{ github.ref }}-${{ contains(github.event.head_commit.message, '[ci-queue-bypass]') && github.sha || 'shared' }}
   cancel-in-progress: true
 
 jobs:
