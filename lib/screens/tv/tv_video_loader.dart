@@ -45,6 +45,7 @@ import 'package:flutter/material.dart';
 import '../../screens/common/player.dart';
 import '../../screens/common/embedded_web_playback_screen.dart';
 import '../../screens/common/download_selection_sheets.dart';
+import '../../screens/common/offline_storage_preflight.dart';
 import '../../screens/common/manual_source_picker.dart';
 import '../../tv/player/tv_player_screen.dart';
 
@@ -940,6 +941,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     }
     final selected = await DownloadSelectionSheets.showQualityCatalog(
       context,
+      scraperApiUrl: _scraperApiUrl,
       entries: entries,
       entriesListenable: entriesListenable,
       searchingListenable: searchingListenable,
@@ -955,6 +957,15 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       return;
     }
 
+    final hasStorage = await OfflineStoragePreflight.ensureAvailable(
+      context,
+      estimatedDownloadBytes: selected.estimatedSizeBytes,
+    );
+    if (!mounted) return;
+    if (!hasStorage) {
+      Navigator.pop(context, false);
+      return;
+    }
     final url = selected.link.url?.trim() ?? '';
     if (url.isEmpty) {
       _showErrorSheet('The selected quality returned an empty video URL.');
@@ -1023,6 +1034,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               'S${season.toString().padLeft(2, '0')} • E${episode.toString().padLeft(2, '0')} ${widget.metadata.episodeName ?? ''}',
           mediaType: 'episode',
           quality: quality,
+          estimatedDownloadBytes: selected.estimatedSizeBytes,
           posterUrl: posterPath == null
               ? null
               : '${TMDB_BASE_IMAGE_URL}w500$posterPath',
@@ -1125,6 +1137,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
 
     final selected = await DownloadSelectionSheets.showQualityCatalog(
       context,
+      scraperApiUrl: _scraperApiUrl,
       entries: entries,
     );
     if (!mounted) return;
@@ -1139,6 +1152,15 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
       return;
     }
 
+    final hasStorage = await OfflineStoragePreflight.ensureAvailable(
+      context,
+      estimatedDownloadBytes: selected.estimatedSizeBytes,
+    );
+    if (!mounted) return;
+    if (!hasStorage) {
+      Navigator.pop(context, false);
+      return;
+    }
     final url = selected.link.url?.trim() ?? '';
     if (url.isEmpty) {
       _showErrorSheet('The selected quality returned an empty video URL.');
@@ -1193,6 +1215,7 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
               '${widget.metadata.episodeName ?? ''} • ${selected.sourceDisplayName}',
           mediaType: 'episode',
           quality: selected.qualityLabel,
+          estimatedDownloadBytes: selected.estimatedSizeBytes,
           posterUrl: widget.metadata.posterPath == null
               ? null
               : '${TMDB_BASE_IMAGE_URL}w500${widget.metadata.posterPath}',
