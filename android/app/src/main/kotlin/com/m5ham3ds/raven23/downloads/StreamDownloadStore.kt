@@ -48,6 +48,17 @@ internal fun progressiveMimeType(format: String): String = when (format.trim().l
     )
 }
 
+internal fun canCopyProgressiveMp4FromCache(
+    state: Int,
+    mimeType: String?,
+    contentLength: Long,
+    bytesDownloaded: Long,
+): Boolean =
+    state == Download.STATE_COMPLETED &&
+        mimeType == MimeTypes.VIDEO_MP4 &&
+        contentLength > 0L &&
+        contentLength == bytesDownloaded
+
 @UnstableApi
 class StreamDownloadStore private constructor(context: Context) {
     private val appContext = context.applicationContext
@@ -352,10 +363,14 @@ class StreamDownloadStore private constructor(context: Context) {
         download: Download,
         destination: File,
     ): Boolean {
-        if (download.state != Download.STATE_COMPLETED) return false
-        if (download.request.mimeType != MimeTypes.VIDEO_MP4) return false
+        if (!canCopyProgressiveMp4FromCache(
+                download.state,
+                download.request.mimeType,
+                download.contentLength,
+                download.bytesDownloaded,
+            )
+        ) return false
         val length = download.contentLength
-        if (length <= 0L || length != download.bytesDownloaded) return false
         val dataSource = readOnlyCacheFactory(download.request).createDataSource()
         val dataSpec = DataSpec.Builder()
             .setUri(download.request.uri)
