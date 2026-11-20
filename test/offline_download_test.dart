@@ -397,6 +397,75 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets('save copy requires confirmation before writing to Documents', (tester) async {
+    final gateway = _FakeGateway([
+      _download(
+        'movie_save_confirm',
+        createdAt: 1,
+        state: OfflineDownloadState.completed,
+        progress: 100,
+        bytesDownloaded: 1024,
+        contentLength: 1024,
+      ),
+    ]);
+    final provider = OfflineDownloadProvider(service: gateway);
+    await provider.initialize();
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(home: DownloadsScreen()),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('download-actions-movie_save_confirm')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save a copy'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Save video to your phone?'), findsOneWidget);
+    expect(find.textContaining('Documents/RAVEN23/MOVIES'), findsOneWidget);
+    expect(gateway.operations, isNot(contains('saveCopy:movie_save_confirm')));
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(gateway.operations, contains('saveCopy:movie_save_confirm'));
+    provider.dispose();
+  });
+
+  testWidgets('canceling delete confirmation keeps the downloaded video', (tester) async {
+    final gateway = _FakeGateway([
+      _download(
+        'movie_delete_confirm',
+        createdAt: 2,
+        state: OfflineDownloadState.completed,
+        progress: 100,
+        bytesDownloaded: 1024,
+        contentLength: 1024,
+      ),
+    ]);
+    final provider = OfflineDownloadProvider(service: gateway);
+    await provider.initialize();
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(home: DownloadsScreen()),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('download-actions-movie_delete_confirm')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete download'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete download?'), findsOneWidget);
+    expect(gateway.operations, isNot(contains('remove:movie_delete_confirm')));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(gateway.operations, isNot(contains('remove:movie_delete_confirm')));
+    expect(provider.downloadForId('movie_delete_confirm'), isNotNull);
+    provider.dispose();
+  });
+
   testWidgets('status chips are neutral, except a failure in the error colour',
       (tester) async {
     final gateway = _FakeGateway([
