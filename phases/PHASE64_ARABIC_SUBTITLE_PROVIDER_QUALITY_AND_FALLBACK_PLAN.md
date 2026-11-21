@@ -5,7 +5,8 @@
 **Baseline inspected:** main commit 6d12023e446db3d444716c3b407572a89cf545be  
 **Baseline build:** GitHub Actions #249 passed (Flutter tests, Android tests, ARM64 release APK, ABI/size audit).  
 **Language target:** Arabic (ar) as the automatic preferred subtitle language.  
-**Cost constraint:** free provider/API tiers only. No paid AI-translation service, VIP plan, or paid provider is included in this proposal.
+**Cost constraint:** free provider/API tiers only. No paid AI-translation service, VIP plan, or paid provider is included in this proposal.  
+**Owner-confirmed product rule (2026-11-21):** search for and select already-published Arabic subtitle files only. Do not translate English subtitles into Arabic, do not invoke an AI translation endpoint, and do not generate substitute Arabic captions.
 
 ## 0. Approval gate
 
@@ -33,7 +34,8 @@ Make Arabic subtitles the reliable default for movies, series, and anime by:
 ### Not included
 
 - Paid plans, paid translation quotas, paid AI subtitle generation, or subscription-only APIs.
-- Automatically translating English subtitles into Arabic in this provider phase. The target here is finding and applying actual Arabic subtitle files. Any future machine-translation path must be a separate proposal and must not be presented as a free feature when the provider marks it paid.
+- Translating English subtitles into Arabic by any automated service, model, API, or local conversion pipeline. The owner explicitly confirmed that RAVEN23 must search for existing Arabic subtitle files and apply those files; it must not convert English subtitles into Arabic.
+- AI subtitle-generation and translation endpoints, including paid and free trials. The task is discovery of existing Arabic files, not the production of new ones.
 - Changing the main player design, stream provider order, video quality policy, offline player, download flow, or phone export.
 - The deferred DCIM subtitle-sidecar issue.
 
@@ -66,6 +68,7 @@ The existing project is not starting from zero. The following code already exist
 - SubDL's current integration calls the older v1 endpoint. Its current developer documentation describes v2 search and file-matching endpoints that expose release match scores.
 - ArabicSubs is designed around an Arabic catalogue and exposes title/episode subtitle records, release labels, download counts, and translation-type metadata. Its current API contract is different from the custom proxy adapter already in RAVEN23 and needs to be mapped deliberately.
 - If a preferred Arabic provider subtitle is already marked selectedByDefault, the automatic external-provider search is skipped. This can suppress better alternatives when the in-stream Arabic track is badly timed or otherwise poor.
+- The owner has explicitly excluded translating English subtitle files into Arabic; candidate discovery and scoring must never invoke a translation service as a fallback.
 - The current OpenSubtitles and SubDL queries include both Arabic and English even when Arabic is preferred. The final auto-apply filter is Arabic-only, but the provider search still spends quota/time on non-Arabic results.
 - SubtitleFileNormalizer first tries UTF-8 and then falls back to Windows-1252. It does not currently have explicit Arabic Windows-1256 or UTF-16 decoding. Some older Arabic subtitle files may therefore be corrupted even when the provider returned the correct file.
 - Search quality and timing quality are different problems. Correct title/episode identity does not guarantee the subtitle is synchronized to the exact release.
@@ -175,6 +178,70 @@ Constraints:
 
 Keep it as a final independent compatibility source while the documented providers are evaluated. Do not remove or rewrite its video-provider or stream-scraping behavior in this phase. Its subtitle adapter may only be changed under the explicit subtitle scope and must not alter stream URLs, provider selection, or source priority.
 
+### Candidate E — SubtitleCenter API v1: human-first Subscene archive and release/hash matching
+
+Official API documentation: https://subtitlecenter.com/api/docs  
+OpenAPI schema: https://subtitlecenter.com/api/openapi.yaml
+
+Documented capabilities:
+- Free JSON API, no key required for anonymous testing, with registered and open-source application-key tiers.
+- Search by IMDb ID, TMDB ID, exact season/episode, release filename, or OpenSubtitles video hash.
+- Release matching returns matching subtitles with uploader details and download links.
+- Machine-translated subtitles are excluded by default and can be explicitly requested by API filter. This matches the owner-confirmed human/existing-Arabic-file preference.
+- The website has Arabic as a language category and imports the former Subscene archive.
+
+Critical current availability:
+- The API documentation currently states that the API is paused and all /api/v1 calls return HTTP 503 until the service is reactivated.
+- Therefore this is a **watchlist candidate only**, not an active production fallback at this time. Do not implement against a paused API. Recheck availability during PHASE64.0 and add it only after a real Arabic search and download succeed.
+
+### Candidate F — SubF2M: community Arabic catalogue
+
+Website: https://subf2m.co
+
+Evidence and limitations:
+- The independent Bazarr provider catalog maps the Arabic language to ara for SubF2M and includes captured Arabic episode pages in its test fixtures (for example, fixture examples for Chernobyl and The Matrix).
+- The available implementation is a community scraper, not a documented official API contract in the material reviewed for this plan.
+- It is a promising Arabic coverage candidate, but live results, exact episode quality, site terms, robots policy, download behavior, and stable access must be validated before implementation.
+- No CAPTCHA, Cloudflare, Anubis, or other access-control bypass is allowed. If automated access is disallowed or blocked, exclude it rather than building a bypass.
+
+### Candidate G — Sub-Scene: Arabic-capable community mirror
+
+Website: https://sub-scene.com
+
+Evidence and limitations:
+- The independent Bazarr+ provider catalog describes this Subscene-style mirror as covering 35+ languages, including Arabic, for movie and episode subtitles.
+- Its community adapter currently relies on browser-like scraping and anti-bot challenge handling. This is not equivalent to a documented, provider-authorized public API.
+- Keep it in the experimental research pool only. Do not integrate challenge-solving, CAPTCHA bypass, proxy rotation, or other access-control circumvention. A supported API or explicit permission is required before any production integration.
+- Its catalogue may overlap with SubDL's Subscene archive mirror; overlap must be measured before counting it as an independent source.
+
+### Candidate H — AnimeTosho: anime-only Arabic archive attachment source
+
+Website: https://animetosho.org
+
+Evidence and limitations:
+- The current Bazarr Subliminal provider implementation lists ara (Arabic) among AnimeTosho's supported languages.
+- Its adapter consumes AnimeTosho JSON feeds and retrieves embedded subtitle attachments for older anime releases by AniDB episode identity. It is an archive/attachment source, not a guaranteed current-release Arabic subtitle catalogue.
+- Include it in the anime-only benchmark. Verify that an attachment is an actual Arabic subtitle file, matches the requested anime episode/release, and can be retrieved within the site's documented/public access rules.
+- The provider's archive-only notes indicate that new torrent ingestion stopped on 2026-05-09; this may limit coverage of newly released episodes. Do not present it as the primary current-season anime provider.
+
+### Candidate I — Other community sources from the Bazarr provider ecosystem
+
+The Bazarr/Bazarr+ ecosystem lists dozens of independent providers, but language coverage differs significantly. Many are built for Greek, Romanian, Persian, Turkish, Bulgarian, Polish, French, or other language communities; their existence does not prove Arabic coverage.
+
+Rules for this pool:
+- Only shortlist providers whose own current language maps or captured live pages explicitly demonstrate Arabic (ar/ara).
+- Verify movies versus series and exact episode handling separately.
+- Verify terms and API availability before automation.
+- Prefer a documented provider API. Treat HTML scrapers as experimental and do not evade access controls.
+- Do not clone a full third-party scraper framework into RAVEN23. Reimplement only a small, scoped adapter where access is authorized and the test corpus proves measurable Arabic coverage.
+
+### Source counting and overlap
+
+- SubDL's preserved Subscene archive is part of SubDL's catalogue, not a separate provider.
+- SubtitleCenter's Subscene archive is a separate candidate API, but its current API is paused.
+- A website and a mirror that carry the same file must be deduplicated by file hash/metadata when possible and must not be counted as two independent successful sources.
+- The third-party Bazarr/Bazarr+ catalogs are research references for discovering providers and language support; they are not subtitle providers themselves and their code is not automatically authorized for inclusion in RAVEN23.
+
 ---
 
 ## 4. Proposed provider orchestration and fallback behavior
@@ -227,11 +294,15 @@ The final provider priority must be derived from measured results. A provider th
 
 ## 6. Proposed implementation phases
 
-### PHASE64.0 — Baseline and provider contract tests
-- Record current provider results and failures for an agreed benchmark title set.
-- Verify API documentation, required credentials, free limits, and exact request/response contracts for each candidate.
+### PHASE64.0 — Baseline and expanded Arabic-provider discovery
+- Record current provider results and failures for a fixed benchmark of movies, ordinary series, and anime.
+- Check every provider separately for Arabic availability, exact episode identity, release matching, actual download success, human/machine label, and synchronization signals.
+- Verify API documentation, current service availability, credentials, free limits, key-sharing restrictions, site terms, robots/access policy, and exact request/response contracts.
+- Benchmark the existing five paths plus SubF2M, Sub-Scene, AnimeTosho, and SubtitleCenter where each source is lawfully and technically accessible.
+- Mark paused, captcha-protected, undocumented, or access-restricted sources as unavailable; do not bypass their controls.
+- Identify duplicate catalogues and mirrored files so the final provider count reflects independent sources rather than aliases.
 - Create mocked tests for every documented provider response and failure mode.
-- No player UI or provider behavior changes in this stage.
+- No player UI, settings, subtitle search order, or provider behavior changes in this stage.
 
 ### PHASE64.1 — Safe free-key configuration
 - Define how the owner will provide free API credentials.
@@ -243,7 +314,11 @@ The final provider priority must be derived from measured results. A provider th
 ### PHASE64.2 — Documented provider adapters
 - OpenSubtitles.com API v1 only; remove reliance on the VIP-only legacy route for free operation.
 - SubDL API v2 search/download and release match-score support.
-- ArabicSubs documented v1 via a secure proxy, including translationType and exact episode metadata.
+- ArabicSubs documented v1 via a secure proxy, including the documented translationType field and exact episode metadata.
+- SubF2M experimental adapter, only if the live Arabic benchmark and site access rules permit automated retrieval.
+- Sub-Scene experimental candidate, only if the provider supplies an approved API/access path; never build CAPTCHA/anti-bot bypass.
+- AnimeTosho anime-only adapter, after confirming Arabic attachment availability and AniDB episode mapping.
+- SubtitleCenter, only if its currently paused API returns to service and a live Arabic test passes.
 - SubSource documented API, only after verifying Arabic/episode coverage.
 - Preserve RAVEN23 Scraper API as the last compatibility source.
 
@@ -300,13 +375,23 @@ Acceptance:
 - Arabic text encoding, RTL rendering, and timing are checked on an actual Android device.
 - No protected feature group is changed; every phase declares the protected-scope impact.
 
-## 8. Owner decisions needed before implementation
+## 8. Owner decisions and current confirmed direction
 
-1. **Free-key model:** use each user's own free API keys (BYOK) in RAVEN23, or use only providers that can legally be served through the owner's private backend/proxy without violating their free-tier terms? SubDL explicitly restricts using a free key as a shared key for a commercial service; its terms permit per-user keys.
-2. **Arabic content policy:** automatically prefer human-authored Arabic subtitles and reject machine-generated results unless the user explicitly enables them?
-3. **Low-confidence matches:** keep the currently available subtitle and show alternatives, rather than silently replacing it with a weak release match?
+### Confirmed by the owner on 2026-11-21
 
-These decisions should be confirmed before PHASE64.1/64.2. No provider integration or player change is authorized by this proposal alone.
+- Search for existing Arabic subtitle files and apply those files.
+- Do not translate English subtitles into Arabic.
+- Do not use AI translation, machine-translation APIs, or generated replacement subtitles in this phase.
+- Use free sources only; respect each provider's published quotas and key-sharing rules.
+- Keep the currently deferred DCIM subtitle-sidecar export issue outside this work.
+
+### Decisions still to settle before provider credentials or production ranking
+
+1. **Free-key model:** use each user's own free API keys (BYOK) in RAVEN23, or use only providers that can legally be served through the owner's private backend/proxy without violating their free-tier terms? SubDL explicitly prohibits using one free key as a shared key to power a commercial service and permits per-user keys.
+2. **Human-authored versus labelled machine-submitted files:** proposed default is to prefer human-authored Arabic files and exclude files explicitly marked as AI/machine translated. Confirm whether all machine-labelled files should be excluded or merely ranked below human submissions.
+3. **Low-confidence matches:** keep the currently selected/available subtitle and show alternatives, rather than silently replacing it with a weak release match.
+
+No provider integration or player change is authorized by this proposal alone. PHASE64.0 remains a research/benchmark stage and must not modify application behavior.
 
 ## 9. Official references checked on 2026-11-21
 
@@ -315,4 +400,7 @@ These decisions should be confirmed before PHASE64.1/64.2. No provider integrati
 - SubDL current API v2 and free limits: https://subdl.com/developers
 - SubDL terms and per-user free-key restriction: https://subdl.com/terms
 - SubSource documented API and free limits: https://subsource.net/api-docs
-- ArabicSubs API, free tier, Arabic endpoints, and key-handling guidance: https://arabicsubs.com/api-access and https://arabicsubs.com/api/v1/openapi.json
+- ArabicSubs API, free tier, Arabic endpoints, documented translationType schema, and key-handling guidance: https://arabicsubs.com/api-access and https://arabicsubs.com/api/v1/openapi.json
+- SubtitleCenter free API, current paused status, human/machine filtering, exact-release and hash lookup: https://subtitlecenter.com/api/docs
+- SubF2M and Sub-Scene language coverage evidence in the independent Bazarr+ provider catalog: https://github.com/LavX/bazarr-provider-catalog
+- AnimeTosho Arabic language support in the Bazarr Subliminal provider implementation: https://github.com/morpheus65535/bazarr/blob/master/custom_libs/subliminal_patch/providers/animetosho.py
