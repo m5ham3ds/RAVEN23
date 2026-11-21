@@ -48,13 +48,14 @@ internal object OfflineSubtitleFormat {
             val text = lines.drop(timingIndex + 1).joinToString("\n").trim()
             if (text.isEmpty()) continue
 
-            val start = "\${timing.groupValues[1].ifEmpty { "00" }}:" +
-                "\${timing.groupValues[2]}:\${timing.groupValues[3]}," +
+            val start = (timing.groupValues[1].ifEmpty { "00" }) + ":" +
+                timing.groupValues[2] + ":" + timing.groupValues[3] + "," +
                 timing.groupValues[4]
-            val end = "\${timing.groupValues[5].ifEmpty { "00" }}:" +
-                "\${timing.groupValues[6]}:\${timing.groupValues[7]}," +
+            val end = (timing.groupValues[5].ifEmpty { "00" }) + ":" +
+                timing.groupValues[6] + ":" + timing.groupValues[7] + "," +
                 timing.groupValues[8]
-            cues += "\${cues.size + 1}\n$start --> $end\n$text"
+            cues += (cues.size + 1).toString() + "\n" +
+                start + " --> " + end + "\n" + text
         }
 
         require(cues.isNotEmpty()) { "Selected subtitle contains no valid WebVTT cues." }
