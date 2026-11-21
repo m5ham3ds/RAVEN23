@@ -1,6 +1,6 @@
 # PHASE63.34 — Partial Offline Playback
 
-Status: Design only; implementation remains deliberately disabled as of 2026-11-20. Do not remove the completed-download guard until every acceptance test below is implemented and passes.
+Status: The earlier “design only / deliberately disabled” wording is superseded by PHASE63.39. Partial offline playback is now an explicit product requirement. Keep the completed-file fallback until the cache-only incremental path below is implemented and verified; do not silently treat this transitional fallback as completion of the requested feature.
 User scenario: Watch the already-downloaded portion of a movie or episode while the remaining download continues.
 
 ## Why a download percentage is not a playable-time percentage
@@ -11,7 +11,7 @@ A progress value such as 40% describes downloaded bytes. It does not prove that 
 
 - Completed downloads are exported from the Media3 download cache to a validated MP4.
 - The Flutter offline player uses the application's BetterPlayer-based controls and gestures.
-- The native Media3 cache player is a separate PlatformView and currently rejects non-completed downloads.
+- The existing completed-file path uses the same BetterPlayer-based player surface; it remains the safe fallback while a verified incremental cache bridge is built.
 - The complete-download export path must remain cache-only and must not fetch missing segments from the internet during offline playback.
 
 Removing the completed-state guard or opening the partial cache directly in the separate native player would either fail at cache misses or break the requirement to retain the same player controls. It is therefore not an acceptable implementation.
@@ -41,4 +41,4 @@ The current Android `StreamOfflinePlayerView` still enforces `Download.STATE_COM
 
 This design was rechecked during the source-scan/quality-estimation work. No partial-playback code was enabled because the repository still has no cache-range timeline verifier for HLS, DASH, or progressive MP4, no moving playable-boundary bridge to the existing BetterPlayer UI, and no tests for concurrent cache reads/writes while the download continues. Merely removing the completed-state guard would violate cache-only playback and could fail at the first missing segment.
 
-Until these conditions are met, partial downloads remain visible as downloading but are not offered as playable files. This is a known, explicitly recorded limitation, not a completed feature.
+The above guard is a transitional safety fallback only. The required end state is concurrent preparation from the earliest safely available cache data and playback of the verified contiguous prefix while download continues. The percentage downloaded must never be substituted for timeline coverage. PHASE63.39 is the active scope and acceptance authority; older wording that frames partial playback as a permanently disabled or out-of-scope feature must not be used.
