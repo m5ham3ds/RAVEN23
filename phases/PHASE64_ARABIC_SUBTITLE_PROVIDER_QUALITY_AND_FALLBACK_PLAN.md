@@ -129,34 +129,7 @@ Constraints:
 - Respect the free download quota. Do not rotate keys or accounts to bypass limits.
 - The app must not silently download English when the selected preference is Arabic.
 
-### Candidate C — SubDL API v2: large catalogue and release matching
-
-Official developer documentation: https://subdl.com/developers  
-Terms: https://subdl.com/terms
-
-Documented free allowance:
-- 2,000 searches per day;
-- 50 downloads per day;
-- subtitle search and download are available on the free key;
-- AI translation is paid and is therefore excluded from this free-only plan.
-
-Documented capabilities:
-- 6 million-plus subtitle files across 90-plus languages;
-- TMDB/IMDb title identifiers;
-- movie, TV, episode, and season-pack search;
-- release-filename matching;
-- a match_score from 0 to 1 on the file-search endpoint, with the documentation identifying scores of 0.8 or higher as confident release matches;
-- direct single-file download options.
-
-Why evaluate it: its release-aware matching can help avoid subtitles that belong to another encode or release even when the title and episode are correct.
-
-Important terms constraint:
-- SubDL's terms say a free API key must not be used as a shared key to power a commercial service for its users.
-- The terms allow an app to let each user bring their own API key, with each user's requests counted against that user's own account.
-- Do not bundle one free shared key in the APK or use a free key pool to bypass limits.
-- Use documented v2 endpoints; do not silently treat paid AI translation as free.
-
-### Candidate D — SubSource documented API: replace the undocumented flow
+### Candidate C — SubSource documented API: replace the undocumented flow
 
 Official API documentation: https://subsource.net/api-docs
 
@@ -178,23 +151,12 @@ Constraints:
 
 Keep it as a final independent compatibility source while the documented providers are evaluated. Do not remove or rewrite its video-provider or stream-scraping behavior in this phase. Its subtitle adapter may only be changed under the explicit subtitle scope and must not alter stream URLs, provider selection, or source priority.
 
-### Candidate E — SubtitleCenter API v1: human-first Subscene archive and release/hash matching
+### Sources explicitly excluded by owner decision
 
-Official API documentation: https://subtitlecenter.com/api/docs  
-OpenAPI schema: https://subtitlecenter.com/api/openapi.yaml
+- **SubDL API v2:** excluded completely from PHASE64 research, provider adapters, fallback order, and acceptance benchmarks by the owner's direct instruction. Do not add or migrate to SubDL API v2. The existing repository uses the legacy SubDL API v1 path; this planning update does not alter that existing code. Removing that separate v1 integration would require a separate direct instruction.
+- **SubtitleCenter:** excluded completely from PHASE64 and must not be integrated through scraping or another workaround. Its official API status page says the API is paused by its maintainers and all /api/v1 calls return HTTP 503 while the website itself remains open. Direct checks of /api/v1/languages and /api/v1/stats also returned 503. SubtitleCenter is not currently integrated in RAVEN23 (repository search found no implementation). Although its website currently lists Arabic subtitle files, the owner chose to abandon it because its API is provider-paused; do not add it to the app or benchmark unless the owner explicitly reopens that decision.
 
-Documented capabilities:
-- Free JSON API, no key required for anonymous testing, with registered and open-source application-key tiers.
-- Search by IMDb ID, TMDB ID, exact season/episode, release filename, or OpenSubtitles video hash.
-- Release matching returns matching subtitles with uploader details and download links.
-- Machine-translated subtitles are excluded by default and can be explicitly requested by API filter. This matches the owner-confirmed human/existing-Arabic-file preference.
-- The website has Arabic as a language category and imports the former Subscene archive.
-
-Critical current availability:
-- The API documentation currently states that the API is paused and all /api/v1 calls return HTTP 503 until the service is reactivated.
-- Therefore this is a **watchlist candidate only**, not an active production fallback at this time. Do not implement against a paused API. Recheck availability during PHASE64.0 and add it only after a real Arabic search and download succeed.
-
-### Candidate F — SubF2M: community Arabic catalogue
+### Candidate D — SubF2M: community Arabic catalogue
 
 Website: https://subf2m.co
 
@@ -204,7 +166,7 @@ Evidence and limitations:
 - It is a promising Arabic coverage candidate, but live results, exact episode quality, site terms, robots policy, download behavior, and stable access must be validated before implementation.
 - No CAPTCHA, Cloudflare, Anubis, or other access-control bypass is allowed. If automated access is disallowed or blocked, exclude it rather than building a bypass.
 
-### Candidate G — Sub-Scene: Arabic-capable community mirror
+### Candidate E — Sub-Scene: Arabic-capable community mirror
 
 Website: https://sub-scene.com
 
@@ -214,7 +176,7 @@ Evidence and limitations:
 - Keep it in the experimental research pool only. Do not integrate challenge-solving, CAPTCHA bypass, proxy rotation, or other access-control circumvention. A supported API or explicit permission is required before any production integration.
 - Its catalogue may overlap with SubDL's Subscene archive mirror; overlap must be measured before counting it as an independent source.
 
-### Candidate H — AnimeTosho: anime-only Arabic archive attachment source
+### Candidate F — AnimeTosho: anime-only Arabic archive attachment source
 
 Website: https://animetosho.org
 
@@ -237,8 +199,6 @@ Rules for this pool:
 
 ### Source counting and overlap
 
-- SubDL's preserved Subscene archive is part of SubDL's catalogue, not a separate provider.
-- SubtitleCenter's Subscene archive is a separate candidate API, but its current API is paused.
 - A website and a mirror that carry the same file must be deduplicated by file hash/metadata when possible and must not be counted as two independent successful sources.
 - The third-party Bazarr/Bazarr+ catalogs are research references for discovering providers and language support; they are not subtitle providers themselves and their code is not automatically authorized for inclusion in RAVEN23.
 
@@ -298,7 +258,7 @@ The final provider priority must be derived from measured results. A provider th
 - Record current provider results and failures for a fixed benchmark of movies, ordinary series, and anime.
 - Check every provider separately for Arabic availability, exact episode identity, release matching, actual download success, human/machine label, and synchronization signals.
 - Verify API documentation, current service availability, credentials, free limits, key-sharing restrictions, site terms, robots/access policy, and exact request/response contracts.
-- Benchmark the existing five paths plus SubF2M, Sub-Scene, AnimeTosho, and SubtitleCenter where each source is lawfully and technically accessible.
+- Benchmark the existing eligible paths plus SubF2M, Sub-Scene, and AnimeTosho where each source is lawfully and technically accessible.
 - Mark paused, captcha-protected, undocumented, or access-restricted sources as unavailable; do not bypass their controls.
 - Identify duplicate catalogues and mirrored files so the final provider count reflects independent sources rather than aliases.
 - Create mocked tests for every documented provider response and failure mode.
@@ -313,7 +273,6 @@ The final provider priority must be derived from measured results. A provider th
 
 ### PHASE64.2 — Documented provider adapters
 - OpenSubtitles.com API v1 only; remove reliance on the VIP-only legacy route for free operation.
-- SubDL API v2 search/download and release match-score support.
 - ArabicSubs documented v1 via a secure proxy, including the documented translationType field and exact episode metadata.
 - SubF2M experimental adapter, only if the live Arabic benchmark and site access rules permit automated retrieval.
 - Sub-Scene experimental candidate, only if the provider supplies an approved API/access path; never build CAPTCHA/anti-bot bypass.
@@ -397,8 +356,6 @@ No provider integration or player change is authorized by this proposal alone. P
 
 - OpenSubtitles API setup: https://opensubtitles.tawk.help/article/getting-started
 - OpenSubtitles free access and old API migration: https://opensubtitles.tawk.help/article/about-the-api and https://blog.opensubtitles.com/opensubtitles/web/understanding-opensubtitles-websites-and-services
-- SubDL current API v2 and free limits: https://subdl.com/developers
-- SubDL terms and per-user free-key restriction: https://subdl.com/terms
 - SubSource documented API and free limits: https://subsource.net/api-docs
 - ArabicSubs API, free tier, Arabic endpoints, documented translationType schema, and key-handling guidance: https://arabicsubs.com/api-access and https://arabicsubs.com/api/v1/openapi.json
 - SubtitleCenter free API, current paused status, human/machine filtering, exact-release and hash lookup: https://subtitlecenter.com/api/docs
