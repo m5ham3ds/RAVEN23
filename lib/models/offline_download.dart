@@ -111,6 +111,12 @@ class OfflineDownload {
     this.expectedDurationMs,
     this.estimatedDownloadBytes,
     this.streamIdentity = const <String, Object?>{},
+    this.subtitleRequested = false,
+    this.subtitleStatus = 'none',
+    this.seasonEpisodes = const <Map<String, Object?>>[],
+    this.allSeasons = const <Map<String, Object?>>[],
+    this.seriesPosterPath,
+    this.seriesBackdropPath,
   });
 
   final String id;
@@ -137,6 +143,12 @@ class OfflineDownload {
   /// Signed backend estimate for the selected download quality, in bytes.
   final int? estimatedDownloadBytes;
   final Map<String, Object?> streamIdentity;
+  final bool subtitleRequested;
+  final String subtitleStatus;
+  final List<Map<String, Object?>> seasonEpisodes;
+  final List<Map<String, Object?>> allSeasons;
+  final String? seriesPosterPath;
+  final String? seriesBackdropPath;
 
   bool get isComplete => state == OfflineDownloadState.completed;
   bool get isActive =>
@@ -180,6 +192,12 @@ class OfflineDownload {
       expectedDurationMs: expectedDurationMs,
       estimatedDownloadBytes: estimatedDownloadBytes,
       streamIdentity: streamIdentity,
+      subtitleRequested: subtitleRequested,
+      subtitleStatus: subtitleStatus,
+      seasonEpisodes: seasonEpisodes,
+      allSeasons: allSeasons,
+      seriesPosterPath: seriesPosterPath,
+      seriesBackdropPath: seriesBackdropPath,
     );
   }
 
@@ -223,6 +241,12 @@ class OfflineDownload {
       expectedDurationMs: value<num>('expectedDurationMs')?.toInt(),
       estimatedDownloadBytes: value<num>('estimatedDownloadBytes')?.toInt(),
       streamIdentity: streamIdentity,
+      subtitleRequested: value<bool>('subtitleRequested') ?? false,
+      subtitleStatus: value<String>('subtitleStatus') ?? 'none',
+      seasonEpisodes: _offlineMetadataRows(map['seasonEpisodes']),
+      allSeasons: _offlineMetadataRows(map['allSeasons']),
+      seriesPosterPath: value<String>('seriesPosterPath'),
+      seriesBackdropPath: value<String>('seriesBackdropPath'),
     );
   }
 }
@@ -267,6 +291,10 @@ class OfflineDownloadRequest {
     this.source,
     this.exportTitle,
     this.streamIdentity = const <String, Object?>{},
+    this.seasonEpisodes = const <Map<String, Object?>>[],
+    this.allSeasons = const <Map<String, Object?>>[],
+    this.seriesPosterPath,
+    this.seriesBackdropPath,
   });
 
   final String id;
@@ -299,6 +327,10 @@ class OfflineDownloadRequest {
   /// Stable provenance for the exact selected stream; this is metadata only
   /// and is not used as an automatic URL-renewal resolver.
   final Map<String, Object?> streamIdentity;
+  final List<Map<String, Object?>> seasonEpisodes;
+  final List<Map<String, Object?>> allSeasons;
+  final String? seriesPosterPath;
+  final String? seriesBackdropPath;
 
   Map<String, Object?> toMap() => {
         'id': id,
@@ -326,5 +358,21 @@ class OfflineDownloadRequest {
         'subtitleTrackName': subtitleTrackName,
         'subtitleTrackHeaders': subtitleTrackHeaders,
         'exportTitle': exportTitle,
+        'seasonEpisodes': seasonEpisodes,
+        'allSeasons': allSeasons,
+        'seriesPosterPath': seriesPosterPath,
+        'seriesBackdropPath': seriesBackdropPath,
       };
+}
+
+List<Map<String, Object?>> _offlineMetadataRows(Object? raw) {
+  if (raw is! List) return const <Map<String, Object?>>[];
+  return raw
+      .whereType<Map>()
+      .map(
+        (row) => <String, Object?>{
+          for (final entry in row.entries) entry.key.toString(): entry.value,
+        },
+      )
+      .toList(growable: false);
 }
