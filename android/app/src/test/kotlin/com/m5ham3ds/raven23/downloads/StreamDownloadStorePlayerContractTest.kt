@@ -212,7 +212,7 @@ class StreamDownloadStorePlayerContractTest {
     fun episodeExportIncludesSeasonEpisodeAndEpisodeName() {
         assertEquals(
             "ONE PIECE - S02E07 - The Adventure Begins",
-            StreamDownloadsBridge.buildOfflineExportStem(
+            OfflineExportFileNames.buildStem(
                 title = "ONE PIECE",
                 isMovie = false,
                 season = 2,
@@ -234,7 +234,7 @@ class StreamDownloadStorePlayerContractTest {
     fun exportTitleSanitizerRemovesUnsafePathCharacters() {
         assertEquals(
             "One_ Piece_ Season 2",
-            StreamDownloadsBridge.sanitizeOfflineExportTitle("One/ Piece: Season 2"),
+            OfflineExportFileNames.sanitize("One/ Piece: Season 2"),
         )
     }
 
