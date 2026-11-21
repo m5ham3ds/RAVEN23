@@ -120,7 +120,7 @@ class _OfflinePlayerScreenState extends State<OfflinePlayerScreen> {
         ? fallbackParts[1].replaceFirst(RegExp(r'^E\d+\s*'), '').trim()
         : '';
     return EpisodeMetadata(
-      episodeId: _intValue(row, 'episodeId') ?? number,
+      episodeId: _intValue(row, 'episodeId') ?? 0,
       episodeName: savedName?.isNotEmpty == true
           ? savedName!
           : (fallbackName.isNotEmpty ? fallbackName : 'Episode $number'),
