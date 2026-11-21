@@ -38,6 +38,9 @@ class PlayerExternalSubtitles {
   List<BetterPlayerSubtitlesSource> get appliedSubtitles =>
       List.unmodifiable(_appliedSubtitles);
 
+  List<ExternalSubtitle> get availableExternalSubtitles =>
+      List<ExternalSubtitle>.unmodifiable(_availableExternalSubtitles);
+
   BetterPlayerSubtitlesSource? get preferredCachedSubtitle =>
       _preferredRestoredSource;
 
