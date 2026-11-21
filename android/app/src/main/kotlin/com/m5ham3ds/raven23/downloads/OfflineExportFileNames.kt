@@ -28,8 +28,8 @@ internal object OfflineExportFileNames {
         // Strip only the episode-code prefix and trailing provider attribution.
         // Do not split on the first bullet: that would discard "E07 The Name".
         val label = episodeLabel
-            .substringBefore(" • From ", missingDelimiterValue = episodeLabel)
-            .substringBefore(" • Server ", missingDelimiterValue = episodeLabel)
+            .substringBefore(" • From ")
+            .substringBefore(" • Server ")
             .trim()
             .replace(episodePrefix, "")
             .trim()
