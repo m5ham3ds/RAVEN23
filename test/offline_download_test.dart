@@ -424,7 +424,7 @@ void main() {
     provider.dispose();
   });
 
-  testWidgets('save copy requires confirmation before writing to Documents', (tester) async {
+  testWidgets('save copy requires confirmation before writing to DCIM', (tester) async {
     final gateway = _FakeGateway([
       _download(
         'movie_save_confirm',
@@ -450,7 +450,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Save video to your phone?'), findsOneWidget);
-    expect(find.textContaining('Documents/RAVEN23/MOVIES'), findsOneWidget);
+    expect(find.textContaining('DCIM/RAVEN23/MOVIES'), findsOneWidget);
     expect(gateway.operations, isNot(contains('saveCopy:movie_save_confirm')));
 
     await tester.tap(find.text('Save'));
