@@ -294,7 +294,7 @@ class OfflineDownloadRequest {
   /// A normalized WebVTT subtitle selected from an external subtitle catalogue.
   final String? subtitleTrackContent;
   final OfflineDownloadSource? source;
-  /// File name stem used when exporting this movie or episode to Documents/RAVEN23.
+  /// File name stem used when exporting this movie or episode to DCIM/RAVEN23.
   final String? exportTitle;
   /// Stable provenance for the exact selected stream; this is metadata only
   /// and is not used as an automatic URL-renewal resolver.

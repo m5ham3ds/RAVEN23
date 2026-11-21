@@ -15,6 +15,9 @@ class OfflineDownloadProvider extends ChangeNotifier {
   List<OfflineDownload> _downloads = const [];
   final Map<String, _DownloadRateSample> _rateSamples = {};
   final Map<String, OfflineExportProgress> _exports = {};
+  final Set<String> _automaticExportProgressChecked = <String>{};
+  Timer? _automaticExportPoller;
+  bool _pollingAutomaticExports = false;
   bool _initialized = false;
   bool _loading = false;
   String? _error;
@@ -84,7 +87,8 @@ class OfflineDownloadProvider extends ChangeNotifier {
       _runExport(id, () => _service.prepareForPlayback(id));
   Future<void> openExternal(String id) =>
       _runExport(id, () => _service.openExternal(id));
-  Future<bool> saveCopy(String id) => _service.saveCopy(id);
+  Future<bool> saveCopy(String id) =>
+      _runExport(id, () => _service.saveCopy(id));
 
   Future<T> _runExport<T>(String id, Future<T> Function() operation) async {
     _exports[id] = const OfflineExportProgress(state: 'starting');
@@ -123,7 +127,74 @@ class OfflineDownloadProvider extends ChangeNotifier {
       polling = false;
       timer.cancel();
       _exports.remove(id);
+      _syncAutomaticExportPoller();
       notifyListeners();
+    }
+  }
+
+  bool _isAutomaticExportPending(OfflineExportProgress progress) =>
+      const {'queued', 'starting', 'available', 'unavailable'}
+          .contains(progress.state);
+
+  void _refreshAutomaticExportProgress(String id) {
+    unawaited(() async {
+      try {
+        final progress = await _service.getExportProgress(id);
+        if (!_downloads.any((item) => item.id == id && item.isComplete)) return;
+        if (progress.state == 'idle') {
+          _exports.remove(id);
+        } else {
+          _exports[id] = progress;
+        }
+        _syncAutomaticExportPoller();
+        notifyListeners();
+      } catch (_) {
+        // Downloading and playback remain independent of status polling.
+      }
+    }());
+  }
+
+  void _syncAutomaticExportPoller() {
+    final hasPending = _exports.values.any(_isAutomaticExportPending);
+    if (hasPending && _automaticExportPoller == null) {
+      _automaticExportPoller = Timer.periodic(
+        const Duration(milliseconds: 900),
+        (_) => unawaited(_pollAutomaticExportProgress()),
+      );
+    } else if (!hasPending && _automaticExportPoller != null) {
+      _automaticExportPoller!.cancel();
+      _automaticExportPoller = null;
+    }
+  }
+
+  Future<void> _pollAutomaticExportProgress() async {
+    if (_pollingAutomaticExports) return;
+    _pollingAutomaticExports = true;
+    try {
+      final pendingIds = _exports.entries
+          .where((entry) => _isAutomaticExportPending(entry.value))
+          .map((entry) => entry.key)
+          .toList(growable: false);
+      for (final id in pendingIds) {
+        if (!_downloads.any((item) => item.id == id && item.isComplete)) {
+          _exports.remove(id);
+          continue;
+        }
+        try {
+          final next = await _service.getExportProgress(id);
+          if (next.state == 'idle') {
+            _exports.remove(id);
+          } else {
+            _exports[id] = next;
+          }
+        } catch (_) {
+          // Keep the last known state until the next lightweight poll.
+        }
+      }
+      _syncAutomaticExportPoller();
+      notifyListeners();
+    } finally {
+      _pollingAutomaticExports = false;
     }
   }
 
@@ -143,6 +214,14 @@ class OfflineDownloadProvider extends ChangeNotifier {
     final previousById = {for (final item in _downloads) item.id: item};
     final now = DateTime.now();
     final activeIds = downloads.map((download) => download.id).toSet();
+    final completedIds = downloads
+        .where((download) => download.isComplete)
+        .map((download) => download.id)
+        .toSet();
+    _automaticExportProgressChecked.removeWhere(
+      (id) => !completedIds.contains(id),
+    );
+    _exports.removeWhere((id, _) => !completedIds.contains(id));
     _rateSamples.removeWhere((id, _) => !activeIds.contains(id));
 
     final withRates = downloads.map((download) {
@@ -184,6 +263,11 @@ class OfflineDownloadProvider extends ChangeNotifier {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _downloads = List.unmodifiable(sorted);
     for (final download in sorted) {
+      if (download.isComplete &&
+          _automaticExportProgressChecked.add(download.id) &&
+          !_exports.containsKey(download.id)) {
+        _refreshAutomaticExportProgress(download.id);
+      }
       final previous = previousById[download.id];
       if (previous == null || previous.state == download.state) continue;
       if (download.state == OfflineDownloadState.completed) {
@@ -201,12 +285,14 @@ class OfflineDownloadProvider extends ChangeNotifier {
         ));
       }
     }
+    _syncAutomaticExportPoller();
     notifyListeners();
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
+    _automaticExportPoller?.cancel();
     super.dispose();
   }
 }

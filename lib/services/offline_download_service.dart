@@ -48,10 +48,11 @@ class OfflineStorageSnapshot {
 }
 
 class OfflineExportProgress {
-  const OfflineExportProgress({required this.state, this.progress});
+  const OfflineExportProgress({required this.state, this.progress, this.error});
 
   final String state;
   final int? progress;
+  final String? error;
 
   bool get isAvailable => progress != null;
 
@@ -62,6 +63,7 @@ class OfflineExportProgress {
     return OfflineExportProgress(
       state: map['state'] as String? ?? 'starting',
       progress: progress,
+      error: (map['error'] as String?)?.trim(),
     );
   }
 }

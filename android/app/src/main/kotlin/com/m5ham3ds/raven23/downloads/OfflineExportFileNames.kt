@@ -42,6 +42,12 @@ internal object OfflineExportFileNames {
             .joinToString(" - ")
     }
 
+    internal fun publicRelativePath(relativeFolder: String): String {
+        val normalized = relativeFolder.trim('/').replace(Regex("/+"), "/")
+        require(normalized.isNotBlank()) { "A public media folder is required." }
+        return "DCIM/$normalized"
+    }
+
     internal fun sanitize(value: String): String =
         value.trim()
             .replace(unsafePathCharacters, "_")

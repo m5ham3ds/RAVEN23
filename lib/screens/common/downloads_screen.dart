@@ -217,12 +217,19 @@ class _DownloadCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 5),
                             Text(
-                              export.progress == null
-                                  ? 'Preparing export…'
-                                  : 'Preparing export ${export.progress}%',
+                              switch (export.state) {
+                                'queued' => 'Waiting for preparation…',
+                                'ready' => 'Ready for offline playback',
+                                'failed' => export.error ?? 'Preparation failed',
+                                'available' when export.progress != null =>
+                                  'Preparing export ${export.progress}%',
+                                _ => 'Preparing export…',
+                              },
                               style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
-                                    color: palette.mutedText,
+                                    color: export.state == 'failed'
+                                        ? colors.error
+                                        : palette.mutedText,
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -232,9 +239,13 @@ class _DownloadCard extends StatelessWidget {
                       ],
                       LinearProgressIndicator(
                         value: export != null
-                            ? export.progress == null
-                                  ? null
-                                  : export.progress! / 100
+                            ? export.state == 'ready'
+                                  ? 1
+                                  : export.state == 'failed'
+                                      ? 0
+                                      : export.progress == null
+                                          ? null
+                                          : export.progress! / 100
                             : download.isComplete
                             ? 1
                             : download.progress > 0
@@ -589,8 +600,8 @@ class _DownloadActions extends StatelessWidget {
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
         .trim();
     final folder = download.mediaType == 'movie'
-        ? 'Documents/RAVEN23/MOVIES'
-        : 'Documents/RAVEN23/$titleFolder';
+        ? 'DCIM/RAVEN23/MOVIES'
+        : 'DCIM/RAVEN23/$titleFolder';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -616,7 +627,7 @@ class _DownloadActions extends StatelessWidget {
       context,
       analyticsAction: 'save_copy',
       operation: () => provider.saveCopy(download.id),
-      successMessage: 'Video and selected subtitle saved to Documents/RAVEN23',
+      successMessage: 'Video and selected subtitle saved to DCIM/RAVEN23',
     );
   }
 
@@ -744,7 +755,7 @@ class _DownloadActionsSheet extends StatelessWidget {
               _DownloadActionTile(
                 icon: PhosphorIcons.folderOpen(PhosphorIconsStyle.bold),
                 title: 'Save a copy',
-                subtitle: 'Save directly to Documents/RAVEN23 on this device',
+                subtitle: 'Save directly to DCIM/RAVEN23 on this device',
                 onTap: () => Navigator.pop(context, _DownloadAction.saveCopy),
               ),
               const SizedBox(height: 10),

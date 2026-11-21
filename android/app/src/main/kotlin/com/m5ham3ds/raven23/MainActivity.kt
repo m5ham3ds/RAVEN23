@@ -18,7 +18,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import com.m5ham3ds.raven23.downloads.StreamDownloadsBridge
-import com.m5ham3ds.raven23.downloads.StreamOfflinePlayerFactory
 import com.m5ham3ds.raven23.links.MediaLinkBridge
 import com.m5ham3ds.raven23.ads.PlaybackAdInputBridge
 import com.m5ham3ds.raven23.ads.PlaybackAdBrowserBridge
@@ -266,14 +265,6 @@ class MainActivity: FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
         )
         downloadsBridge = bridge
-        flutterEngine
-            .platformViewsController
-            .registry
-            .registerViewFactory(
-                "com.m5ham3ds.raven23/offline_player",
-                StreamOfflinePlayerFactory(bridge.store, flutterEngine.dartExecutor.binaryMessenger),
-            )
-
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             DEVICE_PRESENTATION_CHANNEL,

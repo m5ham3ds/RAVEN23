@@ -9,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The native Media3 offline PlatformView resolves completed downloads through these store APIs. */
+/** The unified offline BetterPlayer path depends on these completed-cache contracts. */
 class StreamDownloadStorePlayerContractTest {
     @Test
     fun progressiveContainersMapToMedia3ProgressiveMimeTypes() {
@@ -319,6 +319,18 @@ class StreamDownloadStorePlayerContractTest {
                 contentLength = -1L,
                 bytesDownloaded = 120L,
             ),
+        )
+    }
+
+    @Test
+    fun publicVideoAndSubtitleCopiesUseTheDcimFolderTree() {
+        assertEquals(
+            "DCIM/RAVEN23/MOVIES",
+            OfflineExportFileNames.publicRelativePath("RAVEN23/MOVIES"),
+        )
+        assertEquals(
+            "DCIM/RAVEN23/ONE PIECE/SUBTITLE",
+            OfflineExportFileNames.publicRelativePath("//RAVEN23//ONE PIECE/SUBTITLE//"),
         )
     }
 

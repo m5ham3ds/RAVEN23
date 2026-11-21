@@ -25,6 +25,7 @@ import androidx.media3.transformer.Transformer
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.CancellationException
+import java.util.concurrent.Executors
 
 internal const val OFFLINE_EXPORT_TIMEOUT_MS = 30L * 60L * 1000L
 
@@ -71,11 +72,38 @@ class StreamDownloadExporter(
     private val callbacks = mutableListOf<(Result<File>) -> Unit>()
     private var exportStartedAtMs = 0L
     private var exportTimeoutRunnable: Runnable? = null
+    private val exportExecutor = Executors.newSingleThreadExecutor()
+    private val queuedExportIds = mutableSetOf<String>()
+    private val readyExportIds = mutableSetOf<String>()
+    private val failedExports = mutableMapOf<String, String>()
+
+    fun isBusy(): Boolean = activeExportId != null
+
+    fun markQueued(downloadId: String) {
+        if (activeExportId == downloadId || downloadId in readyExportIds) return
+        failedExports.remove(downloadId)
+        queuedExportIds.add(downloadId)
+    }
+
+    private fun failBeforeStart(
+        downloadId: String,
+        error: Exception,
+        callback: (Result<File>) -> Unit,
+    ) {
+        queuedExportIds.remove(downloadId)
+        readyExportIds.remove(downloadId)
+        failedExports[downloadId] = error.message ?: "Could not prepare this video."
+        callback(Result.failure(error))
+    }
 
     fun export(downloadId: String, callback: (Result<File>) -> Unit) {
         val download = store.getDownload(downloadId)
         if (download == null || download.state != Download.STATE_COMPLETED) {
-            callback(Result.failure(IllegalStateException("The download must finish before it can be exported.")))
+            failBeforeStart(
+                downloadId,
+                IllegalStateException("The download must finish before it can be exported."),
+                callback,
+            )
             return
         }
 
@@ -88,6 +116,9 @@ class StreamDownloadExporter(
         // and regenerated from the completed Media3 cache, rather than trusting
         // an old short MP4 merely because the container can be opened.
         if (output.isFile && hasCurrentMarker && isValidExport(download, output)) {
+            queuedExportIds.remove(downloadId)
+            failedExports.remove(downloadId)
+            readyExportIds.add(downloadId)
             callback(Result.success(output))
             return
         }
@@ -95,21 +126,32 @@ class StreamDownloadExporter(
             callbacks.add(callback)
             return
         }
+        queuedExportIds.remove(downloadId)
+        readyExportIds.remove(downloadId)
+        failedExports.remove(downloadId)
         if (output.exists()) output.delete()
         marker.delete()
         val temporary = temporaryFile(output)
         temporary.delete()
         if (activeExportId != null) {
-            callback(Result.failure(IllegalStateException("Another video is already being prepared.")))
+            failBeforeStart(
+                downloadId,
+                IllegalStateException("Another video is already being prepared."),
+                callback,
+            )
             return
         }
         if (!exportDirectory.exists() && !exportDirectory.mkdirs()) {
-            callback(Result.failure(IllegalStateException("Could not create the video export directory.")))
+            failBeforeStart(
+                downloadId,
+                IllegalStateException("Could not create the video export directory."),
+                callback,
+            )
             return
         }
 
         if (!hasSpaceFor(download)) {
-            callback(Result.failure(notEnoughStorage(download, cause = null)))
+            failBeforeStart(downloadId, notEnoughStorage(download, cause = null), callback)
             return
         }
 
@@ -117,7 +159,33 @@ class StreamDownloadExporter(
         callbacks.add(callback)
         exportStartedAtMs = SystemClock.elapsedRealtime()
         scheduleExportTimeout(downloadId, temporary)
-        startTransformer(download, temporary, output, inAppMuxer = false)
+        val canCopyProgressiveMp4 = canCopyProgressiveMp4FromCache(
+            state = download.state,
+            mimeType = download.request.mimeType,
+            contentLength = download.contentLength,
+            bytesDownloaded = download.bytesDownloaded,
+        )
+        if (canCopyProgressiveMp4) {
+            exportExecutor.execute {
+                val copied = runCatching {
+                    store.copyCompletedProgressiveMp4To(download, temporary)
+                }.getOrDefault(false)
+                mainHandler.post {
+                    if (activeExportId != downloadId) {
+                        temporary.delete()
+                        return@post
+                    }
+                    if (copied && validateExport(download, temporary) == null) {
+                        finalizeExport(download, temporary, output)
+                    } else {
+                        temporary.delete()
+                        startTransformer(download, temporary, output, inAppMuxer = false)
+                    }
+                }
+            }
+        } else {
+            startTransformer(download, temporary, output, inAppMuxer = false)
+        }
     }
 
     /**
@@ -143,26 +211,7 @@ class StreamDownloadExporter(
         val listener = object : Transformer.Listener {
             override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                 if (activeExportId != downloadId) return
-                val validationError = validateExport(download, temporary)
-                if (validationError != null) {
-                    temporary.delete()
-                    finish(Result.failure(validationError))
-                    return
-                }
-                if (output.exists() && !output.delete()) {
-                    temporary.delete()
-                    finish(Result.failure(IOException("Could not replace the previous offline video.")))
-                    return
-                }
-                if (!temporary.renameTo(output)) {
-                    temporary.delete()
-                    finish(Result.failure(IOException("Could not finalize the offline video file.")))
-                    return
-                }
-                // A missing marker forces one safe regeneration on the next
-                // app version instead of silently reusing an older export.
-                runCatching { validationMarker(output).writeText(EXPORT_VALIDATION_VERSION) }
-                finish(Result.success(output))
+                finalizeExport(download, temporary, output)
             }
 
             override fun onError(
@@ -208,6 +257,28 @@ class StreamDownloadExporter(
         }
     }
 
+    private fun finalizeExport(download: Download, temporary: File, output: File) {
+        val validationError = validateExport(download, temporary)
+        if (validationError != null) {
+            temporary.delete()
+            finish(Result.failure(validationError))
+            return
+        }
+        if (output.exists() && !output.delete()) {
+            temporary.delete()
+            finish(Result.failure(IOException("Could not replace the previous offline video.")))
+            return
+        }
+        if (!temporary.renameTo(output)) {
+            temporary.delete()
+            finish(Result.failure(IOException("Could not finalize the offline video file.")))
+            return
+        }
+        // The marker distinguishes exports validated by this version.
+        runCatching { validationMarker(output).writeText(EXPORT_VALIDATION_VERSION) }
+        finish(Result.success(output))
+    }
+
     private fun scheduleExportTimeout(downloadId: String, temporary: File) {
         val timeout = Runnable {
             if (activeExportId != downloadId) return@Runnable
@@ -238,9 +309,15 @@ class StreamDownloadExporter(
     }
 
     fun deleteExport(downloadId: String) {
+        queuedExportIds.remove(downloadId)
+        readyExportIds.remove(downloadId)
+        failedExports.remove(downloadId)
         if (activeExportId == downloadId) {
             activeTransformer?.cancel()
             finish(Result.failure(CancellationException("Video export was cancelled.")))
+            queuedExportIds.remove(downloadId)
+            readyExportIds.remove(downloadId)
+            failedExports.remove(downloadId)
         }
         val suffix = "-${Integer.toHexString(downloadId.hashCode())}.mp4"
         exportDirectory.listFiles()
@@ -255,6 +332,21 @@ class StreamDownloadExporter(
     /** Returns the remuxer's real progress when the current export exposes it. */
     fun progress(downloadId: String): Map<String, Any?> {
         if (activeExportId != downloadId) {
+            if (downloadId in queuedExportIds) {
+                return mapOf("state" to "queued", "progress" to null)
+            }
+            if (downloadId in readyExportIds) {
+                return mapOf("state" to "ready", "progress" to 100)
+            }
+            val failure = failedExports[downloadId]
+            if (failure != null) {
+                return mapOf("state" to "failed", "progress" to null, "error" to failure)
+            }
+            val download = store.getDownload(downloadId)
+            if (download?.state == Download.STATE_COMPLETED) {
+                queuedExportIds.add(downloadId)
+                return mapOf("state" to "queued", "progress" to null)
+            }
             return mapOf("state" to "idle", "progress" to null)
         }
         val transformer = activeTransformer
@@ -277,6 +369,18 @@ class StreamDownloadExporter(
         exportTimeoutRunnable?.let(mainHandler::removeCallbacks)
         exportTimeoutRunnable = null
         exportStartedAtMs = 0L
+        val completedId = activeExportId
+        if (completedId != null) {
+            queuedExportIds.remove(completedId)
+            if (result.isSuccess) {
+                readyExportIds.add(completedId)
+                failedExports.remove(completedId)
+            } else {
+                readyExportIds.remove(completedId)
+                failedExports[completedId] = result.exceptionOrNull()?.message
+                    ?: "Could not prepare this video."
+            }
+        }
         val completedCallbacks = callbacks.toList()
         callbacks.clear()
         activeTransformer = null
@@ -378,7 +482,16 @@ class StreamDownloadExporter(
             } else {
                 val expectedMs = StreamDownloadStore.requestMetadata(download.request)
                     .optLong("expectedDurationMs", 0L)
-                isOfflineExportDurationComplete(durationMs, expectedMs)
+                if (expectedMs > 0L) {
+                    isOfflineExportDurationComplete(durationMs, expectedMs)
+                } else {
+                    canCopyProgressiveMp4FromCache(
+                        state = download.state,
+                        mimeType = download.request.mimeType,
+                        contentLength = download.contentLength,
+                        bytesDownloaded = download.bytesDownloaded,
+                    )
+                }
             }
         } catch (_: Exception) {
             false
@@ -415,7 +528,13 @@ class StreamDownloadExporter(
         val validMarker = runCatching {
             marker.isFile && marker.readText().trim() == EXPORT_VALIDATION_VERSION
         }.getOrDefault(false)
-        return output.takeIf { validMarker && isValidExport(download, it) }
+        val valid = output.takeIf { validMarker && isValidExport(download, it) }
+        if (valid != null) {
+            queuedExportIds.remove(downloadId)
+            readyExportIds.add(downloadId)
+            failedExports.remove(downloadId)
+        }
+        return valid
     }
 
     private companion object {

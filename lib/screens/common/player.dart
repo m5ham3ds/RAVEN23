@@ -5127,11 +5127,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   @override
-  Widget build(BuildContext context) => AdBlockPlaybackGuard(
-    stopPlayback: _stopForAdBlocker,
-    television: widget.useTvControls,
-    child: _buildPlayback(context),
-  );
+  Widget build(BuildContext context) => _isOfflinePlayback
+      ? _buildPlayback(context)
+      : AdBlockPlaybackGuard(
+          stopPlayback: _stopForAdBlocker,
+          television: widget.useTvControls,
+          child: _buildPlayback(context),
+        );
 
   Widget _buildPlayback(BuildContext context) {
     _handleScreenOrientation(context);

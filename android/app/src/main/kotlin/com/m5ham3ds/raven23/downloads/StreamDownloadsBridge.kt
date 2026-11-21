@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.media3.common.util.UnstableApi
@@ -22,6 +23,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import java.util.ArrayDeque
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -40,12 +42,16 @@ class StreamDownloadsBridge(
     private var polling = false
     private var pendingLegacySave: PendingLegacySave? = null
     private val pendingEnqueues = mutableMapOf<String, Any>()
+    private val pendingVideoExports = ArrayDeque<PendingVideoExport>()
+    private val queuedVideoExports = mutableMapOf<String, PendingVideoExport>()
+    private var activeVideoExport: PendingVideoExport? = null
 
     init {
         MethodChannel(messenger, METHOD_CHANNEL).setMethodCallHandler(this)
         EventChannel(messenger, EVENT_CHANNEL).setStreamHandler(this)
         store.downloadManager.addListener(this)
         DownloadService.start(appContext, StreamDownloadService::class.java)
+        mainHandler.post { queueCompletedDownloads() }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -89,6 +95,7 @@ class StreamDownloadsBridge(
             "saveCopy" -> saveIntoRaven23Folder(call, result)
             "remove" -> withId(call, result) { id ->
                 pendingEnqueues.remove(id)
+                discardQueuedVideoExport(id)
                 exporter.deleteExport(id)
                 store.deleteSubtitle(id)
                 DownloadService.sendRemoveDownload(
@@ -110,7 +117,7 @@ class StreamDownloadsBridge(
         val pending = pendingLegacySave ?: return true
         pendingLegacySave = null
         if (grantResults.firstOrNull() != PackageManager.PERMISSION_GRANTED) {
-            pending.result.error("STORAGE_PERMISSION_DENIED", "RAVEN23 needs file-write permission to save into Documents on this Android version.", null)
+            pending.result.error("STORAGE_PERMISSION_DENIED", "RAVEN23 needs file-write permission to save into DCIM on this Android version.", null)
             return true
         }
         writeLegacySave(pending.call, pending.result)
@@ -149,71 +156,86 @@ class StreamDownloadsBridge(
             result.error("DOWNLOAD_NOT_COMPLETE", "Wait until this download finishes before saving it.", null)
             return
         }
-        fileExecutor.execute {
-            var videoTemp: File? = null
-            try {
-                val metadata = StreamDownloadStore.requestMetadata(download.request)
-                val isMovie = metadata.optString("mediaType").equals("movie", true)
-                val rawTitle = metadata.optString("exportTitle")
-                    .ifBlank { metadata.optString("title", "RAVEN23 video") }
-                val baseStem = OfflineExportFileNames.sanitize(rawTitle)
-                val fileStem = OfflineExportFileNames.buildStem(
-                    baseStem,
-                    isMovie,
-                    metadata.optInt("seasonNumber", -1),
-                    metadata.optInt("episodeNumber", -1),
-                    metadata.optString("subtitle"),
-                )
-                val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$baseStem"
-                videoTemp = File(appContext.cacheDir, "raven23-export-$downloadId.mp4")
-                videoTemp.delete()
-                val directCopy = store.copyCompletedProgressiveMp4To(download, videoTemp)
-                val videoSource = if (directCopy) {
-                    videoTemp
-                } else {
-                    exporter.existingExport(downloadId)
-                        ?: throw IllegalStateException(
-                            "This source needs MP4 preparation before it can be saved as one file. " +
-                                "Try Open with another player first, then save again.",
-                        )
-                }
-                val videoUri = savePublicFile(videoSource, fileStem, "video/mp4", videoFolder)
-                val subtitle = store.subtitleFileForExport(downloadId)
-                val subtitleUri = subtitle?.let {
-                    val subtitleFolder = if (isMovie) {
-                        "RAVEN23/MOVIES/SUBTITLE"
-                    } else {
-                        "RAVEN23/$baseStem/SUBTITLE"
+
+        val metadata = StreamDownloadStore.requestMetadata(download.request)
+        val isMovie = metadata.optString("mediaType").equals("movie", true)
+        val rawTitle = metadata.optString("exportTitle")
+            .ifBlank { metadata.optString("title", "RAVEN23 video") }
+        val baseStem = OfflineExportFileNames.sanitize(rawTitle)
+        val fileStem = OfflineExportFileNames.buildStem(
+            baseStem,
+            isMovie,
+            metadata.optInt("seasonNumber", -1),
+            metadata.optInt("episodeNumber", -1),
+            metadata.optString("subtitle"),
+        )
+        val videoFolder = if (isMovie) "RAVEN23/MOVIES" else "RAVEN23/$baseStem"
+
+        // Save waits for the same validated export that offline playback uses.
+        // A completed HLS/DASH download is never handed to MediaStore as if its
+        // private segment cache were a standalone MP4.
+        requestVideoExport(downloadId) { exported ->
+            exported.fold(
+                onSuccess = { videoSource ->
+                    fileExecutor.execute {
+                        try {
+                            val videoUri = savePublicFile(
+                                videoSource,
+                                fileStem,
+                                "video/mp4",
+                                videoFolder,
+                            )
+                            val subtitle = store.subtitleFileForExport(downloadId)
+                            val subtitleUri = subtitle?.let {
+                                val subtitleFolder = if (isMovie) {
+                                    "RAVEN23/MOVIES/SUBTITLE"
+                                } else {
+                                    "RAVEN23/$baseStem/SUBTITLE"
+                                }
+                                val mime = if (it.extension.equals("srt", true)) {
+                                    "application/x-subrip"
+                                } else {
+                                    "text/vtt"
+                                }
+                                savePublicFile(
+                                    it,
+                                    fileStem,
+                                    mime,
+                                    subtitleFolder,
+                                    it.extension.lowercase(Locale.ROOT),
+                                )
+                            }
+                            mainHandler.post {
+                                result.success(
+                                    mapOf(
+                                        "saved" to true,
+                                        "videoUri" to videoUri,
+                                        "subtitleSaved" to (subtitleUri != null),
+                                        "subtitleUri" to subtitleUri,
+                                        "copiedDirectlyFromCache" to canCopyProgressiveMp4FromCache(
+                                            state = download.state,
+                                            mimeType = download.request.mimeType,
+                                            contentLength = download.contentLength,
+                                            bytesDownloaded = download.bytesDownloaded,
+                                        ),
+                                    ),
+                                )
+                            }
+                        } catch (error: Exception) {
+                            mainHandler.post {
+                                result.error("SAVE_COPY_FAILED", error.message, null)
+                            }
+                        }
                     }
-                    val mime = if (it.extension.equals("srt", true)) {
-                        "application/x-subrip"
-                    } else {
-                        "text/vtt"
-                    }
-                    savePublicFile(
-                        it,
-                        fileStem,
-                        mime,
-                        subtitleFolder,
-                        it.extension.lowercase(Locale.ROOT),
+                },
+                onFailure = { error ->
+                    result.error(
+                        (error as? StreamDownloadExportException)?.code ?: "EXPORT_FAILED",
+                        error.message,
+                        causeSummary(error),
                     )
-                }
-                mainHandler.post {
-                    result.success(
-                        mapOf(
-                            "saved" to true,
-                            "videoUri" to videoUri,
-                            "subtitleSaved" to (subtitleUri != null),
-                            "subtitleUri" to subtitleUri,
-                            "copiedDirectlyFromCache" to directCopy,
-                        ),
-                    )
-                }
-            } catch (error: Exception) {
-                mainHandler.post { result.error("SAVE_COPY_FAILED", error.message, null) }
-            } finally {
-                videoTemp?.delete()
-            }
+                },
+            )
         }
     }
 
@@ -233,7 +255,7 @@ class StreamDownloadsBridge(
                 MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             }
             val resolver = appContext.contentResolver
-            val relativePath = "Documents/$relativeFolder"
+            val relativePath = OfflineExportFileNames.publicRelativePath(relativeFolder)
             val existing = resolver.query(
                 collection,
                 arrayOf(MediaStore.MediaColumns._ID),
@@ -284,10 +306,10 @@ class StreamDownloadsBridge(
             return uri.toString()
         }
         @Suppress("DEPRECATION")
-        val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        val directory = File(documents, relativeFolder)
+        val dcim = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
+        val directory = File(dcim, relativeFolder)
         if (!directory.exists() && !directory.mkdirs()) {
-            throw IllegalStateException("Could not create Documents/$relativeFolder")
+            throw IllegalStateException("Could not create DCIM/$relativeFolder")
         }
         val destination = File(directory, fileName)
         source.inputStream().use { input ->
@@ -314,7 +336,7 @@ class StreamDownloadsBridge(
             }
             return
         }
-        exporter.exportValidated(id) { exported ->
+        requestVideoExport(id) { exported ->
             mainHandler.post {
                 exported.fold(
                     onSuccess = { file -> try { operation(file) } catch (error: Exception) {
@@ -369,7 +391,7 @@ class StreamDownloadsBridge(
             result.error("INVALID_ID", "A download id is required.", null)
             return
         }
-        exporter.export(id) { exported ->
+        requestVideoExport(id) { exported ->
             mainHandler.post {
                 exported.fold(
                     onSuccess = { file ->
@@ -389,6 +411,70 @@ class StreamDownloadsBridge(
                 )
             }
         }
+    }
+
+    private fun queueCompletedDownloads() {
+        runCatching {
+            store.getDownloads()
+                .filter { it.state == Download.STATE_COMPLETED }
+                .forEach { queueAutomaticExport(it.request.id) }
+        }.onFailure { error ->
+            Log.w(TAG, "Could not scan completed downloads for offline preparation.", error)
+        }
+    }
+
+    private fun queueAutomaticExport(downloadId: String) {
+        requestVideoExport(downloadId) { exported ->
+            exported.exceptionOrNull()?.let { error ->
+                Log.w(TAG, "Automatic offline preparation failed for $downloadId.", error)
+            }
+        }
+    }
+
+    private fun requestVideoExport(
+        downloadId: String,
+        callback: (Result<File>) -> Unit,
+    ) {
+        val active = activeVideoExport
+        if (active?.id == downloadId) {
+            active.callbacks.add(callback)
+            return
+        }
+        val queued = queuedVideoExports[downloadId]
+        if (queued != null) {
+            queued.callbacks.add(callback)
+            return
+        }
+        val pending = PendingVideoExport(
+            id = downloadId,
+            callbacks = mutableListOf(callback),
+        )
+        queuedVideoExports[downloadId] = pending
+        pendingVideoExports.addLast(pending)
+        exporter.markQueued(downloadId)
+        drainVideoExports()
+    }
+
+    private fun drainVideoExports() {
+        if (activeVideoExport != null) return
+        val next = pendingVideoExports.pollFirst() ?: return
+        queuedVideoExports.remove(next.id)
+        activeVideoExport = next
+        exporter.export(next.id) { exported ->
+            mainHandler.post {
+                if (activeVideoExport !== next) return@post
+                activeVideoExport = null
+                next.callbacks.forEach { callback ->
+                    runCatching { callback(exported) }
+                }
+                drainVideoExports()
+            }
+        }
+    }
+
+    private fun discardQueuedVideoExport(downloadId: String) {
+        val queued = queuedVideoExports.remove(downloadId) ?: return
+        pendingVideoExports.remove(queued)
     }
 
     private fun enqueue(call: MethodCall, result: MethodChannel.Result) {
@@ -607,6 +693,7 @@ class StreamDownloadsBridge(
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
         eventSink = events
+        queueCompletedDownloads()
         emitDownloads()
         if (!polling) {
             polling = true
@@ -637,24 +724,41 @@ class StreamDownloadsBridge(
         }
     }
 
-    override fun onInitialized(downloadManager: DownloadManager) = emitDownloads()
+    override fun onInitialized(downloadManager: DownloadManager) {
+        queueCompletedDownloads()
+        emitDownloads()
+    }
 
     override fun onDownloadChanged(
         downloadManager: DownloadManager,
         download: Download,
         finalException: Exception?,
-    ) = emitDownloads()
-
-    override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) =
+    ) {
+        if (download.state == Download.STATE_COMPLETED) {
+            queueAutomaticExport(download.request.id)
+        }
         emitDownloads()
+    }
+
+    override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
+        discardQueuedVideoExport(download.request.id)
+        exporter.deleteExport(download.request.id)
+        emitDownloads()
+    }
 
     companion object {
+        private const val TAG = "StreamDownloadsBridge"
         private const val METHOD_CHANNEL = "com.m5ham3ds.raven23/stream_downloads"
         private const val EVENT_CHANNEL = "com.m5ham3ds.raven23/stream_download_events"
         private const val USER_PAUSED = 1
         private const val COPY_BUFFER_BYTES = 1024 * 1024
         private const val LEGACY_WRITE_PERMISSION_REQUEST = 4_304
     }
+
+    private data class PendingVideoExport(
+        val id: String,
+        val callbacks: MutableList<(Result<File>) -> Unit>,
+    )
 
     private data class PendingLegacySave(
         val call: MethodCall,
