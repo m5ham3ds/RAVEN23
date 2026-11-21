@@ -23,7 +23,7 @@ void main() {
   setUpAll(() {
     dotenv.testLoad(
       fileInput:
-          'OPENSUBTITLES_API_KEY=\nSUBDL_API_KEY=\nARABICSUBS_PROXY_URL=',
+          'OPENSUBTITLES_API_KEY=\nARABICSUBS_PROXY_URL=',
     );
   });
 
