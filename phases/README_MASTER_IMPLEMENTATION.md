@@ -1,3 +1,14 @@
+# ACTIVE SCOPE — PHASE63.39 (2026-11-21)
+
+The exact and exclusive authorization for the current RAVEN23 offline-download task is
+[`PHASE63.39_OFFLINE_SUBTITLES_EPISODES_SEASONS_AND_INCREMENTAL_PLAYBACK.md`](PHASE63.39_OFFLINE_SUBTITLES_EPISODES_SEASONS_AND_INCREMENTAL_PLAYBACK.md).
+
+Only the four items in that phase are authorized: selected subtitle sidecars, restoring complete offline episode cards, locally switching among seasons with completed downloads, and concurrent export preparation / verified partial playback. No unrelated source, navigation, styling, backend, catalog, quality, priority or player-design changes are allowed.
+
+PHASE63.39 is the active acceptance authority. Where an older phase or this historical log differs, PHASE63.39 wins. The complete supersession rules and safety conditions are in the linked phase document.
+
+---
+
 # PHASE63.38 — Unified BetterPlayer offline playback, automatic export and DCIM library (2026-11-21)
 
 ## User requirements
@@ -15,18 +26,20 @@ The Downloads screen must play every completed offline title with the same RAVEN
 
 1. `PlayerOne` is the only in-app movie / episode player surface. Offline playback receives a validated local MP4 through `BetterPlayerDataSource.file`; it does not receive the online URL, provider scan, or a second native player view.
 2. The offline subtitles passed to the primary player are the cached subtitle files and the selected downloaded subtitle file. The existing subtitle menu and explicit online subtitle search remain available; subtitle toggling does not depend on changing the video source.
-3. TV episode selection is built from completed downloads matching the same series and season. Selecting an episode resolves the matching local download, never an online `TVVideoLoader`.
+3. TV episode selection is built from completed downloads for the same series. It retains the online episode-card details (still image, name, rating, runtime and overview), and its season selector appears only when more than one season has downloaded episodes. Season switching reads downloaded episode metadata locally and resolves only completed downloads; it must never call TMDB or an online `TVVideoLoader` while offline.
 4. Provider / quality / recommendation actions are guarded in offline mode. The watch-page provider, download and external-player chips use the existing disabled `onTap: null` presentation. The primary control row's existing action callbacks remain present but return without attempting a network operation.
-5. As soon as DownloadManager reports `STATE_COMPLETED`, the Android bridge queues a validated export. It restores the queue from completed downloads at startup, shares one export per download between background preparation and manual play/save requests, and processes the queue serially.
+5. Export preparation must begin concurrently with the active download as soon as there is cache data that can be safely staged. The final MP4 is still published only after full media validation. Preparation work, playable-prefix verification and final export are separate states; UI must not label an unverified partial file as ready. Existing completed downloads must still be recovered and prepared at startup.
 6. Progressive MP4 is copied directly from the read-only download cache only when DownloadManager reports a completed MP4 with an exact known content-length match. HLS/DASH and all other cases use Media3 Transformer and the existing video/audio/duration validation.
-7. A partial HLS/DASH cache is not exported or advertised as ready. A final standalone MP4 cannot be proven playable while the manifest, initialization data, audio and all required segments are still arriving. Therefore, for HLS/DASH the export starts immediately after the actual download reaches 100%, not at the first 1% network byte. The Downloads page shows the download percentage first, then the actual queued / Transformer export state. No synthetic export percentage is shown.
+7. Partial playback is a required capability, not an optional or permanently disabled design. Preparation must inspect the cache while download is active and expose only a verified contiguous playable timeline from time zero. A byte percentage (including 1% or 40%) is never treated as timeline availability. For HLS/DASH, verify the manifest, initialization data and every required audio/video segment up to the proposed boundary; for progressive MP4, verify the container/index and media data required by the player. Stop at the first missing, incomplete or undecodable range. Until the cache-only BetterPlayer bridge and these per-format checks pass their acceptance tests, keep the existing completed-file path as a safe fallback and do not claim partial playback is implemented.
 8. Public copies, including downloaded subtitle files, use `DCIM/RAVEN23` on Android Q+ through MediaStore and `Environment.DIRECTORY_DCIM` on older Android versions. The app-private validated working MP4 remains under `filesDir/offline_exports`; it is not the user's public library folder.
 
 ## Validation
 
 - Preserve the existing 200 MB storage reserve and incomplete-download guard.
 - Preserve source priorities, default PRIMARY / BACKUP order, provider catalog, HLS/DASH headers, signed-link recovery, and the download cache identity.
-- Run the existing focused Flutter and Android JVM gates through GitHub Actions after committing the changes. CI run 215 checks the first primary-player routing commit; the combined export / DCIM follow-up must trigger a new run before this phase is accepted.
+- Persist the source series poster/backdrop, current-season episode metadata (still path, title, rating, runtime, air date and overview) and season metadata with each episode's native download request. Return them through the download event map so offline playback can reconstruct the same cards and build a local list of seasons that actually have downloaded episodes.
+- A selected provider subtitle or selected external subtitle must be copied into the app-private offline subtitle directory. A selected subtitle that was requested but failed to persist must be reported as a subtitle-save failure; it must never be silently described as saved.
+- Run focused Flutter and Android JVM gates through GitHub Actions after committing the changes. Add round-trip tests for episode/season metadata and tests that selected external subtitles are passed into the native offline request.
 - Manual device checks remain required for an offline MP4, an HLS episode with multiple segments, switching between downloaded episodes, choosing cached/local subtitles, switching to an online subtitle after reconnecting, saving video and subtitle into DCIM, and opening the app with previously completed downloads.
 
 ## Scope and supersession
@@ -34,7 +47,6 @@ The Downloads screen must play every completed offline title with the same RAVEN
 This phase changes only offline playback routing, export scheduling / progress reporting and public save location. It does not change backend APIs, Firebase, source catalog order, PRIMARY / BACKUP priority, quality selection policy, or the online primary player design. It explicitly supersedes the Android native offline-player route and Documents destination described in PHASE63.35 / PHASE63.37.
 
 ---
-
 # PHASE63.31 — Build nullability repair and Movies/Series PRIMARY defaults (2026-11-18)
 
 **PHASE63.31:** عالجت فشل `Flutter analyze` في CI رقم `44212516439`: كان `networkBytesTransferred` قابلًا لأن يكون `null` أثناء قياس سرعة الاتصال الأولي لنظام الجودة التلقائي؛ أصبح القياس يتوقف بأمان ويعيد المحاولة عند ظهور عداد فعلي، دون تغيير نافذة القياس أو منطق اختيار الجودة. كما أصبح ترتيب Movies وSeries الافتراضي: `YaStream → Jett → HdHub → VixSrc → VidSpark → VidFast → Sova → Sage → Phoenix → CineStream → VidZee → VegaMovies`. بقي VixSrc مدمجًا Native في المرتبة الرابعة، ولم يتغير ترتيب Anime أو BACKUP. ترقية القوائم المحفوظة تقتصر على القوائم التي تطابق بدقة ترتيب الافتراضي السابق؛ القوائم التي عدلها المستخدم يدويًا تبقى كما هي.
