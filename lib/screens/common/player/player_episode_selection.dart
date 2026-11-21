@@ -295,6 +295,20 @@ class PlayerEpisodeSelection {
                 colors,
                 () async {
                   Navigator.pop(sheetContext);
+                  if (tvMetadata.onSeasonChange != null) {
+                    tvMetadata.onSeasonChange!(season.seasonNumber);
+                    _browsedSeasonNumber = season.seasonNumber;
+                    if (!playerContext.mounted) return;
+                    await showEpisodeSelectionBottomSheet(
+                      context: playerContext,
+                      colors: colors,
+                      tvMetadata: tvMetadata,
+                      onSaveProgress: onSaveProgress,
+                      closePlayer: closePlayer,
+                      useTvPlayer: useTvPlayer,
+                    );
+                    return;
+                  }
                   final navigator = Navigator.of(
                     playerContext,
                     rootNavigator: true,
