@@ -6,6 +6,10 @@ package com.m5ham3ds.raven23.downloads
  * verified on the JVM.
  */
 internal object OfflineExportFileNames {
+    private val unsafePathCharacters = Regex("[\\\\/:*?\\\"<>|\\p{Cntrl}]")
+    private val repeatedWhitespace = Regex("\\s+")
+    private val episodePrefix = Regex("(?i)^\\s*S\\d+\\s*[•·|:/-]?\\s*E\\d+\\s*")
+
     internal fun buildStem(
         title: String,
         isMovie: Boolean,
@@ -19,25 +23,30 @@ internal object OfflineExportFileNames {
             ""
         }
         if (isMovie || seasonEpisode.isEmpty()) return title
+
+        // Provider labels commonly look like "S02 • E07 The Name • From Server".
+        // Strip only the episode-code prefix and trailing provider attribution.
+        // Do not split on the first bullet: that would discard "E07 The Name".
         val label = episodeLabel
-            .substringAfter(" • ", "")
-            .substringBefore(" • ")
+            .substringBefore(" • From ", missingDelimiterValue = episodeLabel)
+            .substringBefore(" • Server ", missingDelimiterValue = episodeLabel)
             .trim()
-            .takeIf { it.isNotEmpty() && !it.startsWith("From ", true) }
+            .replace(episodePrefix, "")
+            .trim()
+            .takeIf { it.isNotEmpty() && !it.startsWith("From ", ignoreCase = true) }
+
         return listOf(title, seasonEpisode, label)
             .filterNotNull()
             .filter { it.isNotBlank() }
             .distinct()
             .joinToString(" - ")
     }
-    
+
     internal fun sanitize(value: String): String =
         value.trim()
-            .replace(Regex("[\\\\/:*?\\\"<>|\\\\p{Cntrl}]"), "_")
-            .replace(Regex("\\\\s+"), " ")
+            .replace(unsafePathCharacters, "_")
+            .replace(repeatedWhitespace, " ")
             .trim(' ', '.')
             .take(120)
             .ifBlank { "RAVEN23 video" }
-    
-    
 }
