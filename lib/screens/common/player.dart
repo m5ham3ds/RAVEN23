@@ -6254,6 +6254,26 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               )
               .toList(growable: false) ??
           const <Map<String, Object?>>[];
+      final selectedStillPath = seasonEpisodes
+          .where(
+            (item) =>
+                item['seasonNumber'] == season &&
+                item['episodeNumber'] == episodeNumber,
+          )
+          .map((item) => item['stillPath'])
+          .whereType<String>()
+          .firstOrNull;
+      if (selectedStillPath != null && selectedStillPath.trim().isNotEmpty) {
+        try {
+          await cacheProp()
+              .getSingleFile(
+                'https://image.tmdb.org/t/p/w300$selectedStillPath',
+              )
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {
+          // Thumbnail caching must never block or fail the video download.
+        }
+      }
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
           id: isMovie
