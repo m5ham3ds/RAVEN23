@@ -6,6 +6,7 @@ import 'package:raven23/widgets/playback_action.dart';
 // ignore_for_file: deprecated_member_use
 
 import 'dart:async';
+import 'dart:io';
 import '../../data/sync/library_scope.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -104,6 +105,9 @@ class PlayerOne extends StatefulWidget {
     this.initialStreamUrl,
     this.useTvControls = false,
     this.onTvPlayerExit,
+    this.offlineDownload,
+    this.offlineFilePath,
+    this.onOfflineEpisodeSelected,
     super.key,
   });
   final Map<String, String> sources;
@@ -131,6 +135,12 @@ class PlayerOne extends StatefulWidget {
   final String? initialStreamUrl;
   final bool useTvControls;
   final VoidCallback? onTvPlayerExit;
+  /// A completed download being played through this same BetterPlayer surface.
+  final OfflineDownload? offlineDownload;
+  /// A validated, app-private local file prepared from the Media3 cache.
+  final String? offlineFilePath;
+  /// Replaces the current offline episode with another completed local download.
+  final Future<void> Function(EpisodeMetadata episode)? onOfflineEpisodeSelected;
 
   @override
   State<PlayerOne> createState() => _PlayerOneState();
@@ -164,6 +174,19 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   int _feedbackSourceSwitches = 0;
 
   final GlobalKey _betterPlayerKey = GlobalKey();
+
+  bool get _isOfflinePlayback =>
+      widget.offlineDownload != null &&
+      widget.offlineFilePath?.trim().isNotEmpty == true;
+
+  void _showOfflineActionUnavailable() {
+    if (!mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text('This action requires an online stream.'),
+      ),
+    );
+  }
 
   int totalMinutesWatched = 0;
   bool isVideoPaused = false;
@@ -601,21 +624,28 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       // away: Switch Provider sits with the other playback actions.
       quickActions: [
         if (widget.availableProviders?.isNotEmpty == true ||
-            widget.useTvControls)
+            widget.useTvControls ||
+            _isOfflinePlayback)
           BetterPlayerOverflowMenuItem(
             PhosphorIcons.hardDrives(),
             tr('switch_provider'),
-            widget.useTvControls ? _showTvProviderMenu : _showProviderSwitcher,
+            _isOfflinePlayback
+                ? _showOfflineActionUnavailable
+                : widget.useTvControls
+                    ? _showTvProviderMenu
+                    : _showProviderSwitcher,
           ),
         // Use BetterPlayer's existing action-row renderer, in RAVEN23's
         // exact order, while keeping RAVEN23's original callbacks.
         if (!widget.useTvControls &&
             widget.mediaType == MediaType.movie &&
-            hasMovieRecommendations)
+            (hasMovieRecommendations || _isOfflinePlayback))
           BetterPlayerOverflowMenuItem(
             PhosphorIcons.squaresFour(),
             controlsStrings.moreLikeThis,
-            () => unawaited(_openMovieRecommendations()),
+            _isOfflinePlayback
+                ? _showOfflineActionUnavailable
+                : () => unawaited(_openMovieRecommendations()),
           ),
         if (!widget.useTvControls &&
             widget.mediaType == MediaType.tvShow &&
@@ -635,7 +665,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           BetterPlayerOverflowMenuItem(
             PhosphorIcons.highDefinition(),
             controlsStrings.quality,
-            _showQualitySwitcher,
+            _isOfflinePlayback
+                ? _showOfflineActionUnavailable
+                : _showQualitySwitcher,
           ),
       ],
       // Handheld More mirrors the three default RAVEN23 entries. The HD
@@ -814,6 +846,57 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> _setupInitialDataSource() async {
+    if (_isOfflinePlayback) {
+      try {
+        await _externalSubtitles.restoreCachedSubtitles(
+          mediaCacheKey: _subtitlePlaybackKey,
+          preferredLanguageCode: settings.defaultSubtitleLanguage,
+          hasPreferredProviderSubtitle: _activeSubtitles.isNotEmpty,
+        );
+        if (!mounted || _adBlockStopped) return;
+        final offlineSubtitles = <BetterPlayerSubtitlesSource>[
+          ..._activeSubtitles,
+          ..._externalSubtitles.appliedSubtitles,
+        ];
+        final savedSubtitle = widget.offlineDownload!.offlineSubtitlePath?.trim();
+        if (savedSubtitle?.isNotEmpty == true &&
+            await File(savedSubtitle!).exists() &&
+            !offlineSubtitles.any(
+              (source) => source.urls?.contains(savedSubtitle) == true,
+            )) {
+          offlineSubtitles.add(
+            BetterPlayerSubtitlesSource(
+              type: BetterPlayerSubtitlesSourceType.file,
+              urls: <String>[savedSubtitle],
+              name: widget.offlineDownload!.offlineSubtitleName ?? tr('subtitle'),
+              selectedByDefault: offlineSubtitles.isEmpty,
+            ),
+          );
+        }
+        if (!mounted || _adBlockStopped) return;
+        await _betterPlayerController.setupDataSource(
+          BetterPlayerDataSource.file(
+            widget.offlineFilePath!.trim(),
+            subtitles: offlineSubtitles,
+            useAsmsSubtitles: false,
+            useAsmsTracks: false,
+          ),
+        );
+        if (!mounted || _adBlockStopped) return;
+        duration = _betterPlayerController
+                .videoPlayerController
+                ?.value
+                .duration
+                ?.inSeconds ??
+            0;
+        _hasPlaybackInitialized = true;
+        debugPrint('[Player][OFFLINE] local file ready durationSeconds=$duration');
+      } catch (error) {
+        _feedbackSession.recordFailure();
+        debugPrint('[Player][OFFLINE_SETUP_FAILED] ${error.runtimeType}: $error');
+      }
+      return;
+    }
     try {
       await _externalSubtitles.restoreCachedSubtitles(
         mediaCacheKey: _subtitlePlaybackKey,
@@ -1335,7 +1418,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
 
   void _startPlaybackMonitor() {
     _progressCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!widget.useTvControls) {
+      if (!widget.useTvControls && !_isOfflinePlayback) {
         AdsterraPlaybackAdsService.instance.notePlayerWatch(
           context,
           Duration(milliseconds: _wellnessTracker.watchedMs()),
@@ -1386,14 +1469,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
             _betterPlayerController.videoPlayerController!.value.duration;
         final isFullScreen = _betterPlayerController.isFullScreen;
         final value = _betterPlayerController.videoPlayerController!.value;
-        _observeAppAutomaticQuality(
-          isPlaying: value.isPlaying,
-          isBuffering: value.isBuffering,
-        );
-        _trackSustainedUnifiedSourcePlayback(
-          isPlaying: value.isPlaying,
-          isBuffering: value.isBuffering,
-        );
+        if (!_isOfflinePlayback) {
+          _observeAppAutomaticQuality(
+            isPlaying: value.isPlaying,
+            isBuffering: value.isBuffering,
+          );
+          _trackSustainedUnifiedSourcePlayback(
+            isPlaying: value.isPlaying,
+            isBuffering: value.isBuffering,
+          );
+        }
 
         final now = DateTime.now();
         if (!_preRollActive &&
@@ -1494,7 +1579,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> _loadIntroDbTimings() async {
-    if (_introDbLoading || _introDbLookupComplete) {
+    if (_isOfflinePlayback || _introDbLoading || _introDbLookupComplete) {
       debugPrint(
         '[Player][IntroDB] lookup skipped: loading=$_introDbLoading '
         'complete=$_introDbLookupComplete',
@@ -2566,6 +2651,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         tvMetadata: metadata,
         onSaveProgress: _handleContentSwitch,
         closePlayer: _closePlayer,
+        onEpisodeSelected: _isOfflinePlayback
+            ? widget.onOfflineEpisodeSelected
+            : null,
       );
       debugPrint('[PlayerContentMenu] episodes sheet future completed');
     } catch (error, stackTrace) {
@@ -2663,7 +2751,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     if (_preRollActive || _awaitingContentAfterPreRoll) return;
     // Requested before the first await so it reaches the player ahead of a
     // dispose that follows this call.
-    final networkBytes = _flushNetworkUsage();
+    final networkBytes = _isOfflinePlayback
+        ? Future<int?>.value(null)
+        : _flushNetworkUsage();
     final value = _betterPlayerController.videoPlayerController?.value;
     final positionMs = value?.position.inMilliseconds ?? 0;
     final durationMs = value?.duration?.inMilliseconds ?? duration * 1000;
@@ -2683,7 +2773,9 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       sessionId: _analyticsSessionId,
       tracker: _wellnessTracker,
       mediaType: isMovie ? WellnessMediaType.movie : WellnessMediaType.episode,
-      source: WellnessPlaybackSource.streaming,
+      source: _isOfflinePlayback
+          ? WellnessPlaybackSource.offline
+          : WellnessPlaybackSource.streaming,
       contentId: contentId,
       seriesId: isMovie ? null : episode?.tvId?.toString(),
       title: title,
@@ -3168,6 +3260,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showTvProviderMenu() {
+    if (_isOfflinePlayback) {
+      _showOfflineActionUnavailable();
+      return;
+    }
     final providers = (widget.availableProviders ?? const <VideoProvider>[])
         .where(
           (provider) =>
@@ -3547,8 +3643,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     _contentSwitchLoading = null;
   }
 
-  Future<void> _playTvEpisode(EpisodeMetadata episode) =>
-      _startContent(() async {
+  Future<void> _playTvEpisode(EpisodeMetadata episode) {
+    if (_isOfflinePlayback) {
+      final select = widget.onOfflineEpisodeSelected;
+      if (select != null) unawaited(select(episode));
+      return Future<void>.value();
+    }
+    return _startContent(() async {
         _tvNextEpisodeTimer?.cancel();
         if (mounted) {
           setState(() {
@@ -3581,6 +3682,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           ),
         );
       });
+  }
 
   Future<void> _playTvMovie(MovieRecommendation movie) =>
       _startContent(() async {
@@ -3658,6 +3760,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showProviderSwitcher() {
+    if (_isOfflinePlayback) {
+      _showOfflineActionUnavailable();
+      return;
+    }
     showPlayerSheet<void>(
       context: context,
       builder: (sheetContext) => ValueListenableBuilder<int>(
@@ -3972,6 +4078,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showQualitySwitcher() {
+    if (_isOfflinePlayback) {
+      _showOfflineActionUnavailable();
+      return;
+    }
     showPlayerSheet<void>(
       context: context,
       builder: (sheetContext) => ValueListenableBuilder<int>(
@@ -5438,12 +5548,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       }
     }
     return <WatchAction>[
-      if (providers.isNotEmpty)
+      if (providers.isNotEmpty || _isOfflinePlayback)
         WatchAction(
           icon: PhosphorIcons.hardDrives(),
           label: providerName ?? tr('switch_provider'),
           busy: _isSwitchingProvider,
-          onTap: _showProviderSwitcher,
+          onTap: _isOfflinePlayback ? null : _showProviderSwitcher,
         ),
       WatchAction(
         icon: PhosphorIcons.closedCaptioning(),
@@ -5453,12 +5563,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       WatchAction(
         icon: PhosphorIcons.downloadSimple(),
         label: tr('download_action'),
-        onTap: () => unawaited(_downloadFromCurrentProvider()),
+        onTap: _isOfflinePlayback
+            ? null
+            : () => unawaited(_downloadFromCurrentProvider()),
       ),
       WatchAction(
         icon: PhosphorIcons.arrowSquareOut(),
         label: tr('open_external'),
-        onTap: _showExternalPlayerSheet,
+        onTap: _isOfflinePlayback ? null : _showExternalPlayerSheet,
       ),
     ];
   }
@@ -5942,6 +6054,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   void _showExternalPlayerSheet() {
+    if (_isOfflinePlayback) {
+      _showOfflineActionUnavailable();
+      return;
+    }
     showPlayerSheet<void>(
       context: context,
       builder: (context) => AppResponsiveContent(
@@ -5956,6 +6072,10 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
   }
 
   Future<void> _downloadFromCurrentProvider() async {
+    if (_isOfflinePlayback) {
+      _showOfflineActionUnavailable();
+      return;
+    }
     if (!mounted || _downloadQualityEntriesNotifier != null) return;
 
     // Render the qualities already known to this playback session immediately.

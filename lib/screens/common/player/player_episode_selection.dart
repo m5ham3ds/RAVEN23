@@ -37,6 +37,7 @@ class PlayerEpisodeSelection {
     required FutureOr<void> Function() onSaveProgress,
     required Function() closePlayer,
     bool useTvPlayer = false,
+    Future<void> Function(EpisodeMetadata episode)? onEpisodeSelected,
   }) {
     final episodes = tvMetadata.seasonEpisodes;
     debugPrint(
@@ -141,6 +142,13 @@ class PlayerEpisodeSelection {
                               await onSaveProgress();
                               if (!playerContext.mounted ||
                                   !sheetContext.mounted) {
+                                return;
+                              }
+                              if (onEpisodeSelected != null) {
+                                final offlineRoute = ModalRoute.of(sheetContext);
+                                if (offlineRoute?.isActive != true) return;
+                                Navigator.of(sheetContext).removeRoute(offlineRoute!);
+                                await onEpisodeSelected(episode);
                                 return;
                               }
                               final route = ModalRoute.of(sheetContext);
