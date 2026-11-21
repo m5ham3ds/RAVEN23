@@ -185,7 +185,7 @@ class StreamDownloadsBridge(
                                 "video/mp4",
                                 videoFolder,
                             )
-                            val subtitle = store.subtitleFileForExport(downloadId)
+                            val subtitle = store.subtitleFileForExport(downloadId, download.request)
                             val subtitleUri = subtitle?.let {
                                 val subtitleFolder = if (isMovie) {
                                     "RAVEN23/MOVIES/SUBTITLE"
@@ -210,6 +210,15 @@ class StreamDownloadsBridge(
                                     mapOf(
                                         "saved" to true,
                                         "videoUri" to videoUri,
+                                        "subtitleRequested" to StreamDownloadStore.requestMetadata(
+                                            download.request,
+                                        ).optBoolean("subtitleRequested", false),
+                                        "subtitleStatus" to StreamDownloadStore.requestMetadata(
+                                            download.request,
+                                        ).optString("subtitleStatus", "none"),
+                                        "subtitleError" to StreamDownloadStore.requestMetadata(
+                                            download.request,
+                                        ).optString("subtitleError").ifBlank { null },
                                         "subtitleSaved" to (subtitleUri != null),
                                         "subtitleUri" to subtitleUri,
                                         "copiedDirectlyFromCache" to canCopyProgressiveMp4FromCache(
