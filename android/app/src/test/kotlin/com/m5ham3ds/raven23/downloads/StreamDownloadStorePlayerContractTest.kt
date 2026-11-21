@@ -239,6 +239,42 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun exportTitleSanitizerReplacesAllUnsafeCharactersAndNormalizesWhitespace() {
+        assertEquals(
+            "A_B_C_D_E_F_G_H",
+            OfflineExportFileNames.sanitize("A/B:C*D?E\\"F<G>H|"),
+        )
+        assertEquals(
+            "RAVEN23 video",
+            OfflineExportFileNames.sanitize(" /:*?\\\"<>| "),
+        )
+    }
+
+    @Test
+    fun episodeLabelRemovesOnlyTheSeasonEpisodePrefixAndProviderAttribution() {
+        assertEquals(
+            "ONE PIECE - S02E07 - The Adventure Begins",
+            OfflineExportFileNames.buildStem(
+                title = "ONE PIECE",
+                isMovie = false,
+                season = 2,
+                episode = 7,
+                episodeLabel = "S02 • E07 The Adventure Begins • From Server",
+            ),
+        )
+        assertEquals(
+            "ONE PIECE - S02E07 - The Adventure Begins",
+            OfflineExportFileNames.buildStem(
+                title = "ONE PIECE",
+                isMovie = false,
+                season = 2,
+                episode = 7,
+                episodeLabel = "S02E07 The Adventure Begins • Server 1",
+            ),
+        )
+    }
+
+    @Test
     fun progressiveCacheExportRequiresACompletedMp4WithMatchingByteCount() {
         assertTrue(
             canCopyProgressiveMp4FromCache(
