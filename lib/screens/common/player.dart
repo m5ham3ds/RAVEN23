@@ -50,6 +50,7 @@ import '../../ui_components/app_ui_components.dart';
 import '../../services/stream_intro_service.dart';
 import '../../services/introdb_service.dart';
 import '../../services/offline_download_service.dart';
+import '../../services/external_subtitle_service.dart';
 import '../../services/playback_wake_lock.dart';
 import '../movie/movie_video_loader.dart';
 import '../tv/tv_video_loader.dart';
@@ -3208,6 +3209,12 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         onSelected: () {},
       ),
     ]);
+    if (metadata.onSeasonChange != null) {
+      metadata.onSeasonChange!(seasonNumber);
+      if (!mounted || _tvMenu == null) return;
+      _showTvEpisodeMenu();
+      return;
+    }
     final loaded = await _episodeSelection.fetchEpisodesForSeason(
       context,
       seasonNumber,
@@ -5885,12 +5892,17 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
     setState(() => _portraitSeasonLoading = true);
     var loaded = false;
     try {
-      loaded = await _episodeSelection.fetchEpisodesForSeason(
-        context,
-        selectedSeason,
-        metadata,
-        widget.colors,
-      );
+      if (metadata.onSeasonChange != null) {
+        metadata.onSeasonChange!(selectedSeason);
+        loaded = true;
+      } else {
+        loaded = await _episodeSelection.fetchEpisodesForSeason(
+          context,
+          selectedSeason,
+          metadata,
+          widget.colors,
+        );
+      }
     } catch (error) {
       debugPrint('[PlayerContentMenu] portrait season switch failed: $error');
     } finally {
@@ -6202,10 +6214,46 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       final subtitleSelection = await DownloadSelectionSheets.chooseSubtitle(
         context,
         tracks: subtitleCandidates,
+        externalTracks: Future.value(_externalSubtitles.availableExternalSubtitles),
         inPlayer: true,
       );
       if (!mounted || subtitleSelection == null) return;
       final subtitleTrack = subtitleSelection.track;
+      final externalSubtitle = subtitleSelection.externalTrack;
+      final subtitleTrackContent = externalSubtitle == null
+          ? null
+          : await ExternalSubtitleService(
+              _resolveScraperApiUrl(),
+            ).downloadAndNormalizeForPlayback(externalSubtitle);
+      if (!mounted) return;
+      final seasonEpisodes = episode?.seasonEpisodes
+              ?.map(
+                (item) => <String, Object?>{
+                  'episodeId': item.episodeId,
+                  'episodeName': item.episodeName,
+                  'episodeNumber': item.episodeNumber,
+                  'seasonNumber': item.seasonNumber,
+                  'stillPath': item.stillPath,
+                  'airDate': item.airDate,
+                  'runtime': item.runtime,
+                  'overview': item.overview,
+                  'voteAverage': item.voteAverage,
+                },
+              )
+              .toList(growable: false) ??
+          const <Map<String, Object?>>[];
+      final allSeasons = episode?.allSeasons
+              ?.map(
+                (item) => <String, Object?>{
+                  'seasonNumber': item.seasonNumber,
+                  'seasonName': item.seasonName,
+                  'episodeCount': item.episodeCount,
+                  'posterPath': item.posterPath,
+                  'overview': item.overview,
+                },
+              )
+              .toList(growable: false) ??
+          const <Map<String, Object?>>[];
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
           id: isMovie
@@ -6249,8 +6297,14 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           seasonNumber: isMovie ? null : season,
           episodeNumber: isMovie ? null : episodeNumber,
           subtitleTrackUrl: subtitleTrack?.url,
-          subtitleTrackName: subtitleTrack?.language,
+          subtitleTrackName:
+              subtitleTrack?.language ?? externalSubtitle?.language,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
+          subtitleTrackContent: subtitleTrackContent,
+          seasonEpisodes: seasonEpisodes,
+          allSeasons: allSeasons,
+          seriesPosterPath: episode?.posterPath,
+          seriesBackdropPath: episode?.backdropPath,
           audioLanguages: isMovie
               ? (movie?.isAnimeContent == true
                     ? const <String>['ja', 'en']
