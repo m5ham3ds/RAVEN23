@@ -198,7 +198,7 @@ class StreamDownloadStorePlayerContractTest {
     fun movieExportUsesOnlyTheMovieTitle() {
         assertEquals(
             "Dune Part Two",
-            StreamDownloadsBridge.buildOfflineExportStem(
+            OfflineExportFileNames.buildStem(
                 title = "Dune Part Two",
                 isMovie = true,
                 season = -1,
@@ -226,7 +226,7 @@ class StreamDownloadStorePlayerContractTest {
     fun episodeFolderStemRemainsTheSeriesTitle() {
         assertEquals(
             "ONE PIECE",
-            StreamDownloadsBridge.sanitizeOfflineExportTitle("ONE PIECE"),
+            OfflineExportFileNames.sanitize("ONE PIECE"),
         )
     }
 
