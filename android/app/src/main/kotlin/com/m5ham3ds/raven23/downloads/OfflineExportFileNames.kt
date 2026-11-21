@@ -6,7 +6,7 @@ package com.m5ham3ds.raven23.downloads
  * verified on the JVM.
  */
 internal object OfflineExportFileNames {
-    private val unsafePathCharacters = Regex("[\\\\/:*?\\\"<>|\\p{Cntrl}]")
+    private val unsafePathCharacters = Regex("""[\\/:*?"<>|\p{Cntrl}]""")
     private val repeatedWhitespace = Regex("\\s+")
     private val episodePrefix = Regex("(?i)^\\s*S\\d+\\s*[•·|:/-]?\\s*E\\d+\\s*")
 
