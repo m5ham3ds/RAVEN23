@@ -54,22 +54,20 @@ The existing project is not starting from zero. The following code already exist
 
 1. **OpenSubtitles.com API v1:** already supported when OPENSUBTITLES_API_KEY is configured. Without that key, the code falls back to the old rest.opensubtitles.org API.
 2. **SubSource:** already supported through the older undocumented api.subsource.net/v1 website flow. It currently performs IMDb title search, title/season lookup, episode filtering, a detail lookup, token resolution, and ZIP download. The current flow does not use the documented SubSource API-key contract.
-3. **SubDL:** already supported through api.subdl.com/api/v1/subtitles with SUBDL_API_KEY. It currently searches AR and EN together.
 4. **ArabicSubs:** an optional adapter already exists behind ARABICSUBS_PROXY_URL. It expects the app's own proxy to forward search, title-subtitle listing, and download requests.
 5. **RAVEN23 Scraper API:** retained as an additional provider-specific fallback.
 
 ### Important current behavior and weaknesses
 
 - Provider requests are gathered using Future.wait with a global timeout of 48 seconds. If that wait times out, the timeout handler returns an empty result list rather than preserving the providers that already completed. A single slow provider can therefore delay or hide otherwise useful Arabic results.
-- Arabic ordering is currently a fixed provider rank: SubSource, OpenSubtitles, SubDL, ArabicSubs, then other sources. That rank does not prove that a particular file matches the active release.
+- Arabic ordering is currently a fixed provider rank: SubSource, OpenSubtitles, ArabicSubs, then other sources. That rank does not prove that a particular file matches the active release.
 - Automatic application tries only the first five Arabic candidates after merging and sorting. Five weak results from one provider can consume the candidate budget before a better result from another provider is attempted.
 - The OpenSubtitles legacy REST endpoint is not a suitable free-only fallback: OpenSubtitles announced that access to the old API was restricted to VIP users from January 2024. The new OpenSubtitles.com API remains the relevant free route.
 - SubSource's current implementation is explicitly described in the source as an undocumented flow. The provider now publishes a documented API requiring an API key and advertising a free tier.
-- SubDL's current integration calls the older v1 endpoint. Its current developer documentation describes v2 search and file-matching endpoints that expose release match scores.
 - ArabicSubs is designed around an Arabic catalogue and exposes title/episode subtitle records, release labels, download counts, and translation-type metadata. Its current API contract is different from the custom proxy adapter already in RAVEN23 and needs to be mapped deliberately.
 - If a preferred Arabic provider subtitle is already marked selectedByDefault, the automatic external-provider search is skipped. This can suppress better alternatives when the in-stream Arabic track is badly timed or otherwise poor.
 - The owner has explicitly excluded translating English subtitle files into Arabic; candidate discovery and scoring must never invoke a translation service as a fallback.
-- The current OpenSubtitles and SubDL queries include both Arabic and English even when Arabic is preferred. The final auto-apply filter is Arabic-only, but the provider search still spends quota/time on non-Arabic results.
+- The current OpenSubtitles query includes both Arabic and English even when Arabic is preferred. The final auto-apply filter is Arabic-only, but the provider search still spends quota/time on non-Arabic results.
 - SubtitleFileNormalizer first tries UTF-8 and then falls back to Windows-1252. It does not currently have explicit Arabic Windows-1256 or UTF-16 decoding. Some older Arabic subtitle files may therefore be corrupted even when the provider returned the correct file.
 - Search quality and timing quality are different problems. Correct title/episode identity does not guarantee the subtitle is synchronized to the exact release.
 
@@ -105,7 +103,7 @@ Why evaluate it first: it is specifically an Arabic subtitle catalogue and expos
 
 Constraints:
 - The API documentation explicitly says to keep the API key on the server and not in frontend code or a public repository.
-- The free rate limit is much lower than SubDL/SubSource, so it must not be queried repeatedly for every video state change.
+- The free rate limit is low, so ArabicSubs must not be queried repeatedly for every video state change.
 - Its actual coverage, accuracy, synchronization, and uptime for RAVEN23's movie/series/anime test set are not proven by the documentation. Live coverage testing is required.
 - Use the current documented v1 routes; do not assume that the old custom proxy's response shape is the API's response shape.
 
@@ -153,7 +151,7 @@ Keep it as a final independent compatibility source while the documented provide
 
 ### Sources explicitly excluded by owner decision
 
-- **SubDL API v2:** excluded completely from PHASE64 research, provider adapters, fallback order, and acceptance benchmarks by the owner's direct instruction. Do not add or migrate to SubDL API v2. The existing repository uses the legacy SubDL API v1 path; this planning update does not alter that existing code. Removing that separate v1 integration would require a separate direct instruction.
+- **SubDL (all versions):** explicitly and completely removed from RAVEN23 by the owner's direct instruction. Do not add SubDL v1, v2, website scraping, mirrors, or any other SubDL route to the app, fallback order, research shortlist, or acceptance benchmark unless the owner explicitly reopens the decision.
 - **SubtitleCenter:** excluded completely from PHASE64 and must not be integrated through scraping or another workaround. Its official API status page says the API is paused by its maintainers and all /api/v1 calls return HTTP 503 while the website itself remains open. Direct checks of /api/v1/languages and /api/v1/stats also returned 503. SubtitleCenter is not currently integrated in RAVEN23 (repository search found no implementation). Although its website currently lists Arabic subtitle files, the owner chose to abandon it because its API is provider-paused; do not add it to the app or benchmark unless the owner explicitly reopens that decision.
 
 ### Candidate D — SubF2M: community Arabic catalogue
@@ -174,7 +172,6 @@ Evidence and limitations:
 - The independent Bazarr+ provider catalog describes this Subscene-style mirror as covering 35+ languages, including Arabic, for movie and episode subtitles.
 - Its community adapter currently relies on browser-like scraping and anti-bot challenge handling. This is not equivalent to a documented, provider-authorized public API.
 - Keep it in the experimental research pool only. Do not integrate challenge-solving, CAPTCHA bypass, proxy rotation, or other access-control circumvention. A supported API or explicit permission is required before any production integration.
-- Its catalogue may overlap with SubDL's Subscene archive mirror; overlap must be measured before counting it as an independent source.
 
 ### Candidate F — AnimeTosho: anime-only Arabic archive attachment source
 
@@ -346,7 +343,7 @@ Acceptance:
 
 ### Decisions still to settle before provider credentials or production ranking
 
-1. **Free-key model:** use each user's own free API keys (BYOK) in RAVEN23, or use only providers that can legally be served through the owner's private backend/proxy without violating their free-tier terms? SubDL explicitly prohibits using one free key as a shared key to power a commercial service and permits per-user keys.
+1. **Free-key model:** use each user's own free API keys (BYOK) in RAVEN23, or use only providers that can legally be served through the owner's private backend/proxy without violating their free-tier terms?
 2. **Human-authored versus labelled machine-submitted files:** proposed default is to prefer human-authored Arabic files and exclude files explicitly marked as AI/machine translated. Confirm whether all machine-labelled files should be excluded or merely ranked below human submissions.
 3. **Low-confidence matches:** keep the currently selected/available subtitle and show alternatives, rather than silently replacing it with a weak release match.
 
