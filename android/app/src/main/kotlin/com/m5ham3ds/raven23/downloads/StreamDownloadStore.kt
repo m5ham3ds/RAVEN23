@@ -420,6 +420,12 @@ class StreamDownloadStore private constructor(context: Context) {
             "quality" to metadata.optString("quality", "Auto"),
             "audioTrackName" to metadata.optString("audioTrackName").ifBlank { null },
             "posterUrl" to metadata.optString("posterUrl").ifBlank { null },
+            "subtitleRequested" to metadata.optBoolean("subtitleRequested", false),
+            "subtitleStatus" to metadata.optString("subtitleStatus", "none"),
+            "seasonEpisodes" to jsonRowsToMaps(metadata.optJSONArray("seasonEpisodes")),
+            "allSeasons" to jsonRowsToMaps(metadata.optJSONArray("allSeasons")),
+            "seriesPosterPath" to metadata.optString("seriesPosterPath").ifBlank { null },
+            "seriesBackdropPath" to metadata.optString("seriesBackdropPath").ifBlank { null },
             "state" to state,
             "progress" to percent,
             "bytesDownloaded" to download.bytesDownloaded,
@@ -449,10 +455,23 @@ class StreamDownloadStore private constructor(context: Context) {
         )
     }
 
-    fun subtitleFileForExport(id: String): File? =
-        listOf("vtt", "srt").asSequence()
+    fun subtitleFileForExport(id: String, request: DownloadRequest? = null): File? {
+        val root = subtitleDirectory.canonicalFile
+        val recordedPath = request?.let(::requestMetadata)
+            ?.optString("offlineSubtitlePath")
+            .orEmpty()
+        val recorded = recordedPath.takeIf { it.isNotBlank() }?.let(::File)
+        if (recorded != null &&
+            recorded.isFile &&
+            recorded.length() > 0L &&
+            recorded.canonicalFile.parentFile == root
+        ) {
+            return recorded
+        }
+        return listOf("vtt", "srt").asSequence()
             .map { extension -> subtitleFile(id, extension) }
             .firstOrNull { it.isFile && it.length() > 0L }
+    }
 
     fun deleteSubtitle(id: String) {
         subtitleFile(id, "vtt").delete()
@@ -466,6 +485,15 @@ class StreamDownloadStore private constructor(context: Context) {
         put("mediaType", arguments["mediaType"] as? String ?: "video")
         put("quality", arguments["quality"] as? String ?: "Auto")
         put("posterUrl", arguments["posterUrl"] as? String ?: "")
+        put("seriesPosterPath", arguments["seriesPosterPath"] as? String ?: "")
+        put("seriesBackdropPath", arguments["seriesBackdropPath"] as? String ?: "")
+        put("seasonEpisodes", jsonRows(arguments["seasonEpisodes"]))
+        put("allSeasons", jsonRows(arguments["allSeasons"]))
+        val subtitleRequested =
+            !(arguments["subtitleTrackUrl"] as? String).isNullOrBlank() ||
+                !(arguments["subtitleTrackContent"] as? String).isNullOrBlank()
+        put("subtitleRequested", subtitleRequested)
+        put("subtitleStatus", if (subtitleRequested) "pending" else "none")
         put("format", arguments["format"] as? String ?: "")
         put("maxVideoHeight", arguments["maxVideoHeight"] ?: JSONObject.NULL)
         put("expectedDurationMs", (arguments["expectedDurationMs"] as? Number)?.toLong() ?: 0L)
@@ -504,9 +532,14 @@ class StreamDownloadStore private constructor(context: Context) {
         val url = (arguments["subtitleTrackUrl"] as? String).orEmpty().trim()
         val content = (arguments["subtitleTrackContent"] as? String).orEmpty()
         if (url.isEmpty() && content.isBlank()) return
-        // Provider subtitles already arrive normalized to WebVTT. Keep their
-        // contents out of DownloadRequest.data and persist only a local file path.
-        if (content.toByteArray(StandardCharsets.UTF_8).size > MAX_SUBTITLE_BYTES) return
+        // Provider URLs and normalized external subtitles share the same
+        // private sidecar lifecycle. Record failures so save-copy never reports
+        // a successful video+subtitle export when the subtitle was omitted.
+        if (content.toByteArray(StandardCharsets.UTF_8).size > MAX_SUBTITLE_BYTES) {
+            metadata.put("subtitleStatus", "failed")
+            metadata.put("subtitleError", "Selected subtitle exceeds the 12 MB offline limit.")
+            return
+        }
 
         val name = (arguments["subtitleTrackName"] as? String).orEmpty()
             .ifBlank { "Original subtitle" }
@@ -517,7 +550,11 @@ class StreamDownloadStore private constructor(context: Context) {
         } else {
             "vtt"
         }
-        if (!subtitleDirectory.exists() && !subtitleDirectory.mkdirs()) return
+        if (!subtitleDirectory.exists() && !subtitleDirectory.mkdirs()) {
+            metadata.put("subtitleStatus", "failed")
+            metadata.put("subtitleError", "Could not create the offline subtitle directory.")
+            return
+        }
         deleteSubtitle(id)
         val output = subtitleFile(id, extension)
         val headers = buildMap {
@@ -537,12 +574,46 @@ class StreamDownloadStore private constructor(context: Context) {
             if (output.length() > 0L) {
                 metadata.put("offlineSubtitlePath", output.absolutePath)
                 metadata.put("offlineSubtitleName", name)
+                metadata.put("subtitleStatus", "ready")
+                metadata.remove("subtitleError")
             } else {
                 output.delete()
+                metadata.put("subtitleStatus", "failed")
+                metadata.put("subtitleError", "The downloaded subtitle file is empty.")
             }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             output.delete()
+            metadata.put("subtitleStatus", "failed")
+            metadata.put("subtitleError", error.message ?: "Subtitle download failed.")
             // A subtitle failure must not prevent the video itself downloading.
+        }
+    }
+
+    private fun jsonRows(value: Any?): JSONArray = JSONArray().apply {
+        (value as? List<*>)?.forEach { row ->
+            val values = row as? Map<*, *> ?: return@forEach
+            put(JSONObject().apply {
+                values.forEach { (key, item) ->
+                    if (key is String) put(key, item)
+                }
+            })
+        }
+    }
+
+    private fun jsonRowsToMaps(array: JSONArray?): List<Map<String, Any?>> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (index in 0 until array.length()) {
+                val row = array.optJSONObject(index) ?: continue
+                val values = linkedMapOf<String, Any?>()
+                val keys = row.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = row.opt(key)
+                    values[key] = if (value === JSONObject.NULL) null else value
+                }
+                add(values)
+            }
         }
     }
 
