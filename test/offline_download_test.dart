@@ -165,6 +165,52 @@ void main() {
       expect(item.totalBytes, 4096);
       expect(item.estimatedDownloadBytes, 8192);
       expect(item.totalBytesIsEstimated, isFalse);
+      expect(item.subtitleRequested, isFalse);
+      expect(item.seasonEpisodes, isEmpty);
+    });
+
+    test('restores full episode and season metadata from the native snapshot', () {
+      final item = OfflineDownload.fromMap({
+        'id': 'tv_7_s2_e3',
+        'title': 'Example show',
+        'mediaType': 'episode',
+        'state': 'completed',
+        'seasonNumber': 2,
+        'episodeNumber': 3,
+        'subtitleRequested': true,
+        'subtitleStatus': 'ready',
+        'seriesPosterPath': '/series.jpg',
+        'seriesBackdropPath': '/backdrop.jpg',
+        'seasonEpisodes': [
+          {
+            'episodeId': 703,
+            'episodeName': 'A New Adventure',
+            'episodeNumber': 3,
+            'seasonNumber': 2,
+            'stillPath': '/episode.jpg',
+            'runtime': 25,
+            'overview': 'A full episode summary.',
+            'voteAverage': 8.4,
+          },
+        ],
+        'allSeasons': [
+          {
+            'seasonNumber': 2,
+            'seasonName': 'Season Two',
+            'episodeCount': 12,
+            'posterPath': '/season.jpg',
+            'overview': 'Season summary.',
+          },
+        ],
+      });
+
+      expect(item.subtitleRequested, isTrue);
+      expect(item.subtitleStatus, 'ready');
+      expect(item.seriesPosterPath, '/series.jpg');
+      expect(item.seriesBackdropPath, '/backdrop.jpg');
+      expect(item.seasonEpisodes.single['stillPath'], '/episode.jpg');
+      expect(item.seasonEpisodes.single['voteAverage'], 8.4);
+      expect(item.allSeasons.single['seasonName'], 'Season Two');
     });
 
     test('normalizes invalid platform progress', () {
@@ -212,6 +258,47 @@ void main() {
       expect(payload['estimatedDownloadBytes'], 80 * 1024 * 1024);
       expect(payload['subtitleTrackName'], 'Arabic');
       expect(payload['subtitleTrackContent'], contains('WEBVTT'));
+    });
+
+    test('serializes the full season and episode metadata for offline cards', () {
+      const request = OfflineDownloadRequest(
+        id: 'tv_7_s2_e3',
+        url: 'https://example.test/episode.mp4',
+        format: 'mp4',
+        title: 'Example show',
+        mediaType: 'episode',
+        quality: '720p',
+        seasonEpisodes: [
+          {
+            'episodeId': 703,
+            'episodeName': 'A New Adventure',
+            'episodeNumber': 3,
+            'seasonNumber': 2,
+            'stillPath': '/episode.jpg',
+            'runtime': 25,
+            'overview': 'A full episode summary.',
+            'voteAverage': 8.4,
+          },
+        ],
+        allSeasons: [
+          {
+            'seasonNumber': 2,
+            'seasonName': 'Season Two',
+            'episodeCount': 12,
+            'posterPath': '/season.jpg',
+            'overview': 'Season summary.',
+          },
+        ],
+        seriesPosterPath: '/series.jpg',
+        seriesBackdropPath: '/backdrop.jpg',
+      );
+
+      final payload = request.toMap();
+      expect(payload['seasonEpisodes'], hasLength(1));
+      expect((payload['seasonEpisodes'] as List).single['voteAverage'], 8.4);
+      expect((payload['allSeasons'] as List).single['seasonName'], 'Season Two');
+      expect(payload['seriesPosterPath'], '/series.jpg');
+      expect(payload['seriesBackdropPath'], '/backdrop.jpg');
     });
 
     test('serializes the canonical export title independently of display subtitle', () {
