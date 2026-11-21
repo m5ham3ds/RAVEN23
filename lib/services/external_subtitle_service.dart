@@ -20,8 +20,8 @@ import 'subtitle_file_normalizer.dart';
 /// and keeps the older public REST endpoint as a best-effort compatibility
 /// fallback. SubSource uses its undocumented `/v1` flow: IMDb search -> title
 /// link -> language/episode list -> detail endpoint -> short-lived download
-/// token -> ZIP file. SubDL and an optional server-side ArabicSubs proxy are
-/// independent sources. Every provider is isolated so one outage never hides
+/// token -> ZIP file. An optional server-side ArabicSubs proxy is an
+/// independent source. Every provider is isolated so one outage never hides
 /// the results returned by the other providers.
 class ExternalSubtitleService {
   ExternalSubtitleService(
@@ -29,14 +29,12 @@ class ExternalSubtitleService {
     http.Client? client,
     MediaIdentityResolver? identityResolver,
     String? openSubtitlesApiKey,
-    String? subDlApiKey,
     String? arabicSubsProxyUrl,
   }) : _client = client ?? _sharedClient,
        _identityResolver = identityResolver ?? _sharedIdentityResolver,
        _openSubtitlesApiKey =
            (openSubtitlesApiKey ?? dotenv.env['OPENSUBTITLES_API_KEY'] ?? '')
                .trim(),
-       _subDlApiKey = (subDlApiKey ?? dotenv.env['SUBDL_API_KEY'] ?? '').trim(),
        _arabicSubsProxyUrl =
            (arabicSubsProxyUrl ?? dotenv.env['ARABICSUBS_PROXY_URL'] ?? '')
                .trim()
@@ -46,7 +44,6 @@ class ExternalSubtitleService {
   final http.Client _client;
   final MediaIdentityResolver _identityResolver;
   final String _openSubtitlesApiKey;
-  final String _subDlApiKey;
   final String _arabicSubsProxyUrl;
 
   static final http.Client _sharedClient = http.Client();
@@ -58,8 +55,6 @@ class ExternalSubtitleService {
       'https://api.opensubtitles.com/api/v1';
   static const String _openSubtitlesUserAgent = 'TemporaryUserAgent';
   static const String _subSourceBase = 'https://api.subsource.net/v1';
-  static const String _subDlBase = 'https://api.subdl.com/api/v1/subtitles';
-  static const String _subDlDownloadBase = 'https://dl.subdl.com';
   static const Duration _searchTimeout = Duration(seconds: 18);
   static const Duration _downloadTimeout = Duration(seconds: 25);
   static const int _maxSubtitleDownloadBytes = 24 * 1024 * 1024;
@@ -167,18 +162,6 @@ class ExternalSubtitleService {
           preferredLanguageCode: preferredLanguageCode,
         ).catchError((Object error) {
           debugPrint('[Subtitle][SubSource] Search failed: $error');
-          return const <ExternalSubtitle>[];
-        }),
-      if (_subDlApiKey.isNotEmpty)
-        _searchSubDl(
-          tmdbId: tmdbId,
-          title: title,
-          year: year,
-          isMovie: isMovie,
-          season: season,
-          episode: episode,
-        ).catchError((Object error) {
-          debugPrint('[Subtitle][SubDL] Search failed: $error');
           return const <ExternalSubtitle>[];
         }),
       if (_arabicSubsProxyUrl.isNotEmpty)
@@ -317,78 +300,6 @@ class ExternalSubtitleService {
           ),
         );
       }
-    }
-    return results;
-  }
-
-  Future<List<ExternalSubtitle>> _searchSubDl({
-    required int tmdbId,
-    required String? title,
-    required int? year,
-    required bool isMovie,
-    int? season,
-    int? episode,
-  }) async {
-    final uri = Uri.parse(_subDlBase).replace(
-      queryParameters: <String, String>{
-        'api_key': _subDlApiKey,
-        'client': 'other',
-        'tmdb_id': '$tmdbId',
-        'type': isMovie ? 'movie' : 'tv',
-        'languages': 'AR,EN',
-        'subs_per_page': '30',
-        if (!isMovie && season != null) 'season_number': '$season',
-        if (!isMovie && episode != null) 'episode_number': '$episode',
-        if (year != null) 'year': '$year',
-        if (title?.trim().isNotEmpty == true) 'film_name': title!.trim(),
-      },
-    );
-    final response = await _client
-        .get(uri, headers: const <String, String>{'Accept': 'application/json'})
-        .timeout(_searchTimeout);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw http.ClientException(
-        'SubDL returned HTTP ${response.statusCode}.',
-        uri,
-      );
-    }
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map || decoded['status'] == false) {
-      return const <ExternalSubtitle>[];
-    }
-    final rows = decoded['subtitles'];
-    if (rows is! List) return const <ExternalSubtitle>[];
-    final results = <ExternalSubtitle>[];
-    for (final row in rows.whereType<Map>()) {
-      final language = _normaliseLanguageCode(
-        row['language']?.toString() ??
-            row['lang']?.toString() ??
-            row['language_code']?.toString(),
-      );
-      if (language != 'ar' && language != 'en') continue;
-      final rawUrl = row['url']?.toString().trim() ?? '';
-      if (rawUrl.isEmpty) continue;
-      final uri = rawUrl.startsWith('http')
-          ? rawUrl
-          : '$_subDlDownloadBase${rawUrl.startsWith('/') ? '' : '/'}$rawUrl';
-      final release =
-          row['release_name']?.toString() ?? row['name']?.toString() ?? '';
-      final id = row['n_id']?.toString() ?? row['id']?.toString() ?? rawUrl;
-      results.add(
-        ExternalSubtitle(
-          id: 'subdl_${id}_$language',
-          url: uri,
-          flagUrl: '',
-          format: row['format']?.toString() ?? 'zip',
-          encoding: 'zip/auto',
-          display: _languageName(language),
-          language: language,
-          media: isMovie ? 'movie' : 'tv',
-          isHearingImpaired: row['hi'] == true || row['hi']?.toString() == '1',
-          release: release,
-          source: 'SubDL',
-        ),
-      );
     }
     return results;
   }
@@ -979,8 +890,6 @@ class ExternalSubtitleService {
         'User-Agent': _openSubtitlesUserAgent,
         'X-User-Agent': _openSubtitlesUserAgent,
       });
-    } else if (subtitle.source == 'SubDL') {
-      headers.addAll(const <String, String>{'User-Agent': 'RAVEN23 PRO/1.0'});
     }
 
     final uri = Uri.parse(downloadUrl);
@@ -1075,7 +984,6 @@ class ExternalSubtitleService {
         // usable result; the other Arabic providers are deterministic fallbacks.
         'SubSource' => 0,
         'OpenSubtitles' => 1,
-        'SubDL' => 2,
         'ArabicSubs' => 3,
         _ => 4,
       };
@@ -1083,7 +991,6 @@ class ExternalSubtitleService {
     return switch (source) {
       'OpenSubtitles' => 0,
       'SubSource' => 1,
-      'SubDL' => 2,
       'ArabicSubs' => 3,
       _ => 4,
     };
