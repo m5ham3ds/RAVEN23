@@ -1367,17 +1367,23 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         }
 
         final selectedSeason = widget.metadata.seasonNumber!;
+        final selectedEpisodeMetadata = widget.metadata.seasonEpisodes
+            ?.where(
+              (episode) =>
+                  episode.seasonNumber == selectedSeason &&
+                  episode.episodeNumber == widget.metadata.episodeNumber,
+            )
+            .firstOrNull;
         final hasSelectedSeasonEpisodes =
             widget.metadata.seasonEpisodes?.isNotEmpty == true &&
             widget.metadata.seasonEpisodes!.every(
               (episode) => episode.seasonNumber == selectedSeason,
             ) &&
-            widget.metadata.seasonEpisodes!.any(
-              (episode) =>
-                  episode.seasonNumber == selectedSeason &&
-                  episode.episodeNumber == widget.metadata.episodeNumber &&
-                  (episode.runtime ?? 0) > 0,
-            );
+            selectedEpisodeMetadata != null &&
+            (selectedEpisodeMetadata.runtime ?? 0) > 0 &&
+            selectedEpisodeMetadata.stillPath?.trim().isNotEmpty == true &&
+            selectedEpisodeMetadata.overview?.trim().isNotEmpty == true &&
+            selectedEpisodeMetadata.voteAverage != null;
         if (!hasSelectedSeasonEpisodes) {
           final seasonDetails = await fetchTVDetails(
             Endpoints.getSeasonDetails(

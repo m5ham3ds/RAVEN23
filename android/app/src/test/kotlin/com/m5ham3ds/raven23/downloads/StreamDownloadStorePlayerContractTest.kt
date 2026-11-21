@@ -195,6 +195,48 @@ class StreamDownloadStorePlayerContractTest {
     }
 
     @Test
+    fun selectedSrtSubtitleKeepsSrtExtensionAndIsConvertedToSubRip() {
+        assertEquals(
+            "srt",
+            OfflineSubtitleFormat.extension(
+                requestedFormat = "SRT",
+                sourceUrl = "https://subtitles.example/download?id=42",
+            ),
+        )
+        assertEquals(
+            "vtt",
+            OfflineSubtitleFormat.extension(
+                requestedFormat = "WebVTT",
+                sourceUrl = "https://subtitles.example/download?id=42",
+            ),
+        )
+        assertEquals(
+            "srt",
+            OfflineSubtitleFormat.extension(
+                requestedFormat = null,
+                sourceUrl = "https://subtitles.example/subtitle.srt?token=abc",
+            ),
+        )
+
+        val converted = OfflineSubtitleFormat.webVttToSrt(
+            """
+            WEBVTT
+
+            00:00:01.200 --> 00:00:02.500 align:start
+            Hello, crew!
+
+            00:00:03.000 --> 00:00:04.250
+            Second line
+            """.trimIndent(),
+        )
+        assertEquals(
+            "1\n00:00:01,200 --> 00:00:02,500\nHello, crew!\n\n" +
+                "2\n00:00:03,000 --> 00:00:04,250\nSecond line\n",
+            converted,
+        )
+    }
+
+    @Test
     fun movieExportUsesOnlyTheMovieTitle() {
         assertEquals(
             "Dune Part Two",

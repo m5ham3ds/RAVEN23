@@ -249,6 +249,7 @@ void main() {
         expectedDurationMs: 1_320_000,
         estimatedDownloadBytes: 80 * 1024 * 1024,
         subtitleTrackName: 'Arabic',
+        subtitleTrackFormat: 'srt',
         subtitleTrackContent: 'WEBVTT\\n\\n00:00:01.000 --> 00:00:02.000\\nمرحبا',
       );
 
@@ -257,6 +258,7 @@ void main() {
       expect(payload['expectedDurationMs'], 1_320_000);
       expect(payload['estimatedDownloadBytes'], 80 * 1024 * 1024);
       expect(payload['subtitleTrackName'], 'Arabic');
+      expect(payload['subtitleTrackFormat'], 'srt');
       expect(payload['subtitleTrackContent'], contains('WEBVTT'));
     });
 

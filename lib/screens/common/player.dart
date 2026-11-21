@@ -6240,8 +6240,35 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
                   'voteAverage': item.voteAverage,
                 },
               )
-              .toList(growable: false) ??
-          const <Map<String, Object?>>[];
+              .toList(growable: true) ??
+          <Map<String, Object?>>[];
+      if (episode != null) {
+        final currentEpisode = <String, Object?>{
+          'episodeId': episode.episodeId,
+          'episodeName': episode.episodeName,
+          'episodeNumber': episodeNumber,
+          'seasonNumber': season,
+          'stillPath': episode.backdropPath,
+          'airDate': episode.airDate,
+          'runtime': episode.currentEpisodeRuntime,
+          'overview': null,
+          'voteAverage': null,
+        };
+        final currentIndex = seasonEpisodes.indexWhere(
+          (item) =>
+              item['episodeNumber'] == episodeNumber &&
+              item['seasonNumber'] == season,
+        );
+        if (currentIndex < 0) {
+          seasonEpisodes.add(currentEpisode);
+        } else {
+          final existing = seasonEpisodes[currentIndex];
+          seasonEpisodes[currentIndex] = <String, Object?>{
+            for (final key in currentEpisode.keys)
+              key: existing[key] ?? currentEpisode[key],
+          };
+        }
+      }
       final allSeasons = episode?.allSeasons
               ?.map(
                 (item) => <String, Object?>{
@@ -6255,14 +6282,16 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
               .toList(growable: false) ??
           const <Map<String, Object?>>[];
       final selectedStillPath = seasonEpisodes
-          .where(
-            (item) =>
-                item['seasonNumber'] == season &&
-                item['episodeNumber'] == episodeNumber,
-          )
-          .map((item) => item['stillPath'])
-          .whereType<String>()
-          .firstOrNull;
+              .where(
+                (item) =>
+                    item['seasonNumber'] == season &&
+                    item['episodeNumber'] == episodeNumber,
+              )
+              .map((item) => item['stillPath'])
+              .whereType<String>()
+              .firstOrNull ??
+          episode?.backdropPath ??
+          episode?.posterPath;
       if (selectedStillPath != null && selectedStillPath.trim().isNotEmpty) {
         try {
           await cacheProp()
@@ -6319,6 +6348,13 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName:
               subtitleTrack?.language ?? externalSubtitle?.language,
+          subtitleTrackFormat: externalSubtitle?.format ??
+              (RegExp(
+                        r'(\.srt(?:[?#]|$)|[?&](?:format|ext)=srt)',
+                        caseSensitive: false,
+                      ).hasMatch(subtitleTrack?.url ?? '')
+                  ? 'srt'
+                  : null),
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
           subtitleTrackContent: subtitleTrackContent,
           seasonEpisodes: seasonEpisodes,

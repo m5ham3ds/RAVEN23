@@ -282,6 +282,7 @@ class OfflineDownloadRequest {
     this.episodeNumber,
     this.subtitleTrackUrl,
     this.subtitleTrackName,
+    this.subtitleTrackFormat,
     this.subtitleTrackHeaders = const {},
     this.audioTrack,
     this.audioLanguages = const <String>['en'],
@@ -312,6 +313,8 @@ class OfflineDownloadRequest {
   final int? episodeNumber;
   final String? subtitleTrackUrl;
   final String? subtitleTrackName;
+  /// Original selected subtitle format, retained when external subtitles are normalized for playback.
+  final String? subtitleTrackFormat;
   final Map<String, String> subtitleTrackHeaders;
   final OfflineAudioTrack? audioTrack;
   /// Language priority for automatic track selection (Japanese then English for anime).
@@ -356,6 +359,7 @@ class OfflineDownloadRequest {
         'episodeNumber': episodeNumber,
         'subtitleTrackUrl': subtitleTrackUrl,
         'subtitleTrackName': subtitleTrackName,
+        'subtitleTrackFormat': subtitleTrackFormat,
         'subtitleTrackHeaders': subtitleTrackHeaders,
         'exportTitle': exportTitle,
         'seasonEpisodes': seasonEpisodes,

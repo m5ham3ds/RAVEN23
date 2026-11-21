@@ -493,6 +493,7 @@ class StreamDownloadStore private constructor(context: Context) {
             !(arguments["subtitleTrackUrl"] as? String).isNullOrBlank() ||
                 !(arguments["subtitleTrackContent"] as? String).isNullOrBlank()
         put("subtitleRequested", subtitleRequested)
+        put("subtitleTrackFormat", arguments["subtitleTrackFormat"] as? String ?: "")
         put("subtitleStatus", if (subtitleRequested) "pending" else "none")
         put("format", arguments["format"] as? String ?: "")
         put("maxVideoHeight", arguments["maxVideoHeight"] ?: JSONObject.NULL)
@@ -543,13 +544,10 @@ class StreamDownloadStore private constructor(context: Context) {
 
         val name = (arguments["subtitleTrackName"] as? String).orEmpty()
             .ifBlank { "Original subtitle" }
-        val extension = if (content.isNotBlank()) {
-            "vtt"
-        } else if (Uri.parse(url).path?.lowercase()?.endsWith(".srt") == true) {
-            "srt"
-        } else {
-            "vtt"
-        }
+        val extension = OfflineSubtitleFormat.extension(
+            requestedFormat = arguments["subtitleTrackFormat"] as? String,
+            sourceUrl = url,
+        )
         if (!subtitleDirectory.exists() && !subtitleDirectory.mkdirs()) {
             metadata.put("subtitleStatus", "failed")
             metadata.put("subtitleError", "Could not create the offline subtitle directory.")
@@ -564,7 +562,15 @@ class StreamDownloadStore private constructor(context: Context) {
         }
         try {
             if (content.isNotBlank()) {
-                output.writeText(content, StandardCharsets.UTF_8)
+                val persistedContent = if (
+                    extension == "srt" &&
+                    content.trimStart().startsWith("WEBVTT", ignoreCase = true)
+                ) {
+                    OfflineSubtitleFormat.webVttToSrt(content)
+                } else {
+                    content
+                }
+                output.writeText(persistedContent, StandardCharsets.UTF_8)
             } else {
                 val dataSource = httpFactory(headers).createDataSource()
                 DataSourceInputStream(dataSource, DataSpec(Uri.parse(url))).use { input ->
