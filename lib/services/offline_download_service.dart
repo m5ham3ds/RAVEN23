@@ -227,6 +227,17 @@ class OfflineDownloadService implements OfflineDownloadGateway {
       'saveCopy',
       {'id': id},
     );
+    if (result?['saved'] == true &&
+        result?['subtitleRequested'] == true &&
+        result?['subtitleSaved'] != true) {
+      final detail = result?['subtitleError']?.toString().trim();
+      throw PlatformException(
+        code: 'SUBTITLE_SAVE_FAILED',
+        message: detail?.isNotEmpty == true
+            ? 'Video saved, but its selected subtitle could not be saved: $detail'
+            : 'Video saved, but its selected subtitle file is missing. Re-select the subtitle and download again.',
+      );
+    }
     return result?['saved'] == true;
   }
 
