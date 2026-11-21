@@ -984,14 +984,14 @@ class ExternalSubtitleService {
         // usable result; the other Arabic providers are deterministic fallbacks.
         'SubSource' => 0,
         'OpenSubtitles' => 1,
-        'ArabicSubs' => 3,
+        'ArabicSubs' => 2,
         _ => 4,
       };
     }
     return switch (source) {
       'OpenSubtitles' => 0,
       'SubSource' => 1,
-      'ArabicSubs' => 3,
+      'ArabicSubs' => 2,
       _ => 4,
     };
   }
