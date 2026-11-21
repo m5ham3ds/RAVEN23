@@ -241,12 +241,16 @@ class StreamDownloadStorePlayerContractTest {
     @Test
     fun exportTitleSanitizerReplacesAllUnsafeCharactersAndNormalizesWhitespace() {
         assertEquals(
-            "A_B_C_D_E_F_G_H",
-            OfflineExportFileNames.sanitize("A/B:C*D?E\\"F<G>H|"),
+            "A_B_C_D_E_F_G_H_",
+            OfflineExportFileNames.sanitize("""A/B:C*D?E"F<G>H|"""),
+        )
+        assertEquals(
+            "________",
+            OfflineExportFileNames.sanitize(""" /:*?"<>| """),
         )
         assertEquals(
             "RAVEN23 video",
-            OfflineExportFileNames.sanitize(" /:*?\\\"<>| "),
+            OfflineExportFileNames.sanitize("   "),
         )
     }
 
