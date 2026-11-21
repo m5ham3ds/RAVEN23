@@ -6,7 +6,7 @@ package com.m5ham3ds.raven23.downloads
  * verified on the JVM.
  */
 internal object OfflineExportFileNames {
-    internal fun buildOfflineExportStem(
+    internal fun buildStem(
         title: String,
         isMovie: Boolean,
         season: Int,
@@ -31,7 +31,7 @@ internal object OfflineExportFileNames {
             .joinToString(" - ")
     }
     
-    internal fun sanitizeOfflineExportTitle(value: String): String =
+    internal fun sanitize(value: String): String =
         value.trim()
             .replace(Regex("[\\\\/:*?\\\"<>|\\\\p{Cntrl}]"), "_")
             .replace(Regex("\\\\s+"), " ")
