@@ -14,7 +14,7 @@ import 'package:raven23/functions/player_route_handoff.dart';
 import 'package:raven23/models/tv_stream_metadata.dart';
 import 'package:raven23/models/offline_download.dart';
 import 'package:raven23/models/provider_video_source.dart';
-import 'package:raven23/constants/app_constants.dart' show MediaType;
+import 'package:raven23/constants/app_constants.dart' show MediaType, cacheProp;
 import 'package:raven23/models/provider_load_state.dart';
 import 'package:raven23/services/globle_method.dart';
 import 'package:raven23/services/offline_download_service.dart';
@@ -763,6 +763,112 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
     return currentProviderIndex;
   }
 
+  List<Map<String, Object?>> _offlineEpisodeMetadataRows() {
+    final rows = (widget.metadata.seasonEpisodes ?? const <EpisodeMetadata>[])
+        .map(
+          (item) => <String, Object?>{
+            'episodeId': item.episodeId,
+            'episodeName': item.episodeName,
+            'episodeNumber': item.episodeNumber,
+            'seasonNumber': item.seasonNumber,
+            'stillPath': item.stillPath,
+            'airDate': item.airDate,
+            'runtime': item.runtime,
+            'overview': item.overview,
+            'voteAverage': item.voteAverage,
+          },
+        )
+        .toList(growable: true);
+    final season = widget.metadata.seasonNumber;
+    final episodeNumber = widget.metadata.episodeNumber;
+    if (season == null || episodeNumber == null) return rows;
+    final current = <String, Object?>{
+      'episodeId': widget.metadata.episodeId,
+      'episodeName': widget.metadata.episodeName,
+      'episodeNumber': episodeNumber,
+      'seasonNumber': season,
+      'stillPath': widget.metadata.backdropPath,
+      'airDate': widget.metadata.airDate,
+      'runtime': widget.metadata.currentEpisodeRuntime,
+      'overview': null,
+      'voteAverage': null,
+    };
+    final index = rows.indexWhere(
+      (row) =>
+          row['seasonNumber'] == season &&
+          row['episodeNumber'] == episodeNumber,
+    );
+    if (index < 0) {
+      rows.add(current);
+    } else {
+      final existing = rows[index];
+      rows[index] = <String, Object?>{
+        for (final key in current.keys) key: existing[key] ?? current[key],
+      };
+    }
+    return rows;
+  }
+
+  List<Map<String, Object?>> _offlineSeasonMetadataRows() =>
+      (widget.metadata.allSeasons ?? const <SeasonMetadata>[])
+          .map(
+            (item) => <String, Object?>{
+              'seasonNumber': item.seasonNumber,
+              'seasonName': item.seasonName,
+              'episodeCount': item.episodeCount,
+              'posterPath': item.posterPath,
+              'overview': item.overview,
+            },
+          )
+          .toList(growable: false);
+
+  String? _offlineSubtitleFormat(
+    ExternalSubtitle? externalSubtitle,
+    RegularSubtitleLinks? providerSubtitle,
+  ) {
+    final externalFormat = externalSubtitle?.format.trim().toLowerCase() ?? '';
+    if (externalFormat.contains('srt') || externalFormat.contains('subrip')) {
+      return 'srt';
+    }
+    if (externalFormat.contains('vtt') || externalFormat.contains('webvtt')) {
+      return 'vtt';
+    }
+    final uri = Uri.tryParse(providerSubtitle?.url ?? '');
+    final path = uri?.path.toLowerCase() ?? '';
+    if (path.endsWith('.srt')) return 'srt';
+    if (path.endsWith('.vtt')) return 'vtt';
+    final queryFormat = (uri?.queryParameters['format'] ??
+            uri?.queryParameters['ext'] ??
+            '')
+        .toLowerCase();
+    if (queryFormat.contains('srt') || queryFormat.contains('subrip')) {
+      return 'srt';
+    }
+    if (queryFormat.contains('vtt') || queryFormat.contains('webvtt')) {
+      return 'vtt';
+    }
+    return null;
+  }
+
+  Future<void> _cacheOfflineEpisodeStill() async {
+    final episodes = widget.metadata.seasonEpisodes ?? const <EpisodeMetadata>[];
+    final current = episodes.where(
+      (item) =>
+          item.seasonNumber == widget.metadata.seasonNumber &&
+          item.episodeNumber == widget.metadata.episodeNumber,
+    ).firstOrNull;
+    final stillPath = current?.stillPath ??
+        widget.metadata.backdropPath ??
+        widget.metadata.posterPath;
+    if (stillPath == null || stillPath.trim().isEmpty) return;
+    try {
+      await cacheProp()
+          .getSingleFile('https://image.tmdb.org/t/p/w300$stillPath')
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Thumbnail caching must never block or fail the video download.
+    }
+  }
   /// Shows [provider] as the one selected for playback.
   void _showSelectedProvider(VideoProvider provider) {
     if (!mounted) return;
@@ -1017,6 +1123,10 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
         : await ExternalSubtitleService(_scraperApiUrl)
             .downloadAndNormalizeForPlayback(externalSubtitle);
     if (!mounted) return;
+    await _cacheOfflineEpisodeStill();
+    final offlineEpisodes = _offlineEpisodeMetadataRows();
+    final offlineSeasons = _offlineSeasonMetadataRows();
+    final subtitleFormat = _offlineSubtitleFormat(externalSubtitle, subtitleTrack);
     final season = widget.metadata.seasonNumber ?? 0;
     final episode = widget.metadata.episodeNumber ?? 0;
     try {
@@ -1062,8 +1172,13 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           episodeNumber: episode,
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: externalSubtitle?.language ?? subtitleTrack?.language,
+          subtitleTrackFormat: subtitleFormat,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
           subtitleTrackContent: subtitleContent,
+          seasonEpisodes: offlineEpisodes,
+          allSeasons: offlineSeasons,
+          seriesPosterPath: widget.metadata.posterPath,
+          seriesBackdropPath: widget.metadata.backdropPath,
           audioLanguages: (widget.metadata.isAnime ? const <String>['ja', 'en'] : const <String>['en']),
           expectedDurationMs: (widget.metadata.currentEpisodeRuntime != null && widget.metadata.currentEpisodeRuntime! > 0 ? widget.metadata.currentEpisodeRuntime! * 60 * 1000 : null),
         ),
@@ -1201,6 +1316,10 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           : await ExternalSubtitleService(_scraperApiUrl)
               .downloadAndNormalizeForPlayback(externalSubtitle);
       if (!mounted) return;
+      await _cacheOfflineEpisodeStill();
+      final offlineEpisodes = _offlineEpisodeMetadataRows();
+      final offlineSeasons = _offlineSeasonMetadataRows();
+      final subtitleFormat = _offlineSubtitleFormat(externalSubtitle, subtitleTrack);
       await context.read<OfflineDownloadProvider>().enqueue(
         OfflineDownloadRequest(
           id: episodeOfflineDownloadId(
@@ -1242,8 +1361,13 @@ class _TVVideoLoaderState extends State<_TVVideoLoader> {
           episodeNumber: episode,
           subtitleTrackUrl: subtitleTrack?.url,
           subtitleTrackName: externalSubtitle?.language ?? subtitleTrack?.language,
+          subtitleTrackFormat: subtitleFormat,
           subtitleTrackHeaders: subtitleTrack?.headers ?? const {},
           subtitleTrackContent: subtitleContent,
+          seasonEpisodes: offlineEpisodes,
+          allSeasons: offlineSeasons,
+          seriesPosterPath: widget.metadata.posterPath,
+          seriesBackdropPath: widget.metadata.backdropPath,
           audioLanguages: (widget.metadata.isAnime ? const <String>['ja', 'en'] : const <String>['en']),
           expectedDurationMs: (widget.metadata.currentEpisodeRuntime != null && widget.metadata.currentEpisodeRuntime! > 0 ? widget.metadata.currentEpisodeRuntime! * 60 * 1000 : null),
         ),
