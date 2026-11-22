@@ -20,6 +20,16 @@ class ExternalSubtitle {
   /// the origin and report a failing host accurately.
   final String source;
 
+  /// Provider quality metadata retained for the evidence-based selector.
+  final String? productionType;
+  final String? releaseType;
+  final int? downloadCount;
+  final int? ratingGood;
+  final int? ratingBad;
+  final String? uploaderName;
+  final bool? foreignParts;
+  final String? createdAt;
+
   ExternalSubtitle({
     required this.id,
     required this.url,
@@ -32,6 +42,14 @@ class ExternalSubtitle {
     required this.isHearingImpaired,
     required this.release,
     this.source = 'Scraper API',
+    this.productionType,
+    this.releaseType,
+    this.downloadCount,
+    this.ratingGood,
+    this.ratingBad,
+    this.uploaderName,
+    this.foreignParts,
+    this.createdAt,
   });
 
   factory ExternalSubtitle.fromJson(Map<String, dynamic> json) {
@@ -49,6 +67,15 @@ class ExternalSubtitle {
       release: json['release']?.toString() ?? '',
       source: json['source']?.toString() ??
           json['provider']?.toString() ?? 'Scraper API',
+      productionType: json['productionType']?.toString(),
+      releaseType: json['releaseType']?.toString(),
+      downloadCount: int.tryParse(json['downloadCount']?.toString() ?? ''),
+      ratingGood: int.tryParse(json['ratingGood']?.toString() ?? ''),
+      ratingBad: int.tryParse(json['ratingBad']?.toString() ?? ''),
+      uploaderName: json['uploaderName']?.toString(),
+      foreignParts: json['foreignParts'] == true ||
+          json['foreignParts']?.toString() == '1',
+      createdAt: json['createdAt']?.toString(),
     );
   }
 
