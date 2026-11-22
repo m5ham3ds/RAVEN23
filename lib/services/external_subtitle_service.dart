@@ -7,6 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/external_subtitles.dart';
+import 'subtitle_provider_orchestrator.dart';
 import '../video_providers/scraper_api.dart';
 import '../video_providers/unified/media_identity.dart';
 import '../video_providers/unified/media_identity_resolver.dart';
@@ -182,14 +183,14 @@ class ExternalSubtitleService {
       }),
     ];
 
-    final results = await Future.wait(providerFutures).timeout(
-      const Duration(seconds: 48),
-      onTimeout: () => const <List<ExternalSubtitle>>[],
+    // Keep results from providers that have already completed if another
+    // provider stalls beyond the batch deadline. Future.wait's timeout handler
+    // used to replace the entire result with an empty list.
+    final results = await SubtitleProviderOrchestrator.collectPartialResults(
+      requests: providerFutures,
+      timeout: const Duration(seconds: 48),
     );
-    return _mergeAndSort(
-      results.expand((result) => result),
-      preferredLanguageCode,
-    );
+    return _mergeAndSort(results, preferredLanguageCode);
   }
 
   Future<List<ExternalSubtitle>> _searchScraper({
