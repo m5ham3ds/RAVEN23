@@ -70,6 +70,119 @@ void main() {
     );
 
     test(
+      'matches ArabicSubs only by exact TMDB provider identity',
+      () async {
+        final requests = <http.Request>[];
+        final client = MockClient((request) async {
+          requests.add(request);
+          if (request.url.path == '/search') {
+            return http.Response(
+              jsonEncode({
+                'items': [
+                  {
+                    'id': 16,
+                    'providerId': '42',
+                    'type': 'movie',
+                    'year': 2025,
+                    'title': 'Example movie',
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/titles/16/subtitles') {
+            return http.Response(
+              jsonEncode({
+                'items': [
+                  {
+                    'id': 12345,
+                    'originalFilename': 'Example.Movie.2025.WEB-DL.srt',
+                    'releaseLabel': 'WEB-DL 1080p',
+                    'hearingImpaired': false,
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        });
+        final resolver = MediaIdentityResolver(
+          lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
+        );
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          identityResolver: resolver,
+          arabicSubsProxyUrl: 'https://arabicsubs-proxy.example.test',
+        );
+
+        final results = await service.fetchMovieSubtitles(
+          42,
+          title: 'Example movie',
+          year: 2025,
+          preferredLanguageCode: 'ar',
+        );
+
+        expect(results, hasLength(1));
+        expect(results.single.source, 'ArabicSubs');
+        expect(results.single.id, 'arabicsubs_12345');
+        expect(results.single.url, 'arabicsubs-proxy://subtitle/12345');
+        expect(results.single.language, 'ar');
+        expect(
+          requests.map((request) => request.url.path),
+          containsAllInOrder(['/search', '/titles/16/subtitles']),
+        );
+      },
+    );
+
+    test(
+      'does not fall back to same-title/year ArabicSubs results without TMDB id',
+      () async {
+        final requests = <http.Request>[];
+        final client = MockClient((request) async {
+          requests.add(request);
+          if (request.url.path == '/search') {
+            return http.Response(
+              jsonEncode({
+                'items': [
+                  {
+                    'id': 17,
+                    'type': 'movie',
+                    'year': 2025,
+                    'title': 'Example movie',
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        });
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          identityResolver: MediaIdentityResolver(
+            lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
+          ),
+          arabicSubsProxyUrl: 'https://arabicsubs-proxy.example.test',
+        );
+
+        final results = await service.fetchMovieSubtitles(
+          42,
+          title: 'Example movie',
+          year: 2025,
+          preferredLanguageCode: 'ar',
+        );
+
+        expect(results, isEmpty);
+        expect(requests, hasLength(1));
+        expect(requests.single.url.path, '/search');
+      },
+    );
+
+    test(
       'uses OpenSubtitles v1 Arabic search and downloads its temporary link',
       () async {
         const arabicSrt = '1\n00:00:01,000 --> 00:00:02,000\nمرحبا\n';

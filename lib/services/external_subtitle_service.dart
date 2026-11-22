@@ -346,6 +346,9 @@ class ExternalSubtitleService {
       return const <ExternalSubtitle>[];
     }
     final titles = (searchBody['items'] as List).whereType<Map>().toList();
+    // The protected proxy must enrich search items with providerId by
+    // resolving the official /titles/{id} record. A title/year-only fallback
+    // can confuse remakes or same-name works and is not safe for auto-match.
     Map? match;
     for (final candidate in titles) {
       final providerId = candidate['providerId']?.toString();
@@ -353,21 +356,14 @@ class ExternalSubtitleService {
       final typeMatches = isMovie
           ? candidateType == 'movie'
           : candidateType == 'series' || candidateType == 'tv';
-      if (providerId == '$tmdbId' && typeMatches) {
+      final candidateYear = int.tryParse(candidate['year']?.toString() ?? '');
+      final yearMatches =
+          year == null || candidateYear == null || candidateYear == year;
+      if (providerId == '$tmdbId' && typeMatches && yearMatches) {
         match = candidate;
         break;
       }
     }
-    match ??= titles.cast<Map?>().firstWhere((candidate) {
-      if (candidate == null) return false;
-      final candidateType = candidate['type']?.toString().toLowerCase();
-      final typeMatches = isMovie
-          ? candidateType == 'movie'
-          : candidateType == 'series' || candidateType == 'tv';
-      final candidateYear = int.tryParse(candidate['year']?.toString() ?? '');
-      return typeMatches &&
-          (year == null || candidateYear == null || candidateYear == year);
-    }, orElse: () => null);
     final titleId = match?['id']?.toString();
     if (titleId == null || titleId.isEmpty) return const <ExternalSubtitle>[];
 
