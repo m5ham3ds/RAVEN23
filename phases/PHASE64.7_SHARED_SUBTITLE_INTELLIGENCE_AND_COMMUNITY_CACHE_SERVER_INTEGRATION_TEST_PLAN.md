@@ -302,13 +302,16 @@ Do not start this phase until every prerequisite below is met.
 3. Confirm that video playback starts without waiting for subtitle lookup.
 4. Request the shared cache entry for the selected primary subtitle language.
 5. Claim discovery and record the returned owner/job identifier.
-6. Run the existing eligible provider filtering flow.
-7. Download and normalize the best candidate.
-8. Publish the normalized file and metadata to Laravel.
+6. Run the already accepted PHASE64.6 selector version against the provider candidates; do not introduce or tune a second ranking implementation in this phase.
+7. Download and normalize the selector's recommended candidate.
+8. Confirm the candidate's confidence/status is eligible for shared recommendation. A mere successful download is not enough to mark it Verified.
+9. Publish the normalized file, accepted selector version, evidence summary, and provenance metadata to Laravel.
 
 **Expected**
 - Initial lookup returns `miss`.
 - Exactly one active discovery owner is created.
+- The selector version used is the one recorded as PASS in PHASE64.6.
+- The candidate chosen by the accepted selector is published only with its confidence and evidence status; Candidate is not mislabeled Verified.
 - A valid Arabic file can be published with the original provider and release attribution.
 - Laravel stores a durable file and metadata record.
 - The player continues running throughout the discovery/upload flow.
