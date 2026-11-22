@@ -79,7 +79,8 @@ void main() {
           if (request.url.host == 'api.opensubtitles.com' &&
               request.method == 'GET' &&
               request.url.path.endsWith('/subtitles')) {
-            expect(request.headers['api-key'], 'test-open-key');
+            expect(_headerValue(request, 'Api-Key'), 'test-open-key');
+            expect(_headerValue(request, 'User-Agent'), 'RAVEN23 PRO v1.0');
             expect(request.url.queryParameters['languages'], 'ar,en');
             return http.Response(
               jsonEncode({
@@ -102,7 +103,7 @@ void main() {
           if (request.url.host == 'api.opensubtitles.com' &&
               request.method == 'POST' &&
               request.url.path.endsWith('/download')) {
-            expect(request.headers['api-key'], 'test-open-key');
+            expect(_headerValue(request, 'Api-Key'), 'test-open-key');
             expect(jsonDecode(request.body)['file_id'], 4567);
             return http.Response(
               jsonEncode({'link': 'https://download.example.test/arabic.srt'}),
@@ -362,11 +363,11 @@ void main() {
         expect(source.content, contains('OpenSubtitles cue'));
         expect(
           _headerValue(requests.single, 'user-agent'),
-          'TemporaryUserAgent',
+          'RAVEN23 PRO v1.0',
         );
         expect(
           _headerValue(requests.single, 'x-user-agent'),
-          'TemporaryUserAgent',
+          'RAVEN23 PRO v1.0',
         );
       },
     );
