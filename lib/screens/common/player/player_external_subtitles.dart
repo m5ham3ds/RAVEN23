@@ -10,6 +10,7 @@ import '../../../models/external_subtitles.dart';
 import '../../../models/movie_stream_metadata.dart';
 import '../../../models/tv_stream_metadata.dart';
 import '../../../services/external_subtitle_service.dart';
+import '../../../services/subtitle_selection_engine.dart';
 import '../../../services/subtitle_playback_store.dart';
 import '../../../ui_components/app_ui_components.dart';
 import 'player_sheet_ui.dart';
@@ -32,6 +33,7 @@ class PlayerExternalSubtitles {
   bool _isExternalSubtitlesMenuOpen = false;
   bool _hasAutoLoadedExternalSubtitles = false;
   final Set<String> _addedExternalSubtitleIds = {}; // Track added subtitle IDs
+  final Set<String> _languageSearchesInProgress = <String>{};
 
   final List<BetterPlayerSubtitlesSource> _appliedSubtitles = [];
   ExternalSubtitleService? _subtitleService;
@@ -56,6 +58,7 @@ class PlayerExternalSubtitles {
       _automaticPreferredSearchStarted = false;
       _availableExternalSubtitles = <ExternalSubtitle>[];
       _selectedExternalSubtitles.clear();
+      _languageSearchesInProgress.clear();
     }
     _mediaCacheKey = mediaCacheKey;
     _preferredLanguageCode = _normaliseLanguage(preferredLanguageCode);
@@ -95,6 +98,7 @@ class PlayerExternalSubtitles {
     TVStreamMetadata? tvMetadata,
     required BetterPlayerController betterPlayerController,
     bool hasPreferredProviderSubtitle = false,
+    String? expectedRelease,
   }) async {
     if (hasPreferredProviderSubtitle) {
       _automaticPreferredSearchStarted = true;
@@ -123,12 +127,11 @@ class PlayerExternalSubtitles {
       );
       if (!context.mounted) return;
       _availableExternalSubtitles = results;
-      final preferred = results
-          .where(
-            (item) =>
-                _normaliseLanguage(item.language) == _preferredLanguageCode,
-          )
-          .toList();
+      final preferred = SubtitleSelectionEngine.rankForLanguage(
+        candidates: results,
+        languageCode: _preferredLanguageCode,
+        expectedRelease: expectedRelease,
+      );
       if (preferred.isEmpty) {
         debugPrint(
           '[SubtitleAuto][NO_PREFERRED_TRACK] language=$_preferredLanguageCode '
@@ -136,9 +139,9 @@ class PlayerExternalSubtitles {
         );
         return;
       }
-      // Provider priority and release metadata are already reflected in the
-      // merged search order. Try candidates in order until one downloads.
-      for (final candidate in preferred.take(5)) {
+      // The language-neutral selector ranks candidates for this language
+      // using available release and community evidence, not provider name.
+      for (final candidate in preferred) {
         try {
           final source = await _downloadAndCache(candidate, service);
           if (!context.mounted) return;
@@ -161,6 +164,101 @@ class PlayerExternalSubtitles {
       }
     } catch (error) {
       debugPrint('[SubtitleAuto][SEARCH_FAILED] $error');
+    }
+  }
+
+
+  /// Runs the same best-subtitle selection for a language the user explicitly
+  /// switches to in the player. The configured default remains unchanged:
+  /// selecting English once does not make English the next video's default.
+  Future<void> ensureLanguageSubtitle({
+    required String languageCode,
+    required BuildContext context,
+    required String scraperApiUrl,
+    required MediaType? mediaType,
+    MovieStreamMetadata? movieMetadata,
+    TVStreamMetadata? tvMetadata,
+    required BetterPlayerController betterPlayerController,
+    String? expectedRelease,
+  }) async {
+    final target = _normaliseLanguage(languageCode);
+    if (target.isEmpty ||
+        target == 'off' ||
+        _mediaCacheKey == null ||
+        !context.mounted ||
+        !_languageSearchesInProgress.add(target)) {
+      return;
+    }
+    final mediaKey = _mediaCacheKey;
+    try {
+      final service = ExternalSubtitleService(scraperApiUrl);
+      _subtitleService = service;
+      final results = await _searchForMedia(
+        service: service,
+        context: context,
+        mediaType: mediaType,
+        movieMetadata: movieMetadata,
+        tvMetadata: tvMetadata,
+        preferredLanguageCode: target,
+      );
+      if (!context.mounted || _mediaCacheKey != mediaKey) return;
+
+      final mergedById = <String, ExternalSubtitle>{
+        for (final item in _availableExternalSubtitles) item.id: item,
+        for (final item in results) item.id: item,
+      };
+      _availableExternalSubtitles = mergedById.values.toList(
+        growable: false,
+      );
+
+      final candidates = SubtitleSelectionEngine.rankForLanguage(
+        candidates: results,
+        languageCode: target,
+        expectedRelease: expectedRelease,
+      );
+      if (candidates.isEmpty) {
+        debugPrint(
+          '[SubtitleAuto][NO_LANGUAGE_MATCH] language=$target '
+          'results=${results.length}',
+        );
+        return;
+      }
+
+      for (final candidate in candidates) {
+        try {
+          final source = await _downloadAndCache(candidate, service);
+          if (!context.mounted || _mediaCacheKey != mediaKey) return;
+          if (_addedExternalSubtitleIds.add(candidate.id)) {
+            betterPlayerController.betterPlayerSubtitlesSourceList.add(source);
+            _appliedSubtitles.add(source);
+          } else {
+            final existing = _appliedSubtitles
+                .where((item) => item.name == source.name)
+                .firstOrNull;
+            if (existing != null) {
+              await betterPlayerController.selectSubtitlesSource(existing);
+              return;
+            }
+            betterPlayerController.betterPlayerSubtitlesSourceList.add(source);
+            _appliedSubtitles.add(source);
+          }
+          await betterPlayerController.selectSubtitlesSource(source);
+          debugPrint(
+            '[SubtitleAuto][LANGUAGE_APPLIED] language=$target '
+            'source=${candidate.source} id=${candidate.id}',
+          );
+          return;
+        } catch (error) {
+          debugPrint(
+            '[SubtitleAuto][LANGUAGE_CANDIDATE_FAILED] language=$target '
+            'source=${candidate.source} id=${candidate.id} error=$error',
+          );
+        }
+      }
+    } catch (error) {
+      debugPrint('[SubtitleAuto][LANGUAGE_SEARCH_FAILED] language=$target $error');
+    } finally {
+      _languageSearchesInProgress.remove(target);
     }
   }
 
