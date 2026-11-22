@@ -254,7 +254,8 @@ The final provider priority must be derived from measured results. A provider th
 ### PHASE64.0 — Baseline and expanded Arabic-provider discovery
 - Record current provider results and failures for a fixed benchmark of movies, ordinary series, and anime.
 - Check every provider separately for Arabic availability, exact episode identity, release matching, actual download success, human/machine label, and synchronization signals.
-- Verify API documentation, current service availability, credentials, free limits, key-sharing restrictions, site terms, robots/access policy, and exact request/response contracts.
+- Validate the three owner-supplied API keys (ArabicSubs, SubSource, OpenSubtitles) with one minimal authenticated request each; record only pass/fail, masked key identity, response status, quota headers, and any provider-side restrictions. Never print or persist a full key in logs or reports.
+- Verify current service availability, free limits, key-sharing restrictions, site terms, robots/access policy, and exact request/response contracts.
 - Benchmark the existing eligible paths plus SubF2M, Sub-Scene, and AnimeTosho where each source is lawfully and technically accessible.
 - Mark paused, captcha-protected, undocumented, or access-restricted sources as unavailable; do not bypass their controls.
 - Identify duplicate catalogues and mirrored files so the final provider count reflects independent sources rather than aliases.
@@ -263,8 +264,11 @@ The final provider priority must be derived from measured results. A provider th
 
 ### PHASE64.1 — Development credentials and production separation
 - Preserve the owner's current development workflow: `.env.example` is temporarily used as the active configuration source for phone-testing builds, and its current values must remain available during this testing period. Do not blank the file, remove it from the Flutter asset/build path, or migrate the values to the production server until the owner confirms that phone testing is complete.
+- The owner has confirmed that API keys have been obtained for ArabicSubs, SubSource, and OpenSubtitles. Do not ask the owner to register again; validate the existing keys in PHASE64.0.
 - The current CI flow copies `.env.example` to `.env`, and Flutter currently bundles `.env` as an application asset. Therefore, values used this way are readable from the public repository and extractable from the test APK. This is a documented, temporary development exception, not a secure secret-storage design.
-- Do not place primary account passwords, session cookies, private account recovery data, or provider credentials that explicitly require server-side secrecy into the mobile app. For APIs that mandate server-side secrets (especially ArabicSubs), use a protected test proxy even during phone testing; do not bypass the provider's documented key-handling requirements.
+- OpenSubtitles and SubSource development keys may be used in the temporary phone-test configuration only after confirming their provider terms and accepting the known extraction exposure for this test build. Do not use these test keys as production credentials.
+- ArabicSubs explicitly says its Bearer API key must remain on the server and must not be placed in frontend code. Keep `ARABICSUBS_PROXY_URL` in the phone app configuration and route calls through a protected test proxy; never embed the ArabicSubs key in the APK, even during phone testing.
+- Do not place primary account passwords, session cookies, or private account recovery data into the mobile app.
 - Use only provider credentials whose terms permit the chosen development/testing use. Track free quotas and revoke or replace temporary credentials if misuse or unexpected quota consumption is detected.
 - After phone testing is complete, move production credentials to the appropriate protected backend configuration and remove the temporary development values from public source/build artifacts, with explicit owner approval.
 - Prefer per-user keys stored in Android secure storage where the provider permits BYOK for the production design.
@@ -343,13 +347,13 @@ Acceptance:
 - Use free sources only; respect each provider's published quotas and key-sharing rules.
 - Keep the currently deferred DCIM subtitle-sidecar export issue outside this work.
 
-### Owner-confirmed provider account registrations (2026-11-22)
-The owner confirmed that accounts have been registered for all three providers below:
-- ArabicSubs — https://arabicsubs.com
-- SubSource — https://subsource.net
-- OpenSubtitles — https://www.opensubtitles.com
+### Owner-confirmed provider API keys (2026-11-22)
+The owner confirmed that an API key has already been obtained from each of the three registered providers:
+- ArabicSubs — https://arabicsubs.com — documented `Authorization: Bearer <key>`.
+- SubSource — https://subsource.net — documented `X-API-Key: <key>`.
+- OpenSubtitles — https://www.opensubtitles.com — current API v1 uses the `Api-Key` request header and a valid application User-Agent.
 
-This records account registration only. Do not copy API keys, usernames, passwords, cookies, or tokens into this phase file. The exact credential acquired for each account (API key versus account login only) must be mapped during PHASE64.0 before implementation. The published integrations have different authentication models: ArabicSubs documents Bearer API-key access and requires the key to remain server-side; SubSource's documented API uses `X-API-Key`; OpenSubtitles provides its current API v1 and an application API-key onboarding flow. The current RAVEN23 code is not yet aligned with all three documented contracts (see Sections 2 and 6).
+Do not copy actual key values, usernames, passwords, cookies, or tokens into this phase file, chat replies, CI logs, build reports, or diagnostics. PHASE64.0 must validate each key without exposing it, record only masked identifiers/status, confirm the active free quota, and check the provider's rules for client-side versus server-side use. ArabicSubs explicitly requires its key to be kept on a server; that key must be used through a protected test proxy even during phone testing. SubSource and OpenSubtitles keys can be used in the owner's temporary development configuration only after their current terms and key-exposure implications are respected. The current RAVEN23 code is not yet aligned with all three documented API contracts (see Sections 2 and 6).
 
 ### Additional owner-confirmed development configuration decision (2026-11-22)
 - The owner requires the current `.env.example` values to remain usable during development because the app will consume them in test builds installed on the owner's Android phone.
@@ -360,9 +364,8 @@ This records account registration only. Do not copy API keys, usernames, passwor
 
 ### Decisions still to settle before provider credentials or production ranking
 
-1. **Free-key model:** use each user's own free API keys (BYOK) in RAVEN23, or use only providers that can legally be served through the owner's private backend/proxy without violating their free-tier terms?
-2. **Human-authored versus labelled machine-submitted files:** proposed default is to prefer human-authored Arabic files and exclude files explicitly marked as AI/machine translated. Confirm whether all machine-labelled files should be excluded or merely ranked below human submissions.
-3. **Low-confidence matches:** keep the currently selected/available subtitle and show alternatives, rather than silently replacing it with a weak release match.
+1. **Human-authored versus labelled machine-submitted files:** proposed default is to prefer human-authored Arabic files and exclude files explicitly marked as AI/machine translated. Confirm whether all machine-labelled files should be excluded or merely ranked below human submissions.
+2. **Low-confidence matches:** keep the currently selected/available subtitle and show alternatives, rather than silently replacing it with a weak release match.
 
 No provider integration or player change is authorized by this proposal alone. PHASE64.0 remains a research/benchmark stage and must not modify application behavior.
 
