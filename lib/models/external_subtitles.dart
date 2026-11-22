@@ -20,6 +20,26 @@ class ExternalSubtitle {
   /// the origin and report a failing host accurately.
   final String source;
 
+  /// Provider quality metadata retained for the evidence-based selector.
+  final String? productionType;
+  final String? translationType;
+  /// True when the provider lookup was scoped to this exact media identity.
+  /// Null means the provider did not expose enough evidence to assert it.
+  final bool? isExactIdentity;
+  final String? releaseType;
+  final int? downloadCount;
+  final int? newDownloadCount;
+  final int? ratingGood;
+  final int? ratingBad;
+  final double? providerRating;
+  final int? providerVotes;
+  final double? frameRate;
+  final String? uploaderName;
+  final String? uploaderRank;
+  final bool? isTrustedUploader;
+  final bool? foreignParts;
+  final String? createdAt;
+
   ExternalSubtitle({
     required this.id,
     required this.url,
@@ -32,6 +52,22 @@ class ExternalSubtitle {
     required this.isHearingImpaired,
     required this.release,
     this.source = 'Scraper API',
+    this.productionType,
+    this.translationType,
+    this.isExactIdentity,
+    this.releaseType,
+    this.downloadCount,
+    this.newDownloadCount,
+    this.ratingGood,
+    this.ratingBad,
+    this.providerRating,
+    this.providerVotes,
+    this.frameRate,
+    this.uploaderName,
+    this.uploaderRank,
+    this.isTrustedUploader,
+    this.foreignParts,
+    this.createdAt,
   });
 
   factory ExternalSubtitle.fromJson(Map<String, dynamic> json) {
@@ -49,6 +85,30 @@ class ExternalSubtitle {
       release: json['release']?.toString() ?? '',
       source: json['source']?.toString() ??
           json['provider']?.toString() ?? 'Scraper API',
+      productionType: json['productionType']?.toString(),
+      translationType: json['translationType']?.toString(),
+      isExactIdentity: json['isExactIdentity'] == null
+          ? null
+          : (json['isExactIdentity'] == true ||
+                json['isExactIdentity']?.toString() == '1' ||
+                json['isExactIdentity']?.toString().toLowerCase() == 'true'),
+      releaseType: json['releaseType']?.toString(),
+      downloadCount: int.tryParse(json['downloadCount']?.toString() ?? ''),
+      newDownloadCount:
+          int.tryParse(json['newDownloadCount']?.toString() ?? ''),
+      ratingGood: int.tryParse(json['ratingGood']?.toString() ?? ''),
+      ratingBad: int.tryParse(json['ratingBad']?.toString() ?? ''),
+      providerRating:
+          double.tryParse(json['providerRating']?.toString() ?? ''),
+      providerVotes: int.tryParse(json['providerVotes']?.toString() ?? ''),
+      frameRate: double.tryParse(json['frameRate']?.toString() ?? ''),
+      uploaderName: json['uploaderName']?.toString(),
+      uploaderRank: json['uploaderRank']?.toString(),
+      isTrustedUploader: json['isTrustedUploader'] == true ||
+          json['isTrustedUploader']?.toString() == '1',
+      foreignParts: json['foreignParts'] == true ||
+          json['foreignParts']?.toString() == '1',
+      createdAt: json['createdAt']?.toString(),
     );
   }
 

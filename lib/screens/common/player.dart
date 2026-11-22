@@ -827,6 +827,7 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
       hasPreferredProviderSubtitle: _hasPreferredProviderSubtitle(
         settings.defaultSubtitleLanguage,
       ),
+      expectedRelease: _activeRawVideoLink()?.quality,
     );
   }
 
@@ -6463,6 +6464,22 @@ class _PlayerOneState extends State<PlayerOne> with WidgetsBindingObserver {
         return _SubtitleSwitcherSheet(
           controller: _betterPlayerController,
           options: options,
+          onLanguageSelected: (languageCode) {
+            if (_normaliseSubtitleLanguage(languageCode) ==
+                _normaliseSubtitleLanguage(settings.defaultSubtitleLanguage)) {
+              return Future<void>.value();
+            }
+            return _externalSubtitles.ensureLanguageSubtitle(
+              languageCode: languageCode,
+              context: context,
+              scraperApiUrl: _resolveScraperApiUrl(),
+              mediaType: widget.mediaType,
+              movieMetadata: widget.movieMetadata,
+              tvMetadata: widget.tvMetadata,
+              betterPlayerController: _betterPlayerController,
+              expectedRelease: _activeRawVideoLink()?.quality,
+            );
+          },
           onClose: () => Navigator.pop(sheetContext),
           onTiming: () => then(_showSubtitleTimingAdjuster),
           onSearchOnline: () => then(() {
@@ -6907,6 +6924,7 @@ class _SubtitleSwitcherSheet extends StatefulWidget {
   const _SubtitleSwitcherSheet({
     required this.controller,
     required this.options,
+    required this.onLanguageSelected,
     required this.onClose,
     required this.onTiming,
     required this.onSearchOnline,
@@ -6915,6 +6933,7 @@ class _SubtitleSwitcherSheet extends StatefulWidget {
 
   final BetterPlayerController controller;
   final List<SubtitleOption> options;
+  final Future<void> Function(String languageCode) onLanguageSelected;
   final VoidCallback onClose;
   final VoidCallback onTiming;
   final VoidCallback onSearchOnline;
@@ -6966,6 +6985,16 @@ class _SubtitleSwitcherSheetState extends State<_SubtitleSwitcherSheet> {
         applied.type != BetterPlayerSubtitlesSourceType.none;
     if (played || option.isOff) {
       widget.onClose();
+      // A deliberate switch to a provider subtitle language activates the
+      // same best-subtitle selector for that language. The configured default
+      // is preserved, and local files are not silently replaced.
+      if (played &&
+          option.source.type == BetterPlayerSubtitlesSourceType.network) {
+        final languageCode = languageCodeForLabel(option.name);
+        if (languageCode != null) {
+          unawaited(widget.onLanguageSelected(languageCode));
+        }
+      }
       return;
     }
     // Nothing for this language plays. The controller has turned subtitles off

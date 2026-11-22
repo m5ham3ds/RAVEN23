@@ -1,6 +1,14 @@
 # PHASE64.7 — Shared Subtitle Intelligence & Community Cache
 ## Post-Laravel Integration Test Plan
 
+## Owner-confirmed shared-publication language policy (2026-11-22)
+
+- Shared server publication is allowlisted to normalized Arabic (ar) and English (en) subtitles only.
+- Every other subtitle language remains available in the player's provider list, may be selected and cached locally, and must never be sent to shared server storage.
+- Normalize aliases such as ara/Arabic and eng/English before applying the allowlist.
+- Enforce this rule on the server as well as in the client. A client-supplied language label alone is not trusted; the server validates the stored language metadata and rejects all other languages.
+- This is a future publication constraint, not authorization to start PHASE64.7. The PHASE64.6 selector acceptance gate and connected Laravel staging prerequisites remain mandatory.
+
 **Status:** TEST PLAN ONLY — BLOCKED until BOTH prerequisites are satisfied: (1) PHASE64.0–64.6 subtitle selection/quality engine has passed its benchmark and been accepted; and (2) the Laravel backend is connected to RAVEN23 with the required shared-subtitle API contract deployed.  
 **Project:** RAVEN23  
 **Created:** 2026-11-22  

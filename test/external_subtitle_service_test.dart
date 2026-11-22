@@ -23,74 +23,164 @@ void main() {
   setUpAll(() {
     dotenv.testLoad(
       fileInput:
-          'OPENSUBTITLES_API_KEY=\nARABICSUBS_PROXY_URL=',
+          'OPENSUBTITLES_API_KEY=\nSUBSOURCE_API_KEY=\nARABICSUBS_PROXY_URL=',
     );
   });
 
   group('ExternalSubtitleService', () {
-    test('searches OpenSubtitles using the IMDb id mapped from TMDB', () async {
-      final requests = <http.Request>[];
-      final client = MockClient((request) async {
-        requests.add(request);
-        if (request.url.host == 'rest.opensubtitles.org') {
-          return http.Response(
-            jsonEncode(<Map<String, dynamic>>[
-              <String, dynamic>{
-                'IDSubtitleFile': '8123',
-                'SubDownloadLink': 'https://dl.opensubtitles.org/sub/8123.gz',
-                'SubFormat': 'srt',
-                'LanguageName': 'English',
-                'ISO639': 'en',
-                'SubHearingImpaired': '0',
-                'SubDownloadsCnt': '50',
-                'MovieReleaseName': 'Example.Release',
-              },
-            ]),
-            200,
-          );
-        }
-        if (request.url.host == 'api.subsource.net') {
-          return http.Response(jsonEncode({'results': []}), 200);
-        }
-        return http.Response('not found', 404);
-      });
-      final resolver = MediaIdentityResolver(
-        lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
-      );
-      final service = ExternalSubtitleService(
-        '',
-        client: client,
-        identityResolver: resolver,
-      );
+    test(
+      'does not call the legacy OpenSubtitles endpoint when no v1 key is set',
+      () async {
+        final requests = <http.Request>[];
+        final client = MockClient((request) async {
+          requests.add(request);
+          return http.Response('[]', 200);
+        });
+        final resolver = MediaIdentityResolver(
+          lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
+        );
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          identityResolver: resolver,
+          openSubtitlesApiKey: '',
+        );
 
-      final results = await service.fetchMovieSubtitles(
-        42,
-        title: 'Example movie',
-        year: 2025,
-        preferredLanguageCode: 'ar',
-      );
+        final results = await service.fetchMovieSubtitles(
+          42,
+          title: 'Example movie',
+          year: 2025,
+          preferredLanguageCode: 'ar',
+        );
 
-      expect(results, hasLength(1));
-      expect(results.single.source, 'OpenSubtitles');
-      expect(results.single.id, 'opensubtitles_8123');
-      expect(results.single.language, 'en');
-      expect(
-        requests.where(
-          (request) => request.url.host == 'rest.opensubtitles.org',
-        ),
-        hasLength(3),
-      );
-      expect(
-        requests.any(
-          (request) => request.url.path.contains('/sublanguageid-ara'),
-        ),
-        isTrue,
-      );
-      final legacyRequest = requests.firstWhere(
-        (request) => request.url.host == 'rest.opensubtitles.org',
-      );
-      expect(_headerValue(legacyRequest, 'user-agent'), 'TemporaryUserAgent');
-    });
+        expect(results, isEmpty);
+        expect(
+          requests.where(
+            (request) => request.url.host == 'rest.opensubtitles.org',
+          ),
+          isEmpty,
+        );
+        expect(
+          requests.where(
+            (request) => request.url.host == 'api.opensubtitles.com',
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'matches ArabicSubs only by exact TMDB provider identity',
+      () async {
+        final requests = <http.Request>[];
+        final client = MockClient((request) async {
+          requests.add(request);
+          if (request.url.path == '/search') {
+            return http.Response(
+              jsonEncode({
+                'items': [
+                  {
+                    'id': 16,
+                    'providerId': '42',
+                    'type': 'movie',
+                    'year': 2025,
+                    'title': 'Example movie',
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/titles/16/subtitles') {
+            return http.Response(
+              jsonEncode({
+                'items': [
+                  {
+                    'id': 12345,
+                    'originalFilename': 'Example.Movie.2025.WEB-DL.srt',
+                    'releaseLabel': 'WEB-DL 1080p',
+                    'hearingImpaired': false,
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        });
+        final resolver = MediaIdentityResolver(
+          lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
+        );
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          identityResolver: resolver,
+          arabicSubsProxyUrl: 'https://arabicsubs-proxy.example.test',
+        );
+
+        final results = await service.fetchMovieSubtitles(
+          42,
+          title: 'Example movie',
+          year: 2025,
+          preferredLanguageCode: 'ar',
+        );
+
+        expect(results, hasLength(1));
+        expect(results.single.source, 'ArabicSubs');
+        expect(results.single.id, 'arabicsubs_12345');
+        expect(results.single.url, 'arabicsubs-proxy://subtitle/12345');
+        expect(results.single.language, 'ar');
+        expect(
+          requests.map((request) => request.url.path),
+          containsAllInOrder(['/search', '/titles/16/subtitles']),
+        );
+      },
+    );
+
+    test(
+      'does not fall back to same-title/year ArabicSubs results without TMDB id',
+      () async {
+        final requests = <http.Request>[];
+        final client = MockClient((request) async {
+          requests.add(request);
+          if (request.url.path == '/search') {
+            return http.Response(
+              jsonEncode({
+                'items': [
+                  {
+                    'id': 17,
+                    'type': 'movie',
+                    'year': 2025,
+                    'title': 'Example movie',
+                  },
+                ],
+              }),
+              200,
+            );
+          }
+          return http.Response('not found', 404);
+        });
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          identityResolver: MediaIdentityResolver(
+            lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
+          ),
+          arabicSubsProxyUrl: 'https://arabicsubs-proxy.example.test',
+        );
+
+        final results = await service.fetchMovieSubtitles(
+          42,
+          title: 'Example movie',
+          year: 2025,
+          preferredLanguageCode: 'ar',
+        );
+
+        expect(results, isEmpty);
+        expect(requests, hasLength(1));
+        expect(requests.single.url.path, '/search');
+      },
+    );
 
     test(
       'uses OpenSubtitles v1 Arabic search and downloads its temporary link',
@@ -102,8 +192,11 @@ void main() {
           if (request.url.host == 'api.opensubtitles.com' &&
               request.method == 'GET' &&
               request.url.path.endsWith('/subtitles')) {
-            expect(request.headers['api-key'], 'test-open-key');
+            expect(_headerValue(request, 'Api-Key'), 'test-open-key');
+            expect(_headerValue(request, 'User-Agent'), 'RAVEN23 PRO v1.0');
             expect(request.url.queryParameters['languages'], 'ar,en');
+            expect(request.url.queryParameters['ai_translated'], 'exclude');
+            expect(request.url.queryParameters['machine_translated'], 'exclude');
             return http.Response(
               jsonEncode({
                 'data': [
@@ -112,8 +205,40 @@ void main() {
                       'language': 'ara',
                       'hearing_impaired': false,
                       'release': 'Example.Arabic.Release',
+                      'download_count': 321,
+                      'new_download_count': 12,
+                      'ratings': 8.5,
+                      'votes': 4,
+                      'fps': 23.976,
+                      'from_trusted': true,
+                      'foreign_parts_only': false,
+                      'upload_date': '2026-10-01T12:00:00Z',
+                      'uploader': {
+                        'name': 'Trusted Contributor',
+                        'rank': 'trusted',
+                      },
                       'files': [
                         {'file_id': 4567, 'file_name': 'arabic.srt'},
+                      ],
+                    },
+                  },
+                  {
+                    'attributes': {
+                      'language': 'ara',
+                      'ai_translated': true,
+                      'release': 'Example.AI.Generated',
+                      'files': [
+                        {'file_id': 4568, 'file_name': 'ai.srt'},
+                      ],
+                    },
+                  },
+                  {
+                    'attributes': {
+                      'language': 'ara',
+                      'machine_translated': true,
+                      'release': 'Example.Machine.Generated',
+                      'files': [
+                        {'file_id': 4569, 'file_name': 'machine.srt'},
                       ],
                     },
                   },
@@ -122,14 +247,10 @@ void main() {
               200,
             );
           }
-          if (request.url.host == 'api.subsource.net' &&
-              request.url.path.endsWith('/movie/search')) {
-            return http.Response(jsonEncode({'results': []}), 200);
-          }
           if (request.url.host == 'api.opensubtitles.com' &&
               request.method == 'POST' &&
               request.url.path.endsWith('/download')) {
-            expect(request.headers['api-key'], 'test-open-key');
+            expect(_headerValue(request, 'Api-Key'), 'test-open-key');
             expect(jsonDecode(request.body)['file_id'], 4567);
             return http.Response(
               jsonEncode({'link': 'https://download.example.test/arabic.srt'}),
@@ -160,6 +281,15 @@ void main() {
         expect(results, hasLength(1));
         expect(results.single.language, 'ar');
         expect(results.single.url, 'opensubtitles-v1://file/4567');
+        expect(results.single.downloadCount, 321);
+        expect(results.single.newDownloadCount, 12);
+        expect(results.single.providerRating, 8.5);
+        expect(results.single.providerVotes, 4);
+        expect(results.single.frameRate, 23.976);
+        expect(results.single.uploaderName, 'Trusted Contributor');
+        expect(results.single.uploaderRank, 'trusted');
+        expect(results.single.isTrustedUploader, isTrue);
+        expect(results.single.createdAt, '2026-10-01T12:00:00Z');
 
         final vtt = await service.downloadAndNormalizeForPlayback(
           results.single,
@@ -176,58 +306,90 @@ void main() {
     );
 
     test(
-      'searches SubSource by season and filters to the exact episode',
+      'searches documented SubSource API by IMDb and filters the exact episode',
       () async {
-        final requestedUrls = <Uri>[];
+        final requests = <http.Request>[];
         final client = MockClient((request) async {
-          requestedUrls.add(request.url);
+          requests.add(request);
           if (request.url.host == 'rest.opensubtitles.org') {
             return http.Response('[]', 200);
           }
-          if (request.method == 'POST' &&
-              request.url.path.endsWith('/movie/search')) {
+          if (request.url.host == 'api.subsource.net' &&
+              request.url.path == '/api/v1/movies/search') {
+            expect(request.method, 'GET');
+            expect(_headerValue(request, 'X-API-Key'), 'test-subsource-key');
+            expect(request.url.queryParameters['searchType'], 'imdb');
+            expect(request.url.queryParameters['imdb'], 'tt1234567');
+            expect(request.url.queryParameters['type'], 'series');
+            expect(request.url.queryParameters['season'], '1');
             return http.Response(
               jsonEncode({
-                'results': [
-                  {'link': '/series/example-show'},
+                'success': true,
+                'data': [
+                  {
+                    'movieId': 9901,
+                    'imdbId': 'tt1234567',
+                    'type': 'series',
+                    'releaseYear': 2022,
+                    'season': 1,
+                  },
                 ],
               }),
               200,
             );
           }
           if (request.url.host == 'api.subsource.net' &&
-              request.url.path.endsWith('/season-1')) {
-            return http.Response(
-              jsonEncode({
-                'subtitles': [
-                  {
-                    'id': 10,
-                    'language': 'english',
-                    'release_type': 'episode',
-                    'release_info': 'Example.Show.S01E02.1080p',
-                    'hearing_impaired': 0,
-                    'link': 'detail-10',
-                  },
-                  {
-                    'id': 11,
-                    'language': 'english',
-                    'release_type': 'episode',
-                    'release_info': 'Example.Show.S01E03.1080p',
-                    'hearing_impaired': 0,
-                    'link': 'detail-11',
-                  },
-                  {
-                    'id': 12,
-                    'language': 'french',
-                    'release_type': 'episode',
-                    'release_info': 'Example.Show.S01E02.1080p',
-                    'hearing_impaired': 0,
-                    'link': 'detail-12',
-                  },
-                ],
-              }),
-              200,
-            );
+              request.url.path == '/api/v1/subtitles') {
+            expect(_headerValue(request, 'X-API-Key'), 'test-subsource-key');
+            expect(request.url.queryParameters['movieId'], '9901');
+            if (request.url.queryParameters['language'] == 'english') {
+              return http.Response(
+                jsonEncode({
+                  'success': true,
+                  'data': [
+                    {
+                      'subtitleId': 10,
+                      'movieId': 9901,
+                      'language': 'english',
+                      'releaseInfo': ['Example.Show.S01E02.1080p.WEB-DL'],
+                      'hearingImpaired': false,
+                      'foreignParts': false,
+                      'productionType': 'retail',
+                      'releaseType': 'web',
+                      'downloads': 17,
+                      'framerate': 23.976,
+                      'rating': {'good': 5, 'bad': 1, 'total': 6},
+                      'contributors': [
+                        {'id': 7, 'displayname': 'Example Translator'},
+                      ],
+                      'createdAt': '2026-01-01T00:00:00.000Z',
+                    },
+                    {
+                      'subtitleId': 11,
+                      'movieId': 9901,
+                      'language': 'english',
+                      'releaseInfo': ['Example.Show.S01E03.1080p.WEB-DL'],
+                      'hearingImpaired': false,
+                      'productionType': 'retail',
+                    },
+                    {
+                      'subtitleId': 12,
+                      'movieId': 9901,
+                      'language': 'french',
+                      'releaseInfo': ['Example.Show.S01E02.1080p.WEB-DL'],
+                    },
+                    {
+                      'subtitleId': 13,
+                      'movieId': 9901,
+                      'language': 'english',
+                      'releaseInfo': ['Example.Show.S01E02-E04.PACK'],
+                    },
+                  ],
+                }),
+                200,
+              );
+            }
+            return http.Response(jsonEncode({'success': true, 'data': []}), 200);
           }
           return http.Response('not found', 404);
         });
@@ -238,6 +400,7 @@ void main() {
           '',
           client: client,
           identityResolver: resolver,
+          subSourceApiKey: 'test-subsource-key',
         );
 
         final results = await service.fetchTVSubtitles(
@@ -249,25 +412,39 @@ void main() {
         );
 
         expect(results, hasLength(1));
-        expect(results.single.source, 'SubSource');
-        expect(results.single.id, 'subsource_10');
+        final subtitle = results.single;
+        expect(subtitle.source, 'SubSource');
+        expect(subtitle.id, 'subsource_v2_10');
+        expect(subtitle.url, 'subsource-v2://subtitle/10');
+        expect(subtitle.release, 'Example.Show.S01E02.1080p.WEB-DL');
+        expect(subtitle.productionType, 'retail');
+        expect(subtitle.releaseType, 'web');
+        expect(subtitle.downloadCount, 17);
+        expect(subtitle.ratingGood, 5);
+        expect(subtitle.ratingBad, 1);
+        expect(subtitle.uploaderName, 'Example Translator');
+        expect(subtitle.providerVotes, 6);
+        expect(subtitle.frameRate, 23.976);
         expect(
-          results.single.url,
-          'https://api.subsource.net/v1/subtitle/detail-10',
+          requests.where(
+            (request) => request.url.path == '/api/v1/movies/search',
+          ),
+          hasLength(1),
         );
         expect(
-          requestedUrls.any(
-            (uri) => uri.path.endsWith('/subtitles/example-show/season-1'),
+          requests.where(
+            (request) => request.url.path == '/api/v1/subtitles',
           ),
-          isTrue,
+          isNotEmpty,
         );
       },
     );
 
     test(
-      'resolves a SubSource token and normalizes the returned ZIP',
+      'downloads SubSource ZIP directly from the documented download endpoint',
       () async {
-        const srt = '1\n00:00:01,000 --> 00:00:02,000\nTokenized subtitle\n';
+        const srt =
+            '1\n00:00:01,000 --> 00:00:02,000\nDocumented API subtitle\n';
         final archive = Archive()
           ..addFile(
             ArchiveFile(
@@ -277,29 +454,25 @@ void main() {
             ),
           );
         final zipBytes = ZipEncoder().encodeBytes(archive);
-        final requested = <Uri>[];
+        final requests = <http.Request>[];
         final client = MockClient((request) async {
-          requested.add(request.url);
-          if (request.url.path.endsWith('/subtitle/detail-20')) {
-            return http.Response(
-              jsonEncode({
-                'subtitle': {'download_token': 'short-lived-token'},
-              }),
-              200,
-            );
-          }
-          if (request.url.path.endsWith(
-            '/subtitle/download/short-lived-token',
-          )) {
+          requests.add(request);
+          expect(request.method, 'GET');
+          expect(_headerValue(request, 'X-API-Key'), 'test-subsource-key');
+          if (request.url.path == '/api/v1/subtitles/20/download') {
             return http.Response.bytes(zipBytes, 200);
           }
           return http.Response('not found', 404);
         });
-        final service = ExternalSubtitleService('', client: client);
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          subSourceApiKey: 'test-subsource-key',
+        );
         final source = await service.convertToBetterPlayerSource(
           ExternalSubtitle(
-            id: 'subsource_20',
-            url: 'https://api.subsource.net/v1/subtitle/detail-20',
+            id: 'subsource_v2_20',
+            url: 'subsource-v2://subtitle/20',
             flagUrl: '',
             format: 'auto',
             encoding: 'zip/auto',
@@ -313,12 +486,8 @@ void main() {
         );
 
         expect(source.content, contains('WEBVTT'));
-        expect(source.content, contains('Tokenized subtitle'));
-        expect(requested, hasLength(2));
-        expect(
-          requested.last.path,
-          endsWith('/subtitle/download/short-lived-token'),
-        );
+        expect(source.content, contains('Documented API subtitle'));
+        expect(requests, hasLength(1));
       },
     );
 
@@ -353,17 +522,17 @@ void main() {
         expect(source.content, contains('OpenSubtitles cue'));
         expect(
           _headerValue(requests.single, 'user-agent'),
-          'TemporaryUserAgent',
+          'RAVEN23 PRO v1.0',
         );
         expect(
           _headerValue(requests.single, 'x-user-agent'),
-          'TemporaryUserAgent',
+          'RAVEN23 PRO v1.0',
         );
       },
     );
 
     test(
-      'keeps different releases while deduplicating repeated release records',
+      'preserves same-release alternatives from different providers and removes only exact repeated provider records',
       () {
         ExternalSubtitle make(
           String id,
@@ -383,18 +552,37 @@ void main() {
           release: release,
           source: source,
         );
+        final first = make(
+          '1',
+          'https://one.test/1',
+          'Movie.Release.A',
+          'OpenSubtitles',
+        );
+        final second = make(
+          '2',
+          'https://two.test/2',
+          'Movie.Release.A',
+          'SubSource',
+        );
+        final third = make(
+          '3',
+          'https://three.test/3',
+          'Movie.Release.B',
+          'SubSource',
+        );
         final merged = ExternalSubtitleService.mergeSearchResultsForTesting(
-          <ExternalSubtitle>[
-            make('1', 'https://one.test/1', 'Movie.Release.A', 'OpenSubtitles'),
-            make('2', 'https://two.test/2', 'Movie.Release.A', 'SubSource'),
-            make('3', 'https://three.test/3', 'Movie.Release.B', 'SubSource'),
-          ],
+          <ExternalSubtitle>[first, second, third, second],
           'en',
         );
-        expect(merged, hasLength(2));
+
+        expect(merged, hasLength(3));
         expect(
-          merged.map((item) => item.release),
-          containsAll(<String>['Movie.Release.A', 'Movie.Release.B']),
+          merged.map((item) => item.id),
+          unorderedEquals(<String>['1', '2', '3']),
+        );
+        expect(
+          merged.where((item) => item.release == 'Movie.Release.A'),
+          hasLength(2),
         );
       },
     );
@@ -428,49 +616,55 @@ void main() {
       },
     );
 
-    test('prefers SubSource for Arabic before duplicate-release removal', () {
-      ExternalSubtitle make({
-        required String id,
-        required String source,
-        required String url,
-      }) => ExternalSubtitle(
-        id: id,
-        url: url,
-        flagUrl: '',
-        format: 'srt',
-        encoding: 'UTF-8',
-        display: 'Arabic',
-        language: 'ar',
-        media: 'movie',
-        isHearingImpaired: false,
-        release: 'Resident.Evil.2026.WEB',
-        source: source,
-      );
+    test(
+      'does not impose a provider-name priority on same-language alternatives',
+      () {
+        ExternalSubtitle make({
+          required String id,
+          required String source,
+          required String url,
+        }) => ExternalSubtitle(
+          id: id,
+          url: url,
+          flagUrl: '',
+          format: 'srt',
+          encoding: 'UTF-8',
+          display: 'Arabic',
+          language: 'ar',
+          media: 'movie',
+          isHearingImpaired: false,
+          release: 'Resident.Evil.2026.WEB',
+          source: source,
+        );
 
-      final results = ExternalSubtitleService.mergeSearchResultsForTesting(
-        <ExternalSubtitle>[
-          make(
-            id: 'opensubs',
-            source: 'OpenSubtitles',
-            url: 'https://opensubs.test/ar.srt',
-          ),
-          make(
-            id: 'scraper',
-            source: 'Scraper API',
-            url: 'https://scraper.test/ar.srt',
-          ),
-          make(
-            id: 'subsource',
-            source: 'SubSource',
-            url: 'https://subsource.test/ar.zip',
-          ),
-        ],
-        'ar',
-      );
+        final results = ExternalSubtitleService.mergeSearchResultsForTesting(
+          <ExternalSubtitle>[
+            make(
+              id: 'opensubs',
+              source: 'OpenSubtitles',
+              url: 'https://opensubs.test/ar.srt',
+            ),
+            make(
+              id: 'scraper',
+              source: 'Scraper API',
+              url: 'https://scraper.test/ar.srt',
+            ),
+            make(
+              id: 'subsource',
+              source: 'SubSource',
+              url: 'https://subsource.test/ar.zip',
+            ),
+          ],
+          'ar',
+        );
 
-      expect(results, hasLength(1));
-      expect(results.single.source, 'SubSource');
-    });
+        expect(results, hasLength(3));
+        expect(
+          results.map((item) => item.source),
+          unorderedEquals(<String>['OpenSubtitles', 'Scraper API', 'SubSource']),
+        );
+      },
+    );
 
     test('episode matching does not confuse E02 with E020', () {
       final matcher = ExternalSubtitleService.episodePatternForTesting(1, 2);
@@ -479,7 +673,7 @@ void main() {
       expect(matcher.hasMatch('Example.S01E020.1080p'), isFalse);
     });
 
-    test('keeps SubSource when Arabic providers return the same URL', () {
+    test('preserves distinct provider provenance when providers share a URL', () {
       ExternalSubtitle make(String source) => ExternalSubtitle(
         id: source,
         url: 'https://subtitles.test/resident-evil-ar.zip',
@@ -499,8 +693,12 @@ void main() {
         'ar',
       );
 
-      expect(results, hasLength(1));
-      expect(results.single.source, 'SubSource');
+      expect(results, hasLength(2));
+      expect(
+        results.map((item) => item.source),
+        unorderedEquals(<String>['OpenSubtitles', 'SubSource']),
+      );
     });
+
   });
 }
