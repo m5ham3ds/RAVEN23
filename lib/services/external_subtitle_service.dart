@@ -131,9 +131,8 @@ class ExternalSubtitleService {
     final enriched = await enrichedFuture;
     final imdbId = enriched.imdbId;
     final providerFutures = <Future<List<ExternalSubtitle>>>[
-      // OpenSubtitles free-provider searches use the documented API v1 only.
-      // Never silently fall back to the legacy VIP-only REST endpoint when the
-      // application key is missing or rejected.
+      // OpenSubtitles searches use the documented API v1 only. Do not
+      // silently fall back to the legacy REST service when the key is missing.
       if (_openSubtitlesApiKey.isNotEmpty)
         _searchOpenSubtitlesV1(
           tmdbId: tmdbId,
@@ -408,6 +407,401 @@ class ExternalSubtitleService {
     if (first == 'eng' || first == 'english') return 'en';
     return first;
   }
+
+  Future<List<ExternalSubtitle>> _searchSubSource({
+    required String imdbId,
+    required bool isMovie,
+    int? season,
+    int? episode,
+    String? preferredLanguageCode,
+  }) async {
+    if (_subSourceApiKey.isEmpty) return const <ExternalSubtitle>[];
+
+    final movieId = await _findSubSourceMovieId(
+      imdbId,
+      isMovie: isMovie,
+      season: season,
+    );
+    if (movieId == null) return const <ExternalSubtitle>[];
+
+    final languagePairs = _subSourceLanguages(preferredLanguageCode);
+    final episodePattern = !isMovie ? _episodePattern(season!, episode!) : null;
+    final languageResults = await Future.wait(
+      languagePairs.map((language) async {
+        try {
+          final uri = Uri.parse('$_subSourceBase/subtitles').replace(
+            queryParameters: <String, String>{
+              'movieId': '$movieId',
+              'language': language.name,
+              'page': '1',
+              'limit': '100',
+            },
+          );
+          final response = await _client
+              .get(uri, headers: _subSourceHeaders)
+              .timeout(_searchTimeout);
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            return <ExternalSubtitle>[];
+          }
+          final body = jsonDecode(response.body);
+          if (body is! Map ||
+              body['data'] is! List ||
+              body['success'] == false) {
+            return <ExternalSubtitle>[];
+          }
+
+          final candidates = <ExternalSubtitle>[];
+          final seenIds = <String>{};
+          for (final raw in (body['data'] as List).whereType<Map>()) {
+            final row = Map<String, dynamic>.from(raw);
+            final id = row['subtitleId']?.toString().trim() ?? '';
+            final rowLanguage = row['language']?.toString().trim() ?? '';
+            final release = _subSourceReleaseInfo(row['releaseInfo']);
+            final releaseType = row['releaseType']
+                ?.toString()
+                .trim()
+                .toLowerCase();
+            if (rowLanguage.toLowerCase() != language.name.toLowerCase()) {
+              continue;
+            }
+            if (id.isEmpty || int.tryParse(id) == null || !seenIds.add(id)) {
+              continue;
+            }
+            if (releaseType == 'trailer') continue;
+            // The API list is scoped by movie/series id, not individual
+            // episode. Never surface a season pack or different episode as
+            // a candidate for the requested episode.
+            if (episodePattern != null &&
+                (!episodePattern.hasMatch(release) ||
+                    _episodeRange.hasMatch(release))) {
+              continue;
+            }
+
+            final rating = row['rating'] is Map
+                ? Map<String, dynamic>.from(row['rating'] as Map)
+                : const <String, dynamic>{};
+            final contributors = row['contributors'] is List
+                ? (row['contributors'] as List).whereType<Map>().toList()
+                : const <Map>[];
+            final contributorNames = contributors
+                .map((item) => item['displayname']?.toString().trim() ?? '')
+                .where((name) => name.isNotEmpty)
+                .toSet()
+                .join(', ');
+            candidates.add(
+              ExternalSubtitle(
+                id: 'subsource_v2_$id',
+                url: 'subsource-v2://subtitle/$id',
+                flagUrl: '',
+                format: 'auto',
+                encoding: 'zip/auto',
+                display: _languageName(language.code, fallback: rowLanguage),
+                language: language.code,
+                media: isMovie ? 'movie' : 'tv',
+                isHearingImpaired: _asBool(row['hearingImpaired']),
+                release: release,
+                source: 'SubSource',
+                productionType: row['productionType']?.toString(),
+                releaseType: row['releaseType']?.toString(),
+                downloadCount: _asInt(row['downloads']),
+                ratingGood: _asInt(rating['good']),
+                ratingBad: _asInt(rating['bad']),
+                uploaderName: contributorNames,
+                foreignParts: _asBool(row['foreignParts']),
+                createdAt: row['createdAt']?.toString(),
+              ),
+            );
+          }
+          return candidates;
+        } catch (error) {
+          debugPrint('[Subtitle][SubSource] Search failed safely: $error');
+          return <ExternalSubtitle>[];
+        }
+      }),
+    );
+    return languageResults.expand((items) => items).toList(growable: false);
+  }
+
+  Future<int?> _findSubSourceMovieId(
+    String imdbId, {
+    required bool isMovie,
+    int? season,
+  }) async {
+    final uri = Uri.parse('$_subSourceBase/movies/search').replace(
+      queryParameters: <String, String>{
+        'searchType': 'imdb',
+        'imdb': imdbId,
+        'type': isMovie ? 'movie' : 'series',
+        if (!isMovie && season != null) 'season': '$season',
+      },
+    );
+    final response = await _client
+        .get(uri, headers: _subSourceHeaders)
+        .timeout(_searchTimeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) return null;
+    final body = jsonDecode(response.body);
+    if (body is! Map || body['data'] is! List || body['success'] == false) {
+      return null;
+    }
+
+    for (final raw in (body['data'] as List).whereType<Map>()) {
+      final row = Map<String, dynamic>.from(raw);
+      final returnedImdb = row['imdbId']?.toString().trim().toLowerCase() ?? '';
+      final rowType = row['type']?.toString().trim().toLowerCase() ?? '';
+      final id = _asInt(row['movieId']);
+      final typeMatches = isMovie
+          ? rowType == 'movie'
+          : rowType == 'series' || rowType == 'tv';
+      if (id != null &&
+          id > 0 &&
+          returnedImdb == imdbId.trim().toLowerCase() &&
+          typeMatches) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  static String _subSourceReleaseInfo(dynamic value) {
+    if (value is List) {
+      return value
+          .map((item) => item?.toString().trim() ?? '')
+          .where((item) => item.isNotEmpty)
+          .join(' | ');
+    }
+    return value?.toString().trim() ?? '';
+  }
+
+  static bool _asBool(dynamic value) =>
+      value == true || value?.toString() == '1' || value?.toString() == 'true';
+
+  static int? _asInt(dynamic value) => int.tryParse(value?.toString() ?? '');
+
+  static const Map<String, String> _subSourceLanguageNames = <String, String>{
+    'ar': 'arabic',
+    'bg': 'bulgarian',
+    'zh': 'chinese',
+    'hr': 'croatian',
+    'cs': 'czech',
+    'da': 'danish',
+    'nl': 'dutch',
+    'en': 'english',
+    'et': 'estonian',
+    'fi': 'finnish',
+    'fr': 'french',
+    'de': 'german',
+    'el': 'greek',
+    'he': 'hebrew',
+    'hi': 'hindi',
+    'hu': 'hungarian',
+    'id': 'indonesian',
+    'it': 'italian',
+    'ja': 'japanese',
+    'ko': 'korean',
+    'lv': 'latvian',
+    'lt': 'lithuanian',
+    'ms': 'malay',
+    'no': 'norwegian',
+    'pl': 'polish',
+    'pt': 'portuguese',
+    'ro': 'romanian',
+    'ru': 'russian',
+    'sr': 'serbian',
+    'sk': 'slovak',
+    'sl': 'slovenian',
+    'es': 'spanish',
+    'sv': 'swedish',
+    'th': 'thai',
+    'tr': 'turkish',
+    'uk': 'ukrainian',
+  };
+
+  static List<_SubSourceLanguage> _subSourceLanguages(String? preferred) {
+    String normalizeCode(String? value) =>
+        (value ?? '').trim().toLowerCase().split(RegExp(r'[-_]')).first;
+
+    // OpenStream checks English and the device language. RAVEN23 also
+    // honors the currently selected app language; when that differs from the
+    // Android locale, search both so changing the UI language never hides the
+    // subtitles normally offered for the device language.
+    final codes = <String>{
+      normalizeCode(preferred),
+      'ar',
+      'en',
+      normalizeCode(PlatformDispatcher.instance.locale.languageCode),
+    }..remove('');
+    final result = <_SubSourceLanguage>[];
+    for (final code in codes) {
+      final name = _subSourceLanguageNames[code];
+      if (name != null) result.add(_SubSourceLanguage(name, code));
+    }
+    return result;
+  }
+
+  static String _languageName(String? code, {String fallback = 'Unknown'}) {
+    final normalized = (code ?? '')
+        .trim()
+        .toLowerCase()
+        .split(RegExp(r'[-_]'))
+        .first;
+    return _subSourceLanguageNames[normalized] ?? fallback;
+  }
+
+  static final RegExp _episodeRange = RegExp(
+    r'e\d+\s*-\s*e?\d+',
+    caseSensitive: false,
+  );
+
+  static RegExp _episodePattern(int season, int episode) => RegExp(
+    '(s0*$season[ ._-]*e0*$episode(?!\\d))|'
+    '((?<![a-z0-9])${season}x0*$episode(?!\\d))|'
+    '((?<![a-z0-9])e0*$episode(?!\\d))',
+    caseSensitive: false,
+  );
+
+  /// Downloads and normalizes an external track into a WebVTT memory source.
+  /// For SubSource the public search result is a detail URL, not a file URL;
+  /// the detail response must be exchanged for its short-lived download token.
+  Future<BetterPlayerSubtitlesSource> convertToBetterPlayerSource(
+    ExternalSubtitle subtitle, {
+    int? subtitleNumber,
+  }) async {
+    final text = await _downloadAndNormalize(subtitle);
+    var name = subtitle.display.trim().isEmpty
+        ? subtitle.language
+        : subtitle.display;
+    if (subtitleNumber != null) name = '$name #$subtitleNumber';
+    if (subtitle.isHearingImpaired && !name.toLowerCase().contains('(hi)')) {
+      name = '$name (HI)';
+    }
+    if (subtitle.source.trim().isNotEmpty) name = '$name · ${subtitle.source}';
+    return BetterPlayerSubtitlesSource(
+      type: BetterPlayerSubtitlesSourceType.memory,
+      name: name,
+      content: text,
+      selectedByDefault: false,
+    );
+  }
+
+  Future<String> downloadAndNormalizeForPlayback(ExternalSubtitle subtitle) =>
+      _downloadAndNormalize(subtitle);
+
+  Future<String> _downloadAndNormalize(ExternalSubtitle subtitle) async {
+    final client = _client;
+    var downloadUrl = subtitle.url;
+    final headers = <String, String>{
+      'User-Agent':
+          'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36',
+      'Accept': '*/*',
+    };
+
+    if (subtitle.source == 'OpenSubtitles' &&
+        subtitle.url.startsWith('opensubtitles-v1://')) {
+      if (_openSubtitlesApiKey.isEmpty) {
+        throw StateError('OpenSubtitles API key is not configured.');
+      }
+      final fileId = int.tryParse(Uri.parse(subtitle.url).pathSegments.last);
+      if (fileId == null || fileId <= 0) {
+        throw const FormatException('Invalid OpenSubtitles file id.');
+      }
+      final downloadUri = Uri.parse('$_openSubtitlesV1Base/download');
+      final tokenResponse = await client
+          .post(
+            downloadUri,
+            headers: <String, String>{
+              'Api-Key': _openSubtitlesApiKey,
+              'User-Agent': 'RAVEN23 PRO v1.0',
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(<String, dynamic>{'file_id': fileId}),
+          )
+          .timeout(_downloadTimeout);
+      if (tokenResponse.statusCode < 200 || tokenResponse.statusCode >= 300) {
+        throw http.ClientException(
+          'OpenSubtitles download request returned HTTP ${tokenResponse.statusCode}.',
+          downloadUri,
+        );
+      }
+      final tokenBody = jsonDecode(tokenResponse.body);
+      downloadUrl = tokenBody is Map ? tokenBody['link']?.toString() ?? '' : '';
+      if (!downloadUrl.startsWith('http')) {
+        throw const FormatException('OpenSubtitles returned no download link.');
+      }
+    } else if (subtitle.source == 'SubSource' &&
+        subtitle.url.startsWith('subsource-v2://')) {
+      if (_subSourceApiKey.isEmpty) {
+        throw StateError('SubSource API key is not configured.');
+      }
+      final id = Uri.parse(subtitle.url).pathSegments.last;
+      final parsedId = int.tryParse(id);
+      if (parsedId == null || parsedId <= 0) {
+        throw const FormatException('Invalid SubSource subtitle id.');
+      }
+      final downloadUri =
+          Uri.parse('$_subSourceBase/subtitles/$parsedId/download');
+      final response = await client
+          .get(downloadUri, headers: _subSourceHeaders)
+          .timeout(_downloadTimeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw http.ClientException(
+          'SubSource download returned HTTP ${response.statusCode}.',
+          downloadUri,
+        );
+      }
+      if (response.bodyBytes.length > _maxSubtitleDownloadBytes) {
+        throw const FormatException('Subtitle download exceeds the size limit.');
+      }
+      return SubtitleFileNormalizer.normalizeBytes(response.bodyBytes);
+    } else if (subtitle.source == 'ArabicSubs' &&
+        subtitle.url.startsWith('arabicsubs-proxy://')) {
+      final id = Uri.parse(subtitle.url).pathSegments.last;
+      final proxyUri = Uri.parse(
+        '$_arabicSubsProxyUrl/subtitles/${Uri.encodeComponent(id)}/download',
+      );
+      final response = await client
+          .get(proxyUri, headers: const {'Accept': '*/*'})
+          .timeout(_downloadTimeout);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw http.ClientException(
+          'ArabicSubs proxy download failed.',
+          proxyUri,
+        );
+      }
+      if (response.bodyBytes.length > _maxSubtitleDownloadBytes) {
+        throw const FormatException(
+          'Subtitle download exceeds the size limit.',
+        );
+      }
+      return SubtitleFileNormalizer.normalizeBytes(response.bodyBytes);
+    } else if (subtitle.source == 'OpenSubtitles' &&
+        subtitle.url.startsWith('http')) {
+      headers.addAll(const <String, String>{
+        'User-Agent': _openSubtitlesUserAgent,
+        'X-User-Agent': _openSubtitlesUserAgent,
+      });
+    }
+
+    final uri = Uri.parse(downloadUrl);
+    final response = await client
+        .get(uri, headers: headers)
+        .timeout(_downloadTimeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw http.ClientException(
+        'Subtitle download returned HTTP ${response.statusCode}.',
+        uri,
+      );
+    }
+    if (response.bodyBytes.length > _maxSubtitleDownloadBytes) {
+      throw const FormatException('Subtitle download exceeds the size limit.');
+    }
+    return SubtitleFileNormalizer.normalizeBytes(response.bodyBytes);
+  }
+
+  Map<String, String> get _subSourceHeaders => <String, String>{
+    'X-API-Key': _subSourceApiKey,
+    'Accept': 'application/json, application/zip, */*',
+  };
 
   static List<ExternalSubtitle> _mergeAndSort(
     Iterable<ExternalSubtitle> items,
