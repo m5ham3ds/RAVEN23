@@ -261,11 +261,13 @@ The final provider priority must be derived from measured results. A provider th
 - Create mocked tests for every documented provider response and failure mode.
 - No player UI, settings, subtitle search order, or provider behavior changes in this stage.
 
-### PHASE64.1 — Safe free-key configuration
-- Define how the owner will provide free API credentials.
-- Keep API keys out of source control, public .env assets, APK constants, and logs.
-- Prefer per-user keys stored in Android secure storage where the provider permits BYOK.
-- For APIs that explicitly require server-side secrets (especially ArabicSubs), use a protected user-controlled proxy. Respect each provider's free-key sharing rules.
+### PHASE64.1 — Development credentials and production separation
+- Preserve the owner's current development workflow: `.env.example` is temporarily used as the active configuration source for phone-testing builds, and its current values must remain available during this testing period. Do not blank the file, remove it from the Flutter asset/build path, or migrate the values to the production server until the owner confirms that phone testing is complete.
+- The current CI flow copies `.env.example` to `.env`, and Flutter currently bundles `.env` as an application asset. Therefore, values used this way are readable from the public repository and extractable from the test APK. This is a documented, temporary development exception, not a secure secret-storage design.
+- Do not place primary account passwords, session cookies, private account recovery data, or provider credentials that explicitly require server-side secrecy into the mobile app. For APIs that mandate server-side secrets (especially ArabicSubs), use a protected test proxy even during phone testing; do not bypass the provider's documented key-handling requirements.
+- Use only provider credentials whose terms permit the chosen development/testing use. Track free quotas and revoke or replace temporary credentials if misuse or unexpected quota consumption is detected.
+- After phone testing is complete, move production credentials to the appropriate protected backend configuration and remove the temporary development values from public source/build artifacts, with explicit owner approval.
+- Prefer per-user keys stored in Android secure storage where the provider permits BYOK for the production design.
 - Add per-provider enabled/disabled state and quota/error status without changing unrelated settings.
 
 ### PHASE64.2 — Documented provider adapters
@@ -326,7 +328,7 @@ Acceptance:
 - A failed candidate causes a real fallback to the next eligible candidate/provider.
 - Search never delays video startup or changes the active video source.
 - The best candidate is selected by match evidence, not provider name alone.
-- API keys are not committed, logged, or embedded as public application secrets.
+- Production API keys and account credentials are not committed, logged, or embedded as public application secrets. The owner's temporary phone-testing values in `.env.example` are an explicit development-only exception already documented in PHASE64.1; they must not be treated as safe for production or permanent credentials.
 - All provider quotas and published terms are respected.
 - Arabic text encoding, RTL rendering, and timing are checked on an actual Android device.
 - No protected feature group is changed; every phase declares the protected-scope impact.
@@ -340,6 +342,13 @@ Acceptance:
 - Do not use AI translation, machine-translation APIs, or generated replacement subtitles in this phase.
 - Use free sources only; respect each provider's published quotas and key-sharing rules.
 - Keep the currently deferred DCIM subtitle-sidecar export issue outside this work.
+
+### Additional owner-confirmed development configuration decision (2026-11-22)
+- The owner requires the current `.env.example` values to remain usable during development because the app will consume them in test builds installed on the owner's Android phone.
+- Do not migrate those values to the server or disable their test-build loading before the owner says phone testing is complete.
+- The owner has been informed that the current public repository and CI/APK asset flow make these values retrievable. This temporary arrangement must be treated as a development/testing exception only.
+- Provider-specific restrictions still apply: a credential documented as server-only must remain behind a protected test proxy, even while the app is being tested on a phone.
+- No credential values should be copied into phase documentation, CI logs, build reports, chat replies, or diagnostic output.
 
 ### Decisions still to settle before provider credentials or production ranking
 
