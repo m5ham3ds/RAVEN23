@@ -82,6 +82,8 @@ void main() {
             expect(_headerValue(request, 'Api-Key'), 'test-open-key');
             expect(_headerValue(request, 'User-Agent'), 'RAVEN23 PRO v1.0');
             expect(request.url.queryParameters['languages'], 'ar,en');
+            expect(request.url.queryParameters['ai_translated'], 'exclude');
+            expect(request.url.queryParameters['machine_translated'], 'exclude');
             return http.Response(
               jsonEncode({
                 'data': [
@@ -93,6 +95,46 @@ void main() {
                       'files': [
                         {'file_id': 4567, 'file_name': 'arabic.srt'},
                       ],
+                    },
+                    {
+                      'attributes': {
+                        'language': 'ara',
+                        'ai_translated': true,
+                        'release': 'Example.AI.Generated',
+                        'files': [
+                          {'file_id': 4568, 'file_name': 'ai.srt'},
+                        ],
+                      },
+                    },
+                    {
+                      'attributes': {
+                        'language': 'ara',
+                        'machine_translated': true,
+                        'release': 'Example.Machine.Generated',
+                        'files': [
+                          {'file_id': 4569, 'file_name': 'machine.srt'},
+                        ],
+                      },
+                    {
+                      'attributes': {
+                        'language': 'ara',
+                        'ai_translated': true,
+                        'release': 'Example.AI.Generated',
+                        'files': [
+                          {'file_id': 4568, 'file_name': 'ai.srt'},
+                        ],
+                      },
+                    },
+                    {
+                      'attributes': {
+                        'language': 'ara',
+                        'machine_translated': true,
+                        'release': 'Example.Machine.Generated',
+                        'files': [
+                          {'file_id': 4569, 'file_name': 'machine.srt'},
+                        ],
+                      },
+                    
                     },
                   },
                 ],

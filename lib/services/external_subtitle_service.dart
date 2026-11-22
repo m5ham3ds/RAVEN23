@@ -229,6 +229,10 @@ class ExternalSubtitleService {
       if (!isMovie) 'parent_tmdb_id': '$tmdbId',
       if (!isMovie && season != null) 'season_number': '$season',
       if (!isMovie && episode != null) 'episode_number': '$episode',
+      // OpenSubtitles includes AI-translated subtitles by default. This app
+      // must use pre-existing non-AI/non-machine-translated community tracks.
+      'ai_translated': 'exclude',
+      'machine_translated': 'exclude',
       'order_by': 'download_count',
       'order_direction': 'desc',
     };
@@ -265,6 +269,14 @@ class ExternalSubtitleService {
       final language = _normaliseLanguageCode(
         attributes['language']?.toString(),
       );
+      // Enforce the policy locally as well as in the API query, so a provider
+      // regression or ignored filter cannot promote generated translations.
+      if (attributes['ai_translated'] == true ||
+          attributes['machine_translated'] == true ||
+          attributes['ai_translated']?.toString() == '1' ||
+          attributes['machine_translated']?.toString() == '1') {
+        continue;
+      }
       final files = attributes['files'];
       if (files is! List) continue;
       for (final file in files.whereType<Map>()) {
