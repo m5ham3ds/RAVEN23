@@ -96,45 +96,25 @@ void main() {
                         {'file_id': 4567, 'file_name': 'arabic.srt'},
                       ],
                     },
-                    {
-                      'attributes': {
-                        'language': 'ara',
-                        'ai_translated': true,
-                        'release': 'Example.AI.Generated',
-                        'files': [
-                          {'file_id': 4568, 'file_name': 'ai.srt'},
-                        ],
-                      },
+                  },
+                  {
+                    'attributes': {
+                      'language': 'ara',
+                      'ai_translated': true,
+                      'release': 'Example.AI.Generated',
+                      'files': [
+                        {'file_id': 4568, 'file_name': 'ai.srt'},
+                      ],
                     },
-                    {
-                      'attributes': {
-                        'language': 'ara',
-                        'machine_translated': true,
-                        'release': 'Example.Machine.Generated',
-                        'files': [
-                          {'file_id': 4569, 'file_name': 'machine.srt'},
-                        ],
-                      },
-                    {
-                      'attributes': {
-                        'language': 'ara',
-                        'ai_translated': true,
-                        'release': 'Example.AI.Generated',
-                        'files': [
-                          {'file_id': 4568, 'file_name': 'ai.srt'},
-                        ],
-                      },
-                    },
-                    {
-                      'attributes': {
-                        'language': 'ara',
-                        'machine_translated': true,
-                        'release': 'Example.Machine.Generated',
-                        'files': [
-                          {'file_id': 4569, 'file_name': 'machine.srt'},
-                        ],
-                      },
-                    
+                  },
+                  {
+                    'attributes': {
+                      'language': 'ara',
+                      'machine_translated': true,
+                      'release': 'Example.Machine.Generated',
+                      'files': [
+                        {'file_id': 4569, 'file_name': 'machine.srt'},
+                      ],
                     },
                   },
                 ],
