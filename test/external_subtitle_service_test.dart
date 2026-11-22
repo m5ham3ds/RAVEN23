@@ -28,69 +28,46 @@ void main() {
   });
 
   group('ExternalSubtitleService', () {
-    test('searches OpenSubtitles using the IMDb id mapped from TMDB', () async {
-      final requests = <http.Request>[];
-      final client = MockClient((request) async {
-        requests.add(request);
-        if (request.url.host == 'rest.opensubtitles.org') {
-          return http.Response(
-            jsonEncode(<Map<String, dynamic>>[
-              <String, dynamic>{
-                'IDSubtitleFile': '8123',
-                'SubDownloadLink': 'https://dl.opensubtitles.org/sub/8123.gz',
-                'SubFormat': 'srt',
-                'LanguageName': 'English',
-                'ISO639': 'en',
-                'SubHearingImpaired': '0',
-                'SubDownloadsCnt': '50',
-                'MovieReleaseName': 'Example.Release',
-              },
-            ]),
-            200,
-          );
-        }
-        if (request.url.host == 'api.subsource.net') {
-          return http.Response(jsonEncode({'results': []}), 200);
-        }
-        return http.Response('not found', 404);
-      });
-      final resolver = MediaIdentityResolver(
-        lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
-      );
-      final service = ExternalSubtitleService(
-        '',
-        client: client,
-        identityResolver: resolver,
-      );
+    test(
+      'does not call the legacy OpenSubtitles endpoint when no v1 key is set',
+      () async {
+        final requests = <http.Request>[];
+        final client = MockClient((request) async {
+          requests.add(request);
+          return http.Response('[]', 200);
+        });
+        final resolver = MediaIdentityResolver(
+          lookup: (UnifiedMediaType type, int tmdbId) async => 'tt1234567',
+        );
+        final service = ExternalSubtitleService(
+          '',
+          client: client,
+          identityResolver: resolver,
+          openSubtitlesApiKey: '',
+        );
 
-      final results = await service.fetchMovieSubtitles(
-        42,
-        title: 'Example movie',
-        year: 2025,
-        preferredLanguageCode: 'ar',
-      );
+        final results = await service.fetchMovieSubtitles(
+          42,
+          title: 'Example movie',
+          year: 2025,
+          preferredLanguageCode: 'ar',
+        );
 
-      expect(results, hasLength(1));
-      expect(results.single.source, 'OpenSubtitles');
-      expect(results.single.id, 'opensubtitles_8123');
-      expect(results.single.language, 'en');
-      expect(
-        requests.where(
-          (request) => request.url.host == 'rest.opensubtitles.org',
-        ),
-        hasLength(3),
-      );
-      expect(
-        requests.any(
-          (request) => request.url.path.contains('/sublanguageid-ara'),
-        ),
-        isTrue,
-      );
-      final legacyRequest = requests.firstWhere(
-        (request) => request.url.host == 'rest.opensubtitles.org',
-      );
-      expect(_headerValue(legacyRequest, 'user-agent'), 'TemporaryUserAgent');
-    });
+        expect(results, isEmpty);
+        expect(
+          requests.where(
+            (request) => request.url.host == 'rest.opensubtitles.org',
+          ),
+          isEmpty,
+        );
+        expect(
+          requests.where(
+            (request) => request.url.host == 'api.opensubtitles.com',
+          ),
+          isEmpty,
+        );
+      },
+    );
 
     test(
       'uses OpenSubtitles v1 Arabic search and downloads its temporary link',
@@ -121,10 +98,6 @@ void main() {
               }),
               200,
             );
-          }
-          if (request.url.host == 'api.subsource.net' &&
-              request.url.path.endsWith('/movie/search')) {
-            return http.Response(jsonEncode({'results': []}), 200);
           }
           if (request.url.host == 'api.opensubtitles.com' &&
               request.method == 'POST' &&
