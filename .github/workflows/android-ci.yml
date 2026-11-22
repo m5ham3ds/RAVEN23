@@ -305,7 +305,7 @@ jobs:
       # subtitle normalization/options/local-cache, Manga/Mihon work-detail, source-binding,
       # offline-progress, quality-catalog/scanner, reader, Home/Anime and navigation regressions.
       # Run only after dependencies, canonical formatting and full-project analysis.
-      - name: Run focused auth, Manga, Home, Anime, Mihon, navigation, reader and playback Flutter pre-build tests
+      - name: Run focused auth, subtitle-provider, selector, Manga, Home, Anime, Mihon, navigation, reader and playback Flutter pre-build tests
         id: flutter_tests
         if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' }}
         timeout-minutes: 12
@@ -588,8 +588,7 @@ jobs:
 
       - name: Build production ${{ env.BUILD_MODE }} APK (local development mode, ARM64 only)
         id: build_apk
-        # Build only after dependency resolution, formatting, full analysis, the
-        # thirty-two focused Flutter test files, and the selected Android ABI test succeed.
+        # Build only after dependency resolution, formatting, full analysis, the focused Flutter suite recorded in its test log, Gradle wrapper generation, and focused Android ABI/download contract tests succeed.
         if: ${{ steps.resolve_dependencies.outcome == 'success' && steps.dart_format_phase57.outcome == 'success' && steps.analyze.outcome == 'success' && steps.flutter_tests.outcome == 'success' && steps.gradle_wrapper.outcome == 'success' && steps.android_unit_tests.outcome == 'success' }}
         shell: bash
         run: |
@@ -1045,7 +1044,7 @@ jobs:
               ('Scoped Manga/Home/Anime/Mihon Dart formatting', artifacts / 'phase57-dart-format.log'),
               ('Formatter patch capture', artifacts / 'format-patch.log'),
               ('Flutter analyze', artifacts / 'flutter-analyze.log'),
-              ('Focused Manga/Home/Anime/Mihon/mobile-navigation/reader Flutter pre-build tests', artifacts / 'flutter-prebuild-tests.log'),
+              ('Focused Flutter pre-build tests (including subtitle provider and selector coverage)', artifacts / 'flutter-prebuild-tests.log'),
               ('Gradle wrapper generation', artifacts / 'gradle-wrapper.log'),
               ('Focused Android ABI and download contract unit tests', artifacts / 'android-mihon-abi-test.log'),
               ('Android APK build', artifacts / 'android-apk-build.log'),
@@ -1063,7 +1062,7 @@ jobs:
               '- Dependency resolution: `flutter pub get`.',
               '- Formatting: scoped Manga/Home/Anime/Mihon, PHASE63 work-detail/reader/translation, source-priority, mobile-navigation, playback-quality and press-feedback Dart targets via `bash tool/format_phase57_dart.sh --fix` / `--check` (173 files).',
               '- Static analysis: `flutter analyze --no-fatal-infos`; it starts only after dependency resolution and formatting succeed.',
-              '- Required pre-build tests: thirty-two focused Manga/Home/Anime/Mihon/mobile-navigation/reader/source-priority/playback-quality and full-source-catalog Flutter test files, plus the Android `MihonExtensionLoaderAbiTest` (3 ABI cases) and `StreamDownloadStorePlayerContractTest` (22 Media3/download/storage contract cases). Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
+              '- Required pre-build tests: the exact Flutter test-file inventory and terminal result are extracted from the executed `flutter-prebuild-tests.log` below. The Android gate records the selected Mihon ABI and Media3/download contract methods from Gradle output. Other Flutter and Android test sources remain preserved for owner-led manual/deeper regression; they are not all part of the routine APK gate. Dedicated PHASE52/53 test files remain retired after owner-confirmed acceptance.',
               '- Live Laravel smoke/E2E tests are not pre-build gates; their source files are preserved for explicit manual/staging validation after APK creation. The write-enabled E2E test still requires a disposable staging backend and explicit write consent.',
               '- Wrapper generation: `gradle wrapper --gradle-version 8.14 --distribution-type all`.',
               '- APK build: `flutter build apk --${BUILD_MODE} --flavor prod --target lib/main.dart --target-platform android-arm64 -Pdisable-abi-filtering=true --dart-define=ENABLE_FIREBASE=false --dart-define=LOCAL_DEV_MODE=false --dart-define=RAVEN23_AUTH_ONLY=true --dart-define=LARAVEL_API_URL=https://raven23-backend.onrender.com`.',
@@ -1071,73 +1070,7 @@ jobs:
               '',
               '### Routine pre-build test gate',
               '',
-              code_block('''
-              Routine pre-build Flutter gate runs exactly these thirty-two files:
-
-              test/manga/anilist_catalogue_cache_test.dart
-              --covers: AniList persistent catalogue cache, fresh/stale retention, clear and restart/offline reads
-              test/data/tmdb_network_test.dart
-              --covers: TMDB stale cache fallback and background revalidation across offline/restart scenarios
-              test/video_providers/source_priority_manager_test.dart
-              --covers: unlimited primary/backup priority lists, uniqueness, legacy migration, reorder and repository cleanup
-              test/video_providers/source_priority_policy_test.dart
-              --covers: exact requested Movie/Series/Anime defaults, Anime VixSrc built-in marker, and legacy Anime migration map
-              test/video_providers/stream_host_priority_manager_test.dart
-              --covers: requested VixSrc/Jett/YaStream/... host order and measured reliability/latency ordering for other hosts
-              test/video_providers/offline_stream_identity_test.dart
-              --covers: exact stream provenance survives the Flutter request map and Media3 index readback model
-              test/manga/manga_repository_manager_test.dart
-              --covers: first-use seed, add/edit/remove, HTTP(S) .pb validation,
-                        fragment normalization, duplicate prevention and stale updates
-              test/manga/manga_reader_crop_test.dart
-              --covers: flat scan-margin detection, untouched artwork and invalid input safety
-              test/manga/mihon_source_browser_screen_test.dart
-              --covers: unified available/installed extension directory, screenshot-matched row actions, orphaned installed sources and removal support
-              test/manga/mihon_default_extension_installer_test.dart
-              --covers: exact ten-name selection, pinned Keiyoushi signing fingerprint, Arabic package preference and strict name normalization
-              test/manga/phase55_manga_catalogue_test.dart
-              --covers: All/JP/KR/CN filters, title metadata and catalogue shelves
-              test/manga/phase55_mihon_pb_index_test.dart
-              test/manga/phase56_manga_regression_test.dart
-              --covers: gzip Protobuf decoding, extension mapping, raw repo.json parsing, strict signer trust and install eligibility
-              test/manga/phase57_manga_home_parity_test.dart
-              --covers: every Manga/Manhwa/Manhua catalogue shelf survives aggregation
-              test/manga_detail_metadata_test.dart
-              --covers: AniList detail metadata, characters/staff, relations, tags and optional-field fallbacks
-              test/manga_reading_store_test.dart
-              --covers: source pins, chapter progress, reading status and per-work reader preferences
-              test/manga_source_matcher_test.dart
-              --covers: strict whole-title matching, aliases and chapter-number parsing
-              test/app_press_feedback_test.dart
-              --covers: nested InkWell/FilledButton pointer feedback, press release and tap preservation
-              test/pill_button_test.dart
-              --covers: Play/My List press animation and callback preservation
-              test/mobile/mobile_nav_bar_test.dart
-              --covers: Phosphor destination icons, blank menu-caption alignment, simultaneous Home/secondary selection and shared press feedback
-              test/playback_action_test.dart
-              --covers: player quality choice resolution-first label, server subtitle and tap activation
-              test/quality_catalog_test.dart
-              --covers: full cross-provider quality catalog, low-resolution labels, duplicate-server identity and exact selected-source matching
-              test/video_utils_download_format_test.dart
-              --covers: unique download quality rows, explicit container metadata and MP4/WebM/HLS/DASH detection
-              test/video_providers/legacy_provider_adapter_test.dart
-              --covers: preservation of declared source containers across legacy/unified adapters
-              test/adaptive_quality_scanner_test.dart
-              --covers: HLS/DASH rendition discovery, nested manifests, request headers and low resolutions such as 140p
-              test/provider_background_scan_test.dart
-              --covers: bounded provider scan completion while retaining every quality returned by each completed provider
-              test/anime_media_classification_test.dart
-              --covers: Japanese animation is Anime; non-Japanese Animation and Japanese live action are not
-              test/home_catalog_test.dart
-              --covers: Anime and Series Continue Watching remain isolated
-              test/home_screen_test.dart
-              --covers: Progressive Home/Movies/Series/Anime first paint, partial offline cache, empty/error states, Manga All aggregation and shared rows
-
-              Android gate: `:app:testProdReleaseUnitTest` for `MihonExtensionLoaderAbiTest` (3 cases) and `StreamDownloadStorePlayerContractTest` (21 cases)
-              --covers: Float widening (1.6f), exact supported versions (1.4/1.6), unsupported/non-finite values; MP4/WebM progressive MIME mapping, opaque signed-link container preservation, unsupported format rejection, 200 MiB storage pause/resume checks, and player reflection contracts
-
-              All other test sources remain in the repository for manual/deeper regression; CI does not delete or disable them.
-              '''),
+              'The exact Flutter test-file inventory is extracted from the executed test log below; this report does not maintain a duplicate hard-coded list.',
               '',
               '## 5. Warnings, errors and diagnostics',
               '',
@@ -1210,6 +1143,14 @@ jobs:
               ]
               report += ['', '### Focused Flutter pre-build test summary', '']
               report.append(next((line for line in flutter_test_lines if 'Focused Flutter pre-build test files:' in line), '- Focused Flutter file count was not captured.'))
+              executed_test_files = []
+              for line in flutter_test_lines:
+                  match = re.match(r'\s*-\s+(test/\S+)', line)
+                  if match:
+                      executed_test_files.append(match.group(1))
+              if executed_test_files:
+                  report += ['', '#### Exact Flutter test files executed', '']
+                  report.extend(f'- `{test_file}`' for test_file in executed_test_files)
               if summary_lines:
                   report.extend(f'- `{line[:500]}`' for line in summary_lines[-16:])
               else:
@@ -1275,7 +1216,7 @@ jobs:
               '## 8. Interpretation notes',
               '',
               '- A step marked `skipped` was not executed; this includes later build stages blocked by a prerequisite failure and must not be interpreted as a pass.',
-              '- The routine APK gate intentionally runs thirty-two focused Manga/Home/Anime/Mihon/mobile-navigation/reader/source-priority/playback-quality and full-source-catalog Flutter files, three Mihon ABI cases and twenty offline Media3/download contract cases. The full Flutter and Android test inventories remain untouched in the source tree for manual/deeper regression after the owner installs the APK. Laravel live tests are also retained for explicit staging validation and are not pre-build gates.',
+              '- The executed Flutter file inventory and terminal test result are listed directly from the captured run log above. Android ABI and Media3/download contract method results are extracted from Gradle output. The full Flutter and Android test inventories remain untouched in the source tree for manual/deeper regression after the owner installs the APK. Laravel live tests are also retained for explicit staging validation and are not pre-build gates.',
               '- Setup actions (checkout/tool installers/cache) expose their detailed output in the linked GitHub Actions run; their success/failure outcome is recorded above.',
               '- This report describes this individual run only. It does not mark a RAVEN23 phase accepted unless all required CI and runtime acceptance gates pass.',
               '',

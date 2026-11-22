@@ -17,12 +17,12 @@ import 'subtitle_file_normalizer.dart';
 /// SubSource) while retaining RAVEN23's existing Scraper API as an
 /// additional provider/fallback.
 ///
-/// OpenSubtitles uses its current API v1 when an application key is configured
-/// and keeps a compatibility fallback for older installations. SubSource uses
-/// its documented API v1 endpoints and X-API-Key authentication. ArabicSubs
-/// is accessed only through an optional protected server-side proxy. Every
-/// provider is isolated so one outage never hides the results returned by
-/// other providers.
+/// OpenSubtitles uses its documented API v1 only when an application key is
+/// configured; it does not fall back to the retired legacy REST endpoint.
+/// SubSource uses its documented API v1 endpoints and X-API-Key
+/// authentication. ArabicSubs is accessed only through an optional
+/// protected server-side proxy. Every provider is isolated so one outage
+/// never hides the results returned by other providers.
 class ExternalSubtitleService {
   ExternalSubtitleService(
     this.scraperApiUrl, {
@@ -838,81 +838,59 @@ class ExternalSubtitleService {
     String? preferredLanguageCode,
   ) {
     final preferred = _normaliseLanguageCode(preferredLanguageCode);
-    final ordered = items
-        .where((item) {
-          final url = item.url.trim();
-          final isInternalDownload =
-              (item.source == 'OpenSubtitles' &&
-                  url.startsWith('opensubtitles-v1://')) ||
-              (item.source == 'ArabicSubs' &&
-                  url.startsWith('arabicsubs-proxy://')) ||
-              (item.source == 'SubSource' &&
-                  url.startsWith('subsource-v2://'));
-          return url.isNotEmpty &&
-              (url.startsWith('http') || isInternalDownload);
-        })
-        .toList(growable: true);
+    final byProviderRecord = <String, ExternalSubtitle>{};
 
-    // Apply language and provider priority before BOTH URL and release
-    // de-duplication. This makes SubSource win even when two adapters expose
-    // the same download URL or the same release record.
-    ordered.sort((a, b) {
-      int languageRank(ExternalSubtitle subtitle) {
-        final language = _normaliseLanguageCode(subtitle.language);
-        if (preferred.isNotEmpty && language == preferred) return 0;
-        if (language == 'en') return 1;
-        return 2;
+    for (final item in items) {
+      final url = item.url.trim();
+      final isInternalDownload =
+          (item.source == 'OpenSubtitles' &&
+              url.startsWith('opensubtitles-v1://')) ||
+          (item.source == 'ArabicSubs' &&
+              url.startsWith('arabicsubs-proxy://')) ||
+          (item.source == 'SubSource' &&
+              url.startsWith('subsource-v2://'));
+      if (url.isEmpty || (!url.startsWith('http') && !isInternalDownload)) {
+        continue;
       }
 
+      // Preserve independent providers' records even when their release labels
+      // or download URLs match. Their uploader, rating and provenance evidence
+      // must reach SubtitleSelectionEngine before any winner is chosen.
+      final recordKey = jsonEncode(<String>[
+        item.source.toLowerCase(),
+        item.id,
+        url,
+      ]);
+      byProviderRecord.putIfAbsent(recordKey, () => item);
+    }
+
+    final merged = byProviderRecord.values.toList(growable: true);
+    int languageRank(ExternalSubtitle subtitle) {
+      final language = _normaliseLanguageCode(subtitle.language);
+      if (preferred.isNotEmpty && language == preferred) return 0;
+      if (language == 'en') return 1;
+      return 2;
+    }
+
+    // This is catalogue display order only. Provider name never decides which
+    // same-language candidate reaches the selector first or survives merging.
+    merged.sort((a, b) {
       final languageOrder = languageRank(a).compareTo(languageRank(b));
       if (languageOrder != 0) return languageOrder;
-      final sourceOrder =
-          _sourceRank(
-            a.source,
-            languageCode: _normaliseLanguageCode(a.language),
-          ).compareTo(
-            _sourceRank(
-              b.source,
-              languageCode: _normaliseLanguageCode(b.language),
-            ),
-          );
-      if (sourceOrder != 0) return sourceOrder;
-      return a.display.toLowerCase().compareTo(b.display.toLowerCase());
+      final displayOrder = a.display.toLowerCase().compareTo(
+        b.display.toLowerCase(),
+      );
+      if (displayOrder != 0) return displayOrder;
+      final releaseOrder = a.release.toLowerCase().compareTo(
+        b.release.toLowerCase(),
+      );
+      if (releaseOrder != 0) return releaseOrder;
+      final idOrder = a.id.compareTo(b.id);
+      if (idOrder != 0) return idOrder;
+      return a.source.compareTo(b.source);
     });
 
-    final seenUrls = <String>{};
-    final seenReleases = <String>{};
-    final merged = <ExternalSubtitle>[];
-    for (final item in ordered) {
-      if (!seenUrls.add(item.url.trim())) continue;
-      final release = item.release.trim().toLowerCase();
-      final language = _normaliseLanguageCode(item.language);
-      if (release.isNotEmpty) {
-        final key = '$language|$release|${item.isHearingImpaired}';
-        if (!seenReleases.add(key)) continue;
-      }
-      merged.add(item);
-    }
     return List<ExternalSubtitle>.unmodifiable(merged);
-  }
-
-  static int _sourceRank(String source, {required String languageCode}) {
-    if (languageCode == 'ar') {
-      return switch (source) {
-        // Arabic subtitle selection must prefer SubSource whenever it has a
-        // usable result; the other Arabic providers are deterministic fallbacks.
-        'SubSource' => 0,
-        'OpenSubtitles' => 1,
-        'ArabicSubs' => 2,
-        _ => 4,
-      };
-    }
-    return switch (source) {
-      'OpenSubtitles' => 0,
-      'SubSource' => 1,
-      'ArabicSubs' => 2,
-      _ => 4,
-    };
   }
 
   @visibleForTesting

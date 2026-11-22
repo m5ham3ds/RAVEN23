@@ -57,6 +57,30 @@ The known issue that copies a selected subtitle sidecar beside the video under D
 
 **Protected-scope impact:** only subtitle language resolution, external subtitle candidate selection, its focused tests, the Phase64 CI test list, and Phase64 documentation are touched. No video URL/source selection, PRIMARY/BACKUP order, quality policy, offline player/download/export path, UI layout, backend contract, or deferred DCIM subtitle-sidecar behavior is changed.
 
+### 2026-11-22 — CI #291 result and post-CI selector pipeline audit
+
+- GitHub Actions run #291 for commit `d570ec90f174d843beef22a24d77d4d826b44de4` completed successfully: Flutter analysis passed; the captured pre-build log records 59 focused Flutter test files and `482` passing tests; Android logs record 3 Mihon ABI methods and 22 Media3/download contract methods passed; Release ARM64 APK build and ABI audit passed. The APK artifact was 45,397,593 bytes (about 43.29 MiB).
+- The focused run includes `external_subtitle_service_test.dart`, `subtitle_selection_engine_test.dart`, `language_names_test.dart`, subtitle normalization/options/cache/orchestrator tests. This establishes CI success for the tested commit, not live provider credentials, real provider availability, synchronization, or physical-device playback.
+- A deeper post-CI review found that `_mergeAndSort` still applied a fixed provider-name rank and removed same-language/same-release entries before `SubtitleSelectionEngine` could inspect them. This contradicted the new selector's provider-neutral contract and could discard better candidates. The current follow-up removes provider-name ranking and preserves distinct provider records; its regression run is pending.
+- The Android CI report template also contained an obsolete hard-coded 32-file inventory although the executed log showed 59 files. The current follow-up derives the reported test-file inventory from the actual Flutter log instead of keeping a duplicate stale list.
+- `PHASE64.4` remains IN PROGRESS: the selector still lacks accepted confidence classes/thresholds and benchmark evidence; the active stream currently supplies only a quality label rather than a verified full release fingerprint. Do not start PHASE64.5 or unlock PHASE64.7 until the required matching, Arabic decoding/RTL, and real-device gates are accepted.
+- `PHASE64.0` live credential validation remains blocked until the exposed OpenSubtitles and SubSource keys are rotated. SubF2M, Sub-Scene, and AnimeTosho remain research candidates, not integrated providers.
+- **Protected-scope impact:** the follow-up is restricted to provider-result merge/deduplication, its tests, accurate CI-report generation, environment descriptions, and this phase document. Provider-supplied video subtitle tracks, active video URLs, provider/server ordering, quality selection, offline playback, downloads/export, DCIM behavior, player layout, and backend contracts remain unchanged.
+- **Changed files in this follow-up:** `.github/workflows/android-ci.yml`, `lib/services/external_subtitle_service.dart`, `test/external_subtitle_service_test.dart`, and `phases/PHASE64_ARABIC_SUBTITLE_PROVIDER_QUALITY_AND_FALLBACK_PLAN.md`. The environment template correction is recorded separately in the preceding commits.
+
+### 2026-11-22 — CI #294 success and owner-confirmed API-key exception
+
+- GitHub Actions run #294 for commit `e0c0e8cf2c0a0c07b82f9b01772502bf00786b48` completed with conclusion `success`. Flutter analysis passed; the focused Flutter gate recorded 59 test files and 482 passing tests. The Android contract gate verified 25 cases from JUnit XML: 3 Mihon ABI cases and 22 Media3/download cases, with zero failures/errors/skips.
+- The production Release APK build and APK/ABI audit both passed. The artifact was 45.63 MiB (47,850,874 bytes); the only native ABI directory was `arm64-v8a`. APK upload, diagnostics, formatting patch, and comprehensive build report uploads all completed.
+- Run #294 used commit `e0c0e8cf`, whose `.env.example` still had blank OpenSubtitles/SubSource values. It proves the blank-template build path passed, but does not prove live provider authentication or the owner's populated-key phone-test path.
+- The owner has explicitly instructed that the existing TMDB, OpenSubtitles, and SubSource values must remain populated in `.env.example` during Android phone testing. The public exposure and APK extraction risk are acknowledged and accepted only for this temporary development period. The standalone policy is `phases/RAVEN23_TEMPORARY_PUBLIC_API_KEY_TESTING_EXCEPTION.md`; do not blank/remove/rotate/migrate the values without a later explicit owner instruction. ArabicSubs remains server-only.
+- The follow-up implementation prepared after #294 removes fixed provider-name priority and cross-provider same-release/URL collapse from `ExternalSubtitleService._mergeAndSort`. It preserves distinct provider records and removes only repeated records with the same source, ID, and URL. Regression tests now cover same-release alternatives, provider-neutral merging, and shared-URL provenance.
+- The CI report template now extracts its test-file inventory from the actual Flutter log instead of maintaining a stale hard-coded 32-file inventory.
+- A new CI run is required for the merge fix and the populated-key test-template update. Until that run passes, the follow-up is not accepted.
+- `PHASE64.4` remains IN PROGRESS: accepted confidence classes, benchmark evidence for movies/series/anime, strong release identity, and real Android playback verification are still outstanding. Do not jump to PHASE64.5 or unlock PHASE64.7 based on the build alone.
+- **Protected-scope impact:** only external subtitle result merging, its regression tests, CI report generation, the authorized subtitle-provider environment template, and Phase64 documentation/policy are touched. Provider-supplied subtitle tracks, video source/server ordering, active video URLs, quality selection, offline playback, downloads/export, DCIM behavior, player layout, and backend contracts remain unchanged.
+- **Changed files in this update:** `.env.example`, `.github/workflows/android-ci.yml`, `lib/services/external_subtitle_service.dart`, `test/external_subtitle_service_test.dart`, `phases/PHASE64_ARABIC_SUBTITLE_PROVIDER_QUALITY_AND_FALLBACK_PLAN.md`, and `phases/RAVEN23_TEMPORARY_PUBLIC_API_KEY_TESTING_EXCEPTION.md`.
+
 ## 1. Goal and non-goals
 
 ### Goal
@@ -91,22 +115,22 @@ The existing project is not starting from zero. The following code already exist
 
 ### Existing sources found in code
 
-1. **OpenSubtitles.com API v1:** already supported when OPENSUBTITLES_API_KEY is configured. Without that key, the code falls back to the old rest.opensubtitles.org API.
-2. **SubSource:** already supported through the older undocumented api.subsource.net/v1 website flow. It currently performs IMDb title search, title/season lookup, episode filtering, a detail lookup, token resolution, and ZIP download. The current flow does not use the documented SubSource API-key contract.
-4. **ArabicSubs:** an optional adapter already exists behind ARABICSUBS_PROXY_URL. It expects the app's own proxy to forward search, title-subtitle listing, and download requests.
-5. **RAVEN23 Scraper API:** retained as an additional provider-specific fallback.
+1. **OpenSubtitles.com API v1:** the current adapter uses the documented `https://api.opensubtitles.com/api/v1` endpoints and the `Api-Key` header when `OPENSUBTITLES_API_KEY` is configured. When the key is empty, the provider is skipped; there is no fallback to `rest.opensubtitles.org`.
+2. **SubSource documented API v1:** the current adapter uses `https://api.subsource.net/api/v1`, sends `X-API-Key`, searches by IMDb identity, reads the subtitle list and downloads the ZIP from the documented endpoint. The old undocumented website flow has been removed from the active adapter.
+3. **ArabicSubs:** an optional adapter already exists behind `ARABICSUBS_PROXY_URL`. It expects the app's protected proxy to forward search, title-subtitle listing, and download requests while keeping the Bearer key server-side.
+4. **RAVEN23 Scraper API:** retained as an additional provider-specific fallback.
 
 ### Important current behavior and weaknesses
 
-- Provider requests are gathered using Future.wait with a global timeout of 48 seconds. If that wait times out, the timeout handler returns an empty result list rather than preserving the providers that already completed. A single slow provider can therefore delay or hide otherwise useful Arabic results.
-- Arabic ordering is currently a fixed provider rank: SubSource, OpenSubtitles, ArabicSubs, then other sources. That rank does not prove that a particular file matches the active release.
-- Automatic application tries only the first five Arabic candidates after merging and sorting. Five weak results from one provider can consume the candidate budget before a better result from another provider is attempted.
-- The OpenSubtitles legacy REST endpoint is not a suitable free-only fallback: OpenSubtitles announced that access to the old API was restricted to VIP users from January 2024. The new OpenSubtitles.com API remains the relevant free route.
-- SubSource's current implementation is explicitly described in the source as an undocumented flow. The provider now publishes a documented API requiring an API key and advertising a free tier.
+- Provider requests now start concurrently through `SubtitleProviderOrchestrator.collectPartialResults`; results completed before the 48-second batch deadline are retained when another provider stalls. Per-provider deadlines and true live incremental menu updates are still not implemented.
+- The previous fixed provider-rank and same-release deduplication step could hide alternatives before the selector. The current follow-up removes provider-name ranking and preserves distinct provider records; its regression run is pending.
+- The former global first-five candidate limit has been removed from automatic application; candidate iteration continues until a candidate downloads and applies or the result list is exhausted.
+- The legacy OpenSubtitles REST endpoint is no longer called. Without an API v1 key, the OpenSubtitles provider is skipped rather than falling back to the VIP-restricted legacy service.
+- SubSource now uses its documented API v1 and `X-API-Key` authentication; the old undocumented website flow has been removed from the active adapter.
 - ArabicSubs is designed around an Arabic catalogue and exposes title/episode subtitle records, release labels, download counts, and translation-type metadata. Its current API contract is different from the custom proxy adapter already in RAVEN23 and needs to be mapped deliberately.
 - If a preferred Arabic provider subtitle is already marked selectedByDefault, the automatic external-provider search is skipped. This can suppress better alternatives when the in-stream Arabic track is badly timed or otherwise poor.
 - The owner has explicitly excluded translating English subtitle files into Arabic; candidate discovery and scoring must never invoke a translation service as a fallback.
-- The current OpenSubtitles query includes both Arabic and English even when Arabic is preferred. The final auto-apply filter is Arabic-only, but the provider search still spends quota/time on non-Arabic results.
+- The current OpenSubtitles query includes both the requested language and English even when Arabic is preferred. The selector/auto-apply filter remains target-language-specific, but the provider request still spends quota/time on English results.
 - SubtitleFileNormalizer first tries UTF-8 and then falls back to Windows-1252. It does not currently have explicit Arabic Windows-1256 or UTF-16 decoding. Some older Arabic subtitle files may therefore be corrupted even when the provider returned the correct file.
 - Search quality and timing quality are different problems. Correct title/episode identity does not guarantee the subtitle is synchronized to the exact release.
 
@@ -238,6 +262,15 @@ Rules for this pool:
 - A website and a mirror that carry the same file must be deduplicated by file hash/metadata when possible and must not be counted as two independent successful sources.
 - The third-party Bazarr/Bazarr+ catalogs are research references for discovering providers and language support; they are not subtitle providers themselves and their code is not automatically authorized for inclusion in RAVEN23.
 
+### Open-source repository provenance (research references only)
+
+- [LavX/bazarr-provider-catalog](https://github.com/LavX/bazarr-provider-catalog) — MIT-licensed provider catalog containing the SubF2M, Sub-Scene, and AnimeTosho adapter references and test fixtures. It is a code catalog, not a subtitle source. Review each provider independently; do not embed the entire catalog runtime.
+- [LavX/bazarr](https://github.com/LavX/bazarr) — GPL-3.0 Bazarr+ application that consumes the provider catalog. It is an implementation reference, not a subtitle provider. Do not vendor the full application into RAVEN23.
+- [morpheus65535/bazarr](https://github.com/morpheus65535/bazarr) — GPL-3.0 original Bazarr project; its Subliminal provider implementation is a reference for AnimeTosho. Preserve required license/copyright notices if any code is reused.
+- RAVEN23 remains GPL-3.0. The catalog's MIT license and the two Bazarr projects' GPL-3.0 terms are not interchangeable; record provenance and retain the applicable notices for any code copied or adapted.
+- Current disposition: SubF2M is not integrated and remains conditional on site terms/live Arabic benchmark; Sub-Scene is blocked unless an authorized API/access path exists (no challenge bypass); AnimeTosho is not integrated and remains an anime-only archive candidate. None of these repositories is added as a runtime dependency.
+
+
 ---
 
 ## 4. Proposed provider orchestration and fallback behavior
@@ -302,15 +335,15 @@ The final provider priority must be derived from measured results. A provider th
 - No player UI, settings, subtitle search order, or provider behavior changes in this stage.
 
 ### PHASE64.1 — Development credentials and production separation
-- Preserve the owner's current development workflow: `.env.example` is temporarily used as the active configuration source for phone-testing builds, and its current values must remain available during this testing period. Do not blank the file, remove it from the Flutter asset/build path, or migrate the values to the production server until the owner confirms that phone testing is complete.
-- The owner has confirmed that API keys have been obtained for ArabicSubs, SubSource, and OpenSubtitles. Do not ask the owner to register again; validate the existing keys in PHASE64.0.
-- The current CI flow copies `.env.example` to `.env`, and Flutter currently bundles `.env` as an application asset. Therefore, values used this way are readable from the public repository and extractable from the test APK. This is a documented, temporary development exception, not a secure secret-storage design.
-- OpenSubtitles and SubSource development keys may be used in the temporary phone-test configuration only after confirming their provider terms and accepting the known extraction exposure for this test build. Do not use these test keys as production credentials.
-- ArabicSubs explicitly says its Bearer API key must remain on the server and must not be placed in frontend code. Keep `ARABICSUBS_PROXY_URL` in the phone app configuration and route calls through a protected test proxy; never embed the ArabicSubs key in the APK, even during phone testing.
+- **Owner-authorized temporary exposure exception (2026-11-22):** keep the existing TMDB, OpenSubtitles, and SubSource test values populated in the tracked `.env.example` while the owner is testing RAVEN23 on Android. Do not blank, delete, rotate, replace, or migrate these existing values unless the owner explicitly confirms that phone testing is complete or gives a separate instruction.
+- The owner understands that `.env.example` is public and that GitHub Actions copies it to `.env`; `pubspec.yaml` bundles `.env` as an application asset. Therefore the configured values are publicly visible and are extractable from built APKs. This is an explicitly accepted, temporary development exception only, not a secure design.
+- Do not replace the existing keys with newly registered keys as an automatic remediation. Preserve the owner's current test configuration and do not repeat the previous blanking/removal action.
+- Do not use these exposed values for production traffic, production deployments, or release credentials. They must remain limited to the owner's development/testing period and provider-approved usage.
+- Do not print, echo, or copy actual key values into chat replies, phase documents, CI logs, build reports, test diagnostics, or screenshots. Logs may record variable names, masked identifiers, response status, and quota metadata only.
+- ArabicSubs explicitly requires its Bearer key to remain server-side. Keep only `ARABICSUBS_PROXY_URL` in the phone app and route calls through a protected test proxy; never put `ARABICSUBS_API_KEY` in `.env.example` or the APK.
 - Do not place primary account passwords, session cookies, or private account recovery data into the mobile app.
-- Use only provider credentials whose terms permit the chosen development/testing use. Track free quotas and revoke or replace temporary credentials if misuse or unexpected quota consumption is detected.
-- After phone testing is complete, move production credentials to the appropriate protected backend configuration and remove the temporary development values from public source/build artifacts, with explicit owner approval.
-- Prefer per-user keys stored in Android secure storage where the provider permits BYOK for the production design.
+- Respect provider terms, free quotas, rate limits, and key-sharing rules. Do not use key rotation or additional accounts to evade quotas.
+- **Owner-only closure condition:** only after the owner explicitly confirms phone testing is complete may the existing test values be migrated to protected backend configuration and removed from the public template/build asset. Record that closure before changing this exception.
 - Add per-provider enabled/disabled state and quota/error status without changing unrelated settings.
 
 ### PHASE64.2 — Documented provider adapters
@@ -454,12 +487,12 @@ The owner confirmed that an API key has already been obtained from each of the t
 
 Do not copy actual key values, usernames, passwords, cookies, or tokens into this phase file, chat replies, CI logs, build reports, or diagnostics. PHASE64.0 must validate each key without exposing it, record only masked identifiers/status, confirm the active free quota, and check the provider's rules for client-side versus server-side use. ArabicSubs explicitly requires its key to be kept on a server; that key must be used through a protected test proxy even during phone testing. SubSource and OpenSubtitles keys can be used in the owner's temporary development configuration only after their current terms and key-exposure implications are respected. The current RAVEN23 code is not yet aligned with all three documented API contracts (see Sections 2 and 6).
 
-### Additional owner-confirmed development configuration decision (2026-11-22)
-- The owner requires the current `.env.example` values to remain usable during development because the app will consume them in test builds installed on the owner's Android phone.
-- Do not migrate those values to the server or disable their test-build loading before the owner says phone testing is complete.
-- The owner has been informed that the current public repository and CI/APK asset flow make these values retrievable. This temporary arrangement must be treated as a development/testing exception only.
-- Provider-specific restrictions still apply: a credential documented as server-only must remain behind a protected test proxy, even while the app is being tested on a phone.
-- No credential values should be copied into phase documentation, CI logs, build reports, chat replies, or diagnostic output.
+### Owner-confirmed temporary public-key testing exception (2026-11-22)
+- The owner explicitly reaffirmed that the existing TMDB, OpenSubtitles, and SubSource values are intentionally exposed for the current phone-testing window and must remain in `.env.example`. This instruction supersedes earlier advice in this phase to blank or remove the existing OpenSubtitles and SubSource values.
+- Do not remove, blank, rotate, replace, or migrate these existing values without a later explicit owner instruction. The owner will direct the server migration after the Android testing period is complete.
+- This is not a production-security approval: the tracked file is public and the CI/APK asset path makes values extractable. Do not use the exposed values for production traffic or production releases.
+- Keep actual values out of phase documents, chat replies, CI logs, build reports, and diagnostics. The template may contain the values only as the owner's explicitly approved exception.
+- ArabicSubs remains a separate server-only credential: its Bearer key must remain behind the protected proxy and must never be added to the mobile `.env.example` or APK.
 
 ### Decisions still to settle before provider credentials or production ranking
 

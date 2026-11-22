@@ -532,7 +532,7 @@ void main() {
     );
 
     test(
-      'keeps different releases while deduplicating repeated release records',
+      'preserves same-release alternatives from different providers and removes only exact repeated provider records',
       () {
         ExternalSubtitle make(
           String id,
@@ -552,18 +552,37 @@ void main() {
           release: release,
           source: source,
         );
+        final first = make(
+          '1',
+          'https://one.test/1',
+          'Movie.Release.A',
+          'OpenSubtitles',
+        );
+        final second = make(
+          '2',
+          'https://two.test/2',
+          'Movie.Release.A',
+          'SubSource',
+        );
+        final third = make(
+          '3',
+          'https://three.test/3',
+          'Movie.Release.B',
+          'SubSource',
+        );
         final merged = ExternalSubtitleService.mergeSearchResultsForTesting(
-          <ExternalSubtitle>[
-            make('1', 'https://one.test/1', 'Movie.Release.A', 'OpenSubtitles'),
-            make('2', 'https://two.test/2', 'Movie.Release.A', 'SubSource'),
-            make('3', 'https://three.test/3', 'Movie.Release.B', 'SubSource'),
-          ],
+          <ExternalSubtitle>[first, second, third, second],
           'en',
         );
-        expect(merged, hasLength(2));
+
+        expect(merged, hasLength(3));
         expect(
-          merged.map((item) => item.release),
-          containsAll(<String>['Movie.Release.A', 'Movie.Release.B']),
+          merged.map((item) => item.id),
+          unorderedEquals(<String>['1', '2', '3']),
+        );
+        expect(
+          merged.where((item) => item.release == 'Movie.Release.A'),
+          hasLength(2),
         );
       },
     );
@@ -597,49 +616,55 @@ void main() {
       },
     );
 
-    test('prefers SubSource for Arabic before duplicate-release removal', () {
-      ExternalSubtitle make({
-        required String id,
-        required String source,
-        required String url,
-      }) => ExternalSubtitle(
-        id: id,
-        url: url,
-        flagUrl: '',
-        format: 'srt',
-        encoding: 'UTF-8',
-        display: 'Arabic',
-        language: 'ar',
-        media: 'movie',
-        isHearingImpaired: false,
-        release: 'Resident.Evil.2026.WEB',
-        source: source,
-      );
+    test(
+      'does not impose a provider-name priority on same-language alternatives',
+      () {
+        ExternalSubtitle make({
+          required String id,
+          required String source,
+          required String url,
+        }) => ExternalSubtitle(
+          id: id,
+          url: url,
+          flagUrl: '',
+          format: 'srt',
+          encoding: 'UTF-8',
+          display: 'Arabic',
+          language: 'ar',
+          media: 'movie',
+          isHearingImpaired: false,
+          release: 'Resident.Evil.2026.WEB',
+          source: source,
+        );
 
-      final results = ExternalSubtitleService.mergeSearchResultsForTesting(
-        <ExternalSubtitle>[
-          make(
-            id: 'opensubs',
-            source: 'OpenSubtitles',
-            url: 'https://opensubs.test/ar.srt',
-          ),
-          make(
-            id: 'scraper',
-            source: 'Scraper API',
-            url: 'https://scraper.test/ar.srt',
-          ),
-          make(
-            id: 'subsource',
-            source: 'SubSource',
-            url: 'https://subsource.test/ar.zip',
-          ),
-        ],
-        'ar',
-      );
+        final results = ExternalSubtitleService.mergeSearchResultsForTesting(
+          <ExternalSubtitle>[
+            make(
+              id: 'opensubs',
+              source: 'OpenSubtitles',
+              url: 'https://opensubs.test/ar.srt',
+            ),
+            make(
+              id: 'scraper',
+              source: 'Scraper API',
+              url: 'https://scraper.test/ar.srt',
+            ),
+            make(
+              id: 'subsource',
+              source: 'SubSource',
+              url: 'https://subsource.test/ar.zip',
+            ),
+          ],
+          'ar',
+        );
 
-      expect(results, hasLength(1));
-      expect(results.single.source, 'SubSource');
-    });
+        expect(results, hasLength(3));
+        expect(
+          results.map((item) => item.source),
+          unorderedEquals(<String>['OpenSubtitles', 'Scraper API', 'SubSource']),
+        );
+      },
+    );
 
     test('episode matching does not confuse E02 with E020', () {
       final matcher = ExternalSubtitleService.episodePatternForTesting(1, 2);
@@ -648,7 +673,7 @@ void main() {
       expect(matcher.hasMatch('Example.S01E020.1080p'), isFalse);
     });
 
-    test('keeps SubSource when Arabic providers return the same URL', () {
+    test('preserves distinct provider provenance when providers share a URL', () {
       ExternalSubtitle make(String source) => ExternalSubtitle(
         id: source,
         url: 'https://subtitles.test/resident-evil-ar.zip',
@@ -668,8 +693,12 @@ void main() {
         'ar',
       );
 
-      expect(results, hasLength(1));
-      expect(results.single.source, 'SubSource');
+      expect(results, hasLength(2));
+      expect(
+        results.map((item) => item.source),
+        unorderedEquals(<String>['OpenSubtitles', 'SubSource']),
+      );
     });
+
   });
 }
