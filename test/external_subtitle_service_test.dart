@@ -187,7 +187,7 @@ void main() {
           if (request.url.host == 'api.subsource.net' &&
               request.url.path == '/api/v1/movies/search') {
             expect(request.method, 'GET');
-            expect(request.headers['x-api-key'], 'test-subsource-key');
+            expect(_headerValue(request, 'X-API-Key'), 'test-subsource-key');
             expect(request.url.queryParameters['searchType'], 'imdb');
             expect(request.url.queryParameters['imdb'], 'tt1234567');
             expect(request.url.queryParameters['type'], 'series');
@@ -210,7 +210,7 @@ void main() {
           }
           if (request.url.host == 'api.subsource.net' &&
               request.url.path == '/api/v1/subtitles') {
-            expect(request.headers['x-api-key'], 'test-subsource-key');
+            expect(_headerValue(request, 'X-API-Key'), 'test-subsource-key');
             expect(request.url.queryParameters['movieId'], '9901');
             if (request.url.queryParameters['language'] == 'english') {
               return http.Response(
@@ -311,7 +311,7 @@ void main() {
       'downloads SubSource ZIP directly from the documented download endpoint',
       () async {
         const srt =
-            '1\\n00:00:01,000 --> 00:00:02,000\\nDocumented API subtitle\\n';
+            '1\n00:00:01,000 --> 00:00:02,000\nDocumented API subtitle\n';
         final archive = Archive()
           ..addFile(
             ArchiveFile(
@@ -325,7 +325,7 @@ void main() {
         final client = MockClient((request) async {
           requests.add(request);
           expect(request.method, 'GET');
-          expect(request.headers['x-api-key'], 'test-subsource-key');
+          expect(_headerValue(request, 'X-API-Key'), 'test-subsource-key');
           if (request.url.path == '/api/v1/subtitles/20/download') {
             return http.Response.bytes(zipBytes, 200);
           }
