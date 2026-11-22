@@ -1,6 +1,6 @@
 # PHASE64 — Arabic Subtitle Providers, Matching Quality, Synchronization & Fallback
 
-**Status:** PROPOSAL ONLY — RESEARCH AND PLAN. NOT AUTHORIZED FOR IMPLEMENTATION.  
+**Status:** APPROVED FOR IMPLEMENTATION — IN PROGRESS (owner approval: 2026-11-22).  
 **Project:** RAVEN23  
 **Baseline inspected:** main commit 6d12023e446db3d444716c3b407572a89cf545be  
 **Baseline build:** GitHub Actions #249 passed (Flutter tests, Android tests, ARM64 release APK, ABI/size audit).  
@@ -10,7 +10,7 @@
 
 ## 0. Approval gate
 
-This file is a planning document only. No provider integration, UI change, settings change, key configuration, subtitle algorithm, or playback change may begin until the owner explicitly approves this plan.
+The owner explicitly approved implementation on 2026-11-22. Work may proceed only in the ordered, scoped phases below. Approval authorizes implementation; it does not mark any phase complete, does not waive provider terms or credential handling, and does not authorize changes to protected features.
 
 The separate rule in RAVEN23_PROTECTED_FEATURES_NO_TOUCH_WITHOUT_EXPLICIT_REQUEST.md remains active. In particular, the existing offline player, episode cards, season switching, video downloads, DCIM video export, source ordering, quality behavior, and other accepted features are outside this phase.
 
@@ -31,6 +31,19 @@ Until this gate passes, no subtitle candidate may be uploaded as a globally reco
 The known issue that copies a selected subtitle sidecar beside the video under DCIM/RAVEN23/<title>/SUBTITLE is deferred. This phase does not reopen or alter it.
 
 ---
+
+## Implementation progress log
+
+### 2026-11-22 — Implementation authorized and first PHASE64.3 reliability fix
+
+- Owner approval received to begin implementation. This changes the document from proposal-only to active work; it does not mark PHASE64.0–64.6 as passed.
+- Baseline at start: `main` commit `b61f4f4916319c50b384400bf362590c81b326f1`.
+- Commit `8776ac4a5605fa301395aff150ae56d72f258372` added `SubtitleProviderOrchestrator.collectPartialResults` and replaced the all-or-nothing 48-second result timeout. Completed provider results are now retained if another provider stalls; late results are ignored after the deadline.
+- Added four focused unit tests for aggregation, deadline/partial-result behavior, provider exception isolation, and immutable snapshots. The repository's routine test list did not include subtitle tests at the time of this commit; the next implementation commit adds the relevant subtitle regression files to the Android CI test gate before claiming those new tests ran.
+- GitHub Actions run #265 for commit `8776ac4`: Flutter static analysis and the pre-existing focused test batch completed successfully. The Android Gradle wrapper/build steps were still in progress at the last check; this run is not recorded as a complete build pass.
+- Baseline configuration audit found `OPENSUBTITLES_API_KEY` and `ARABICSUBS_PROXY_URL` empty in the tracked `.env.example`, and no `SUBSOURCE_API_KEY` entry. The owner already confirmed obtaining the three keys; no key values are recorded here. Live key validation and provider calls remain blocked until they are made available through the approved private development configuration and, for ArabicSubs, a protected proxy.
+- Current code still uses the legacy undocumented SubSource route. The documented adapter migration is not complete. PHASE64.0–64.2 therefore remain open; the timeout fix is only the first implementation slice of PHASE64.3.
+- No player UI, language preference, provider ordering, video stream behavior, offline player, download/export flow, or other protected feature was changed. PHASE64.7 remains blocked until selector acceptance (PHASE64.6 PASS) and Laravel shared-cache deployment.
 
 ## 1. Goal and non-goals
 

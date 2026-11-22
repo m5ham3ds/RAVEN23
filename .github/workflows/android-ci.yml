@@ -301,9 +301,9 @@ jobs:
           printf '\nCommand exit code: %s\n' "$command_status" | tee -a build-artifacts/flutter-analyze.log
           exit "$command_status"
 
-      # Routine APK CI runs focused authentication/session, Manga/Mihon work-detail,
-      # source-binding, offline-progress, quality-catalog/scanner, chapter-reader crop,
-      # Home/Anime separation and mobile-navigation regressions. Other deep integrations remain manual.
+      # Routine APK CI runs focused authentication/session, subtitle provider orchestration,
+      # subtitle normalization/options/local-cache, Manga/Mihon work-detail, source-binding,
+      # offline-progress, quality-catalog/scanner, reader, Home/Anime and navigation regressions.
       # Run only after dependencies, canonical formatting and full-project analysis.
       - name: Run focused auth, Manga, Home, Anime, Mihon, navigation, reader and playback Flutter pre-build tests
         id: flutter_tests
@@ -342,6 +342,12 @@ jobs:
             test/mobile/mobile_nav_bar_test.dart
             test/pill_button_test.dart
             test/playback_action_test.dart
+            test/external_subtitle_service_test.dart
+            test/subtitle_file_normalizer_test.dart
+            test/subtitle_options_test.dart
+            test/subtitle_playback_store_test.dart
+            test/subtitle_provider_orchestrator_test.dart
+            test/subtitle_provider_tag_test.dart
             test/offline_download_test.dart
             test/offline_download_ids_test.dart
             test/playback_stream_cache_test.dart
