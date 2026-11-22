@@ -98,6 +98,29 @@ String languageDisplayName(String? label) {
   return '${tr(language.translationKey)}$suffix';
 }
 
+/// Resolve a player subtitle label to its ISO 639-1 code. Provider names,
+/// sequence markers and hearing-impaired suffixes are ignored so a tap on
+/// "English #2 · OpenSubtitles" targets English rather than changing the
+/// configured default language.
+String? languageCodeForLabel(String? label) {
+  var base = label?.trim() ?? '';
+  if (base.isEmpty) return null;
+  final providerSeparator = base.lastIndexOf(' · ');
+  if (providerSeparator >= 0) {
+    base = base.substring(0, providerSeparator).trim();
+  }
+  final hearingImpaired = _hiMarker.firstMatch(base);
+  if (hearingImpaired != null) {
+    base = base.substring(0, hearingImpaired.start).trim();
+  }
+  final numbered = _numberMarker.firstMatch(base);
+  if (numbered != null) {
+    base = base.substring(0, numbered.start).trim();
+  }
+  if (base.isEmpty) return null;
+  return _findLanguage(base)?.code;
+}
+
 LanguageEntry? _findLanguage(String base) {
   final lowered = base.toLowerCase();
   final candidates = <String>[
