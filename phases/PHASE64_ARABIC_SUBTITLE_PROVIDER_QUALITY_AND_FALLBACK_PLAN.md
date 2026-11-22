@@ -45,6 +45,18 @@ The known issue that copies a selected subtitle sidecar beside the video under D
 - Current code still uses the legacy undocumented SubSource route. The documented adapter migration is not complete. PHASE64.0–64.2 therefore remain open; the timeout fix is only the first implementation slice of PHASE64.3.
 - No player UI, language preference, provider ordering, video stream behavior, offline player, download/export flow, or other protected feature was changed. PHASE64.7 remains blocked until selector acceptance (PHASE64.6 PASS) and Laravel shared-cache deployment.
 
+### 2026-11-22 — PHASE64.4 language-aware selector wiring (implementation started)
+
+- Added a deterministic, language-neutral candidate selector. It filters to the explicitly requested language, rejects candidates explicitly marked as wrong media identity, and orders remaining results by available release signals, exact-identity evidence, trusted-uploader evidence, ratings, votes, downloads, and upload date. It does not use fixed provider-name priority or unbenchmarked numeric weights.
+- The existing Arabic default search now uses the same selector. A deliberate player switch to another provider-supplied subtitle language runs the selector for that language only; it does not change the app's configured default language.
+- All existing subtitle rows remain available. The selector's target-language filter is applied only to the selection operation, not to the displayed subtitle catalogue.
+- The active stream exposes a quality label, not a verified full release filename or timing fingerprint. Matching those available quality tokens is ordering evidence only; it is not sufficient to claim high confidence or to close PHASE64.4–64.6.
+- Shared publication is still blocked. The owner has additionally specified that any future shared upload must accept only Arabic (ar) and English (en); all other languages remain searchable, visible, selectable, and device-local, but are not published to the server.
+- .env.example already declares OPENSUBTITLES_API_KEY, SUBSOURCE_API_KEY, and ARABICSUBS_PROXY_URL. No values were copied, inserted, or exposed by this implementation. ArabicSubs credentials remain server-only.
+- Validation is pending until the next CI run. This progress entry does not mark PHASE64.4 complete, does not claim live-provider or real-device acceptance, and does not unlock PHASE64.7.
+
+**Protected-scope impact:** only subtitle language resolution, external subtitle candidate selection, its focused tests, the Phase64 CI test list, and Phase64 documentation are touched. No video URL/source selection, PRIMARY/BACKUP order, quality policy, offline player/download/export path, UI layout, backend contract, or deferred DCIM subtitle-sidecar behavior is changed.
+
 ## 1. Goal and non-goals
 
 ### Goal
