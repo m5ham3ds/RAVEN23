@@ -343,6 +343,8 @@ jobs:
             test/pill_button_test.dart
             test/playback_action_test.dart
             test/external_subtitle_service_test.dart
+            test/subtitle_selection_engine_test.dart
+            test/language_names_test.dart
             test/subtitle_file_normalizer_test.dart
             test/subtitle_options_test.dart
             test/subtitle_playback_store_test.dart
