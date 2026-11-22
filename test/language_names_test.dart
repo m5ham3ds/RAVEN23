@@ -66,4 +66,16 @@ void main() {
       }
     });
   });
+
+  group('languageCodeForLabel', () {
+    test('resolves language names, ISO aliases and provider suffixes', () {
+      expect(languageCodeForLabel('English #2 · OpenSubtitles'), 'en');
+      expect(languageCodeForLabel('ara (HI)'), 'ar');
+      expect(languageCodeForLabel('fr-FR'), 'fr');
+    });
+
+    test('does not invent a language for commentary tracks', () {
+      expect(languageCodeForLabel("Director's commentary"), isNull);
+    });
+  });
 }
