@@ -206,6 +206,7 @@ class ExternalSubtitleService {
             isHearingImpaired: subtitle.isHearingImpaired,
             release: subtitle.release,
             source: subtitle.source,
+            isExactIdentity: true,
           ),
         )
         .toList(growable: false);
@@ -313,6 +314,7 @@ class ExternalSubtitleService {
             isTrustedUploader: _asBool(attributes['from_trusted']),
             foreignParts: _asBool(attributes['foreign_parts_only']),
             createdAt: attributes['upload_date']?.toString(),
+            isExactIdentity: true,
           ),
         );
       }
@@ -414,6 +416,8 @@ class ExternalSubtitleService {
                 row['hearingImpaired'] == true || row['hi'] == true,
             release: release,
             source: 'ArabicSubs',
+            translationType: row['translationType']?.toString(),
+            isExactIdentity: true,
           );
         })
         .where((subtitle) => subtitle.id != 'arabicsubs_')
@@ -532,6 +536,7 @@ class ExternalSubtitleService {
                 uploaderName: contributorNames,
                 foreignParts: _asBool(row['foreignParts']),
                 createdAt: row['createdAt']?.toString(),
+                isExactIdentity: true,
               ),
             );
           }
