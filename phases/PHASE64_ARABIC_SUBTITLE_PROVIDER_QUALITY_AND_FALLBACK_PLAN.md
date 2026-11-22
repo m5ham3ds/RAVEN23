@@ -276,8 +276,8 @@ The final provider priority must be derived from measured results. A provider th
 - SubF2M experimental adapter, only if the live Arabic benchmark and site access rules permit automated retrieval.
 - Sub-Scene experimental candidate, only if the provider supplies an approved API/access path; never build CAPTCHA/anti-bot bypass.
 - AnimeTosho anime-only adapter, after confirming Arabic attachment availability and AniDB episode mapping.
-- SubtitleCenter, only if its currently paused API returns to service and a live Arabic test passes.
-- SubSource documented API, only after verifying Arabic/episode coverage.
+- Do not implement SubtitleCenter: it remains explicitly excluded by the owner decision recorded in Section 3.
+- SubSource documented API using the owner's registered account/API key, replacing the existing undocumented `/v1` website flow; verify the documented endpoint/authentication and exact Arabic season/episode coverage.
 - Preserve RAVEN23 Scraper API as the last compatibility source.
 
 ### PHASE64.3 — Fast independent search and robust fallback
@@ -342,6 +342,14 @@ Acceptance:
 - Do not use AI translation, machine-translation APIs, or generated replacement subtitles in this phase.
 - Use free sources only; respect each provider's published quotas and key-sharing rules.
 - Keep the currently deferred DCIM subtitle-sidecar export issue outside this work.
+
+### Owner-confirmed provider account registrations (2026-11-22)
+The owner confirmed that accounts have been registered for all three providers below:
+- ArabicSubs — https://arabicsubs.com
+- SubSource — https://subsource.net
+- OpenSubtitles — https://www.opensubtitles.com
+
+This records account registration only. Do not copy API keys, usernames, passwords, cookies, or tokens into this phase file. The exact credential acquired for each account (API key versus account login only) must be mapped during PHASE64.0 before implementation. The published integrations have different authentication models: ArabicSubs documents Bearer API-key access and requires the key to remain server-side; SubSource's documented API uses `X-API-Key`; OpenSubtitles provides its current API v1 and an application API-key onboarding flow. The current RAVEN23 code is not yet aligned with all three documented contracts (see Sections 2 and 6).
 
 ### Additional owner-confirmed development configuration decision (2026-11-22)
 - The owner requires the current `.env.example` values to remain usable during development because the app will consume them in test builds installed on the owner's Android phone.
