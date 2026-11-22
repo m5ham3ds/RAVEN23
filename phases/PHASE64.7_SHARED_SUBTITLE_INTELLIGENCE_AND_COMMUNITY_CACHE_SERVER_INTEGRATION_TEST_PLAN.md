@@ -1,7 +1,7 @@
 # PHASE64.7 — Shared Subtitle Intelligence & Community Cache
 ## Post-Laravel Integration Test Plan
 
-**Status:** TEST PLAN ONLY — BLOCKED until the Laravel backend is connected to RAVEN23 and the required shared-subtitle API contract is deployed.  
+**Status:** TEST PLAN ONLY — BLOCKED until BOTH prerequisites are satisfied: (1) PHASE64.0–64.6 subtitle selection/quality engine has passed its benchmark and been accepted; and (2) the Laravel backend is connected to RAVEN23 with the required shared-subtitle API contract deployed.  
 **Project:** RAVEN23  
 **Created:** 2026-11-22  
 **Related phase:** PHASE64 — Arabic Subtitle Providers, Matching Quality, Synchronization & Fallback  
@@ -23,7 +23,22 @@ This document defines how to test the owner's proposed cross-user subtitle workf
 
 **Primary success condition:** after a valid shared subtitle has been published for an exact media/release identity, later users receive the shared file without generating new requests to the external subtitle providers.
 
-This phase is about verification of the shared-cache behavior, not re-running the existing provider integration work.
+### Mandatory prerequisite — selector must already be accepted
+
+PHASE64.7 is downstream of PHASE64.0–64.6. It must not begin merely because Laravel is connected.
+
+Before any shared-cache implementation or test:
+- PHASE64.0–64.2 must have established and tested the eligible provider adapters and credentials.
+- PHASE64.3 must have reliable independent search and fallback behavior.
+- PHASE64.4 must have one deterministic, evidence-based subtitle selector with hard rejection gates, confidence classes, and a single recommended result plus alternatives.
+- PHASE64.5 must have passed Arabic decoding, RTL, and synchronization checks.
+- PHASE64.6 must have passed the movie/series/anime benchmark and real-device playback acceptance. The accepted selector version and confidence thresholds must be recorded in the Phase64.6 report.
+
+If any prerequisite fails or the accepted selector version changes later, pause publication of new globally recommended results until the relevant selector acceptance tests pass again.
+
+The shared cache must store and deliver the output of the accepted selector. It must not independently rank provider results, assume that the first downloadable file is best, or elevate a merely downloaded Candidate to Verified. A cache hit is eligible as the recommended result only if its status and release-match evidence satisfy the same accepted selector rules.
+
+This phase is about verification of the shared-cache behavior, not re-running the provider integration or selector-development work.
 
 ---
 
@@ -386,20 +401,22 @@ Do not start this phase until every prerequisite below is met.
 - A compatible broad match may be offered as a lower-confidence alternative, but cannot silently replace an exact verified track.
 - A remote HLS/DASH URL is never treated as a trustworthy file hash.
 
-### T08 — Recommended track and collapsed alternatives
+### T08 — Preserve the already-accepted selector result and collapsed alternatives
 
 **Procedure**
-1. Seed at least four Arabic subtitle records for one media/release identity, including one verified exact match and several alternatives.
-2. Open the subtitle menu with Arabic as the preferred language.
-3. Open the alternatives section.
-4. Change the user's primary subtitle language and repeat.
+1. Import the accepted PHASE64.6 selector benchmark fixtures and selector version into the staging test environment.
+2. Seed at least four Arabic subtitle records for one media/release identity, including the selector's verified exact winner and several alternatives.
+3. Open the subtitle menu with Arabic as the preferred language.
+4. Open the alternatives section.
+5. Change the user's primary subtitle language and repeat.
 
 **Expected**
-- One best eligible Arabic track is shown as the recommendation.
+- Laravel/client presentation uses the exact recommended candidate produced by the accepted selector version; PHASE64.7 does not independently recalculate or override the winner.
 - Same-language alternatives are grouped behind an explicit expandable control.
 - Provider names/release labels remain available when the user opens alternatives.
 - The configured primary language is respected; no second competing language preference is introduced.
 - A manual user selection remains selected and is not silently overwritten by a later global cache refresh.
+- A Candidate or low-confidence file cannot be promoted to the recommended Verified result solely because it was uploaded or popular.
 
 ### T09 — Quality feedback and promotion/demotion
 
@@ -645,7 +662,8 @@ Attach or link the following evidence in the phase completion report:
 9. Phone and Android TV playback smoke results.
 10. Flutter, Laravel, and Android ARM64 CI links.
 11. Takedown/withdrawal test evidence.
-12. A final statement listing any deferred tests or known limitations.
+12. The PHASE64.6 selector acceptance report, accepted algorithm/version, confidence thresholds, and benchmark corpus reference.
+13. A final statement listing any deferred tests or known limitations.
 
 Never include actual API keys, passwords, bearer tokens, signed URLs, or private user information in this evidence package.
 
@@ -653,11 +671,15 @@ Never include actual API keys, passwords, bearer tokens, signed URLs, or private
 
 ## 11. Current execution status
 
-**Not executable yet.** The owner has stated that RAVEN23 is not yet connected to the Laravel server. The repository contains Flutter Laravel-client foundations and a separate RAVEN23 Scraper API subtitle contract, but this shared Laravel subtitle cache is not currently established in the inspected client contract.
+**Not executable yet.** Two independent prerequisites remain:
+1. The owner has stated that RAVEN23 is not yet connected to the Laravel server.
+2. PHASE64.0–64.6 has not yet completed the selector-development, quality benchmark, and real-device acceptance gate.
 
-No shared-cache endpoint, table, object-storage bucket, discovery lock, upload flow, or second-user delivery test is claimed to exist or to have passed.
+The repository contains Flutter Laravel-client foundations and a separate RAVEN23 Scraper API subtitle contract, but this shared Laravel subtitle cache is not currently established in the inspected client contract. The approved best-subtitle selector is also not yet implemented/accepted.
 
-This file is a forward-looking test plan. Begin execution only after the owner confirms that the Laravel backend has been connected and deployed to staging. Do not treat this document's proposed endpoint names as existing APIs.
+No shared-cache endpoint, table, object-storage bucket, discovery lock, upload flow, accepted selector version, or second-user delivery test is claimed to exist or to have passed.
+
+This file is a forward-looking test plan. Begin execution only after BOTH the PHASE64.6 selector gate passes and the owner confirms that the Laravel backend has been connected and deployed to staging. Do not treat this document's proposed endpoint names as existing APIs.
 
 ## 12. Inspected RAVEN23 files
 
