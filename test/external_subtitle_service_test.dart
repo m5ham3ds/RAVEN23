@@ -92,6 +92,18 @@ void main() {
                       'language': 'ara',
                       'hearing_impaired': false,
                       'release': 'Example.Arabic.Release',
+                      'download_count': 321,
+                      'new_download_count': 12,
+                      'ratings': 8.5,
+                      'votes': 4,
+                      'fps': 23.976,
+                      'from_trusted': true,
+                      'foreign_parts_only': false,
+                      'upload_date': '2026-10-01T12:00:00Z',
+                      'uploader': {
+                        'name': 'Trusted Contributor',
+                        'rank': 'trusted',
+                      },
                       'files': [
                         {'file_id': 4567, 'file_name': 'arabic.srt'},
                       ],
@@ -156,6 +168,15 @@ void main() {
         expect(results, hasLength(1));
         expect(results.single.language, 'ar');
         expect(results.single.url, 'opensubtitles-v1://file/4567');
+        expect(results.single.downloadCount, 321);
+        expect(results.single.newDownloadCount, 12);
+        expect(results.single.providerRating, 8.5);
+        expect(results.single.providerVotes, 4);
+        expect(results.single.frameRate, 23.976);
+        expect(results.single.uploaderName, 'Trusted Contributor');
+        expect(results.single.uploaderRank, 'trusted');
+        expect(results.single.isTrustedUploader, isTrue);
+        expect(results.single.createdAt, '2026-10-01T12:00:00Z');
 
         final vtt = await service.downloadAndNormalizeForPlayback(
           results.single,
@@ -223,6 +244,7 @@ void main() {
                       'productionType': 'retail',
                       'releaseType': 'web',
                       'downloads': 17,
+                      'framerate': 23.976,
                       'rating': {'good': 5, 'bad': 1, 'total': 6},
                       'contributors': [
                         {'id': 7, 'displayname': 'Example Translator'},
@@ -288,6 +310,8 @@ void main() {
         expect(subtitle.ratingGood, 5);
         expect(subtitle.ratingBad, 1);
         expect(subtitle.uploaderName, 'Example Translator');
+        expect(subtitle.providerVotes, 6);
+        expect(subtitle.frameRate, 23.976);
         expect(
           requests.where(
             (request) => request.url.path == '/api/v1/movies/search',

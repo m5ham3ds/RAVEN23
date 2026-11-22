@@ -24,9 +24,15 @@ class ExternalSubtitle {
   final String? productionType;
   final String? releaseType;
   final int? downloadCount;
+  final int? newDownloadCount;
   final int? ratingGood;
   final int? ratingBad;
+  final double? providerRating;
+  final int? providerVotes;
+  final double? frameRate;
   final String? uploaderName;
+  final String? uploaderRank;
+  final bool? isTrustedUploader;
   final bool? foreignParts;
   final String? createdAt;
 
@@ -45,9 +51,15 @@ class ExternalSubtitle {
     this.productionType,
     this.releaseType,
     this.downloadCount,
+    this.newDownloadCount,
     this.ratingGood,
     this.ratingBad,
+    this.providerRating,
+    this.providerVotes,
+    this.frameRate,
     this.uploaderName,
+    this.uploaderRank,
+    this.isTrustedUploader,
     this.foreignParts,
     this.createdAt,
   });
@@ -70,9 +82,18 @@ class ExternalSubtitle {
       productionType: json['productionType']?.toString(),
       releaseType: json['releaseType']?.toString(),
       downloadCount: int.tryParse(json['downloadCount']?.toString() ?? ''),
+      newDownloadCount:
+          int.tryParse(json['newDownloadCount']?.toString() ?? ''),
       ratingGood: int.tryParse(json['ratingGood']?.toString() ?? ''),
       ratingBad: int.tryParse(json['ratingBad']?.toString() ?? ''),
+      providerRating:
+          double.tryParse(json['providerRating']?.toString() ?? ''),
+      providerVotes: int.tryParse(json['providerVotes']?.toString() ?? ''),
+      frameRate: double.tryParse(json['frameRate']?.toString() ?? ''),
       uploaderName: json['uploaderName']?.toString(),
+      uploaderRank: json['uploaderRank']?.toString(),
+      isTrustedUploader: json['isTrustedUploader'] == true ||
+          json['isTrustedUploader']?.toString() == '1',
       foreignParts: json['foreignParts'] == true ||
           json['foreignParts']?.toString() == '1',
       createdAt: json['createdAt']?.toString(),

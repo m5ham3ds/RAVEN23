@@ -266,6 +266,9 @@ class ExternalSubtitleService {
     for (final item in (decoded['data'] as List).whereType<Map>()) {
       final attributes = item['attributes'];
       if (attributes is! Map) continue;
+      final uploader = attributes['uploader'] is Map
+          ? Map<String, dynamic>.from(attributes['uploader'] as Map)
+          : const <String, dynamic>{};
       final language = _normaliseLanguageCode(
         attributes['language']?.toString(),
       );
@@ -300,6 +303,16 @@ class ExternalSubtitleService {
             isHearingImpaired: attributes['hearing_impaired'] == true,
             release: attributes['release']?.toString() ?? fileName,
             source: 'OpenSubtitles',
+            downloadCount: _asInt(attributes['download_count']),
+            newDownloadCount: _asInt(attributes['new_download_count']),
+            providerRating: _asDouble(attributes['ratings']),
+            providerVotes: _asInt(attributes['votes']),
+            frameRate: _asDouble(attributes['fps']),
+            uploaderName: uploader['name']?.toString(),
+            uploaderRank: uploader['rank']?.toString(),
+            isTrustedUploader: _asBool(attributes['from_trusted']),
+            foreignParts: _asBool(attributes['foreign_parts_only']),
+            createdAt: attributes['upload_date']?.toString(),
           ),
         );
       }
@@ -518,6 +531,8 @@ class ExternalSubtitleService {
                 downloadCount: _asInt(row['downloads']),
                 ratingGood: _asInt(rating['good']),
                 ratingBad: _asInt(rating['bad']),
+                providerVotes: _asInt(rating['total']),
+                frameRate: _asDouble(row['framerate']),
                 uploaderName: contributorNames,
                 foreignParts: _asBool(row['foreignParts']),
                 createdAt: row['createdAt']?.toString(),
@@ -588,6 +603,8 @@ class ExternalSubtitleService {
       value == true || value?.toString() == '1' || value?.toString() == 'true';
 
   static int? _asInt(dynamic value) => int.tryParse(value?.toString() ?? '');
+  static double? _asDouble(dynamic value) =>
+      double.tryParse(value?.toString() ?? '');
 
   static const Map<String, String> _subSourceLanguageNames = <String, String>{
     'ar': 'arabic',
