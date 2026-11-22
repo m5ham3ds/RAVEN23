@@ -14,6 +14,20 @@ This file is a planning document only. No provider integration, UI change, setti
 
 The separate rule in RAVEN23_PROTECTED_FEATURES_NO_TOUCH_WITHOUT_EXPLICIT_REQUEST.md remains active. In particular, the existing offline player, episode cards, season switching, video downloads, DCIM video export, source ordering, quality behavior, and other accepted features are outside this phase.
 
+### Mandatory execution order and dependency gate
+
+The subtitle-selection engine must be completed and accepted **before** any Shared Subtitle Intelligence / Community Cache implementation or integration test begins.
+
+Required order:
+1. PHASE64.0–64.2: establish the eligible sources, validate the owner's existing credentials, and implement only permitted/documented adapters.
+2. PHASE64.3: make discovery and candidate fallback reliable without delaying video startup.
+3. PHASE64.4: implement the candidate evaluation and recommended-subtitle selection algorithm.
+4. PHASE64.5: validate Arabic decoding, display, and synchronization behavior.
+5. PHASE64.6: run the selector acceptance benchmark on movies, ordinary series, and anime, including real Android playback. Record the approved selector version and its scorecard.
+6. Only after PHASE64.6 is explicitly marked PASS may PHASE64.7 Shared Subtitle Intelligence & Community Cache begin. The shared cache must store and distribute the winner produced by the approved selector; it must not invent a separate ranking algorithm or turn an unverified candidate into a verified result.
+
+Until this gate passes, no subtitle candidate may be uploaded as a globally recommended/shared result, and PHASE64.7 remains blocked even if the Laravel server becomes available.
+
 The known issue that copies a selected subtitle sidecar beside the video under DCIM/RAVEN23/<title>/SUBTITLE is deferred. This phase does not reopen or alter it.
 
 ---
@@ -290,11 +304,64 @@ The final provider priority must be derived from measured results. A provider th
 - Remove the global five-candidate starvation problem.
 - Continue automatically to the next provider/candidate on a real failure while preserving the video session.
 
-### PHASE64.4 — Release-aware Arabic candidate ranking
-- Add exact episode and release matching.
-- Add candidate confidence, translation-type, download-count, and file-validation scoring.
-- Preserve a working in-stream Arabic track as a candidate, but do not let its existence silently disable the independent Arabic search when the track is poor or fails validation.
-- Do not replace a working subtitle with a lower-confidence candidate.
+### PHASE64.4 — Best-subtitle selection engine (mandatory before shared cache)
+This phase defines the single authoritative selector used by both the standalone app and the later shared cache. It must be implemented and validated before any shared subtitle publication is enabled.
+
+#### A. Hard rejection gates (not score penalties)
+Reject a candidate from automatic selection when any of the following is proven:
+- wrong language for the user's selected primary language;
+- wrong movie/title identity;
+- wrong season or episode, trailer, season pack, or multi-episode range for a single-episode request;
+- invalid, empty, corrupt, unsupported, or cue-less subtitle payload;
+- file content/metadata contradicts its advertised language or format;
+- known wrong release/timing identity that makes it unsafe for this video.
+
+A candidate that fails a hard gate must never be rescued by high download count, provider reputation, or a user popularity score.
+
+#### B. Candidate evidence and ranking
+For every remaining candidate, compute and retain an explainable evidence record using:
+- exact media identity and exact season/episode;
+- exact release identity where the video provider exposes reliable release information;
+- normalized release tags (release group, WEB-DL/WEBRip/BluRay, resolution, codec and other stable tokens);
+- trustworthy video/subtitle hash equality only when a real video file or provider hash is available;
+- source metadata such as translator/uploader attribution, translation type, hearing-impaired flag, download count and provider quality signals;
+- actual downloaded-file integrity, encoding/decoding success and cue structure;
+- synchronization evidence, including real playback verification and user feedback scoped to this title/episode/release.
+
+Provider name or fixed provider priority is never sufficient to make a candidate the winner.
+
+#### C. Confidence classes and automatic-choice policy
+- **High confidence:** exact media/episode match, strong release match, valid Arabic payload, and no known timing/content defect. Eligible for automatic recommendation.
+- **Medium confidence:** exact media/episode and valid file, but release or synchronization evidence is incomplete. Show as an alternative; do not silently replace a working verified subtitle.
+- **Low confidence:** weak release evidence, conflicting metadata, or unresolved synchronization concern. Never auto-apply as the preferred winner; show only when useful and label as unverified.
+- **Rejected:** fails a hard gate or receives sufficient confirmed evidence of a serious defect.
+
+Do not invent numeric weights or confidence cutoffs before measuring the fixed benchmark. Calibrate the weights/thresholds using PHASE64.6 evidence, version the selector rules, and keep the same selector version across phone and TV clients.
+
+#### D. Single recommended row and alternatives
+- Present one recommended candidate for the configured primary language.
+- Group the other candidates for that same language behind an expandable alternatives section.
+- Preserve source/release/HI details for each alternative.
+- Respect a user's explicit manual choice; background search, cache updates, or community feedback must not silently switch it.
+- Never merge distinct releases or timing variants merely because their language is the same.
+
+#### E. Fallback and no-result behavior
+- Try eligible candidates in explainable rank order, with a fair per-provider budget rather than a global five-result starvation limit.
+- On download, parse, decode, or application failure, move to the next eligible candidate.
+- Preserve an already working verified subtitle when no stronger high-confidence candidate exists.
+- If every candidate is weak or rejected, report no verified preferred subtitle rather than presenting a false "perfect" result.
+
+#### Required tests for this phase
+- exact movie/episode identity and season/episode boundary tests;
+- exact-release versus different-release ordering;
+- duplicate-content versus distinct-release retention;
+- wrong-language and malformed-payload rejection;
+- human/machine translation metadata handling;
+- score determinism and selector-version regression;
+- fallback after download/normalization/player-apply failure;
+- low-confidence candidate never replacing a working verified subtitle;
+- single recommended row with expandable alternatives;
+- manual selection persistence during later refreshes.
 
 ### PHASE64.5 — Arabic encoding, RTL, and synchronization verification
 - Add Arabic-specific decoding tests for UTF-8, UTF-16, and verified Windows-1256 samples.
@@ -302,11 +369,14 @@ The final provider priority must be derived from measured results. A provider th
 - Verify subtitle delay controls against the actual BetterPlayer fork before implementing a user-facing offset control.
 - Keep all changes scoped to subtitle behavior.
 
-### PHASE64.6 — Acceptance, telemetry, and release validation
+### PHASE64.6 — Selector acceptance, telemetry, and release validation (hard gate for PHASE64.7)
 - Run the complete relevant Flutter tests, Android JVM tests, static analysis, and Release ARM64 APK/ABI audit.
 - Run live-provider tests using only the owner's free accounts/keys and within published quotas.
-- Perform real-device playback checks for movies, ordinary series, and anime.
-- Publish a provider scorecard with Arabic coverage, exact-episode match rate, exact-release match rate, successful download/parse rate, p50/p95 response time, sync complaints, and fallback success rate.
+- Perform real-device playback checks for movies, ordinary series, and anime, covering multiple releases and known Arabic subtitle references.
+- Publish a provider and selector scorecard with Arabic coverage, exact-episode match rate, exact-release match rate, hard-rejection correctness, high/medium/low confidence distribution, successful download/parse/apply rate, p50/p95 response time, sync complaints, and fallback success rate.
+- Verify that the selector consistently chooses the best supported candidate in the benchmark and never auto-applies a proven wrong-language, wrong-episode, or low-confidence candidate over a working verified subtitle.
+- Freeze and record the accepted selector algorithm/version, confidence thresholds, benchmark corpus, and test results.
+- PHASE64.7 cannot start until the owner-visible report records PHASE64.6 as PASS.
 - Do not claim a provider is “best” based only on its marketing description or catalogue size.
 
 ---
@@ -332,6 +402,10 @@ Acceptance:
 - A failed candidate causes a real fallback to the next eligible candidate/provider.
 - Search never delays video startup or changes the active video source.
 - The best candidate is selected by match evidence, not provider name alone.
+- A wrong-language, wrong-episode, malformed, or proven incompatible candidate is never automatically selected.
+- A low-confidence candidate cannot silently replace a working verified subtitle.
+- The menu shows one recommended track with other same-language tracks available as explicit alternatives.
+- The accepted selector has a recorded version and repeatable passing benchmark for movies, ordinary series, and anime.
 - Production API keys and account credentials are not committed, logged, or embedded as public application secrets. The owner's temporary phone-testing values in `.env.example` are an explicit development-only exception already documented in PHASE64.1; they must not be treated as safe for production or permanent credentials.
 - All provider quotas and published terms are respected.
 - Arabic text encoding, RTL rendering, and timing are checked on an actual Android device.
