@@ -22,6 +22,10 @@ class ExternalSubtitle {
 
   /// Provider quality metadata retained for the evidence-based selector.
   final String? productionType;
+  final String? translationType;
+  /// True when the provider lookup was scoped to this exact media identity.
+  /// Null means the provider did not expose enough evidence to assert it.
+  final bool? isExactIdentity;
   final String? releaseType;
   final int? downloadCount;
   final int? newDownloadCount;
@@ -49,6 +53,8 @@ class ExternalSubtitle {
     required this.release,
     this.source = 'Scraper API',
     this.productionType,
+    this.translationType,
+    this.isExactIdentity,
     this.releaseType,
     this.downloadCount,
     this.newDownloadCount,
@@ -80,6 +86,12 @@ class ExternalSubtitle {
       source: json['source']?.toString() ??
           json['provider']?.toString() ?? 'Scraper API',
       productionType: json['productionType']?.toString(),
+      translationType: json['translationType']?.toString(),
+      isExactIdentity: json['isExactIdentity'] == null
+          ? null
+          : (json['isExactIdentity'] == true ||
+                json['isExactIdentity']?.toString() == '1' ||
+                json['isExactIdentity']?.toString().toLowerCase() == 'true'),
       releaseType: json['releaseType']?.toString(),
       downloadCount: int.tryParse(json['downloadCount']?.toString() ?? ''),
       newDownloadCount:
