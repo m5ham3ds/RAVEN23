@@ -108,6 +108,70 @@ void main() {
     expect(injector.publicDio.options.baseUrl, isEmpty);
   });
   test(
+      'authenticated sign-in reuses the install device id after switching accounts',
+      () async {
+    final h = await SessionHarness.create();
+    addTearDown(h.dispose);
+    final adapter = FakeDioAdapter()..enqueueJson(authFixture(id: 7));
+    final injector = await buildInjector(
+        migrationFlags: MigrationFlags.parse('auth'),
+        environment: AppEnvironment.resolve(defineUrl: 'http://backend.test'),
+        kvStore: h.preferences,
+        tokenStore: h.tokens,
+        responseCacheStore: MemCacheStore(),
+        laravelDio: Dio()..httpClientAdapter = adapter);
+    addTearDown(injector.dispose);
+
+    await injector.session.signIn(
+        const LoginRequest(email: 'beamlak@example.com', password: 'password'));
+    final firstDeviceId = adapter.requests.single.data['device_id'] as String;
+    expect(RegExp(r'^[0-9a-fA-F-]{36}      () async {
+    final h = await SessionHarness.create();
+    addTearDown(h.dispose);
+    final firstAdapter = FakeDioAdapter()..enqueueJson(authFixture());
+    final first = await buildInjector(
+        migrationFlags: MigrationFlags.parse('auth'),
+        environment: AppEnvironment.resolve(defineUrl: 'http://backend.test'),
+        kvStore: h.preferences,
+        tokenStore: h.tokens,
+        responseCacheStore: MemCacheStore(),
+        laravelDio: Dio()..httpClientAdapter = firstAdapter);
+    await first.session.signIn(
+        const LoginRequest(email: 'beamlak@example.com', password: 'password'));
+    await first.dispose();
+    final restoredAdapter = FakeDioAdapter()..enqueueJson(authFixture());
+    final next = await buildInjector(
+        migrationFlags: MigrationFlags.parse('auth'),
+        environment: AppEnvironment.resolve(defineUrl: 'http://backend.test'),
+        kvStore: h.preferences,
+        tokenStore: h.tokens,
+        responseCacheStore: MemCacheStore(),
+        laravelDio: Dio()..httpClientAdapter = restoredAdapter);
+    addTearDown(next.dispose);
+    expect(next.session.state, const SessionState.initializing());
+    await next.session.restore();
+    await next.session.validation;
+    expect(next.session.ownerId.value, 'user:7');
+    expect(next.session.user?.username, 'beamlak');
+    expect(restoredAdapter.requests.single.uri.path, '/api/v1/user/profile');
+    expect(restoredAdapter.requests.single.headers['Authorization'],
+        'Bearer 7|sanitized-test-token');
+  });
+}
+).hasMatch(firstDeviceId), isTrue);
+
+    adapter.enqueueJson({'success': true});
+    await injector.session.signOut();
+    expect(injector.session.ownerId.value, isNull);
+
+    adapter.enqueueJson(authFixture(id: 8, token: '8|new-owner'));
+    await injector.session.signIn(
+        const LoginRequest(email: 'beamlak@example.com', password: 'password'));
+    expect(injector.session.ownerId.value, 'user:8');
+    expect(adapter.requests.last.data['device_id'], firstDeviceId);
+  });
+
+  test(
       'new injector restores a previous lifecycle session from persisted token and profile',
       () async {
     final h = await SessionHarness.create();
