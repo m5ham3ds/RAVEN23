@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:raven23/core/error/result.dart';
 import 'package:raven23/data/sources/device_identity.dart';
 import 'package:raven23/data/models/auth_requests.dart';
 import '../support/session_harness.dart';
