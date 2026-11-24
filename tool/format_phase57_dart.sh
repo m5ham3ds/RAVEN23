@@ -190,6 +190,7 @@ files=(
   lib/widgets/vast_ad_overlay.dart
   lib/data/sync/sync_runner.dart
   test/data/sync_runner_test.dart
+  test/data/device_identity_test.dart
 )
 
 for file in "${files[@]}"; do
