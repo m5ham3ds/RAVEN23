@@ -324,6 +324,7 @@ jobs:
             test/data/auth_repository_test.dart
             test/presentation/auth_screens_test.dart
             test/presentation/session_view_model_test.dart
+            test/data/sync_runner_test.dart
             test/presentation/firebase_session_bridge_test.dart
             test/presentation/guest_account_session_test.dart
             test/manga/manga_repository_manager_test.dart

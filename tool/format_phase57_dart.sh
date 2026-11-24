@@ -188,6 +188,8 @@ files=(
   lib/widgets/network_banner_widget.dart
   lib/widgets/playback_loading_screen.dart
   lib/widgets/vast_ad_overlay.dart
+  lib/data/sync/sync_runner.dart
+  test/data/sync_runner_test.dart
 )
 
 for file in "${files[@]}"; do
