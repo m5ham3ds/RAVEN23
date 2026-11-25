@@ -255,6 +255,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
+        <provider
+            android:name=".downloads.Raven23PlayerMediaProvider"
+            android:authorities="com.m5ham3d.raven23.offline-library"
+            android:exported="true"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>
