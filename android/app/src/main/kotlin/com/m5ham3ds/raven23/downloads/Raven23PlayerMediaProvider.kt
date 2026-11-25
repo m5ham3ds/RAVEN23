@@ -3,30 +3,44 @@ package com.m5ham3ds.raven23.downloads
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Binder
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.offline.Download
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileNotFoundException
+import java.io.IOException
+import java.util.concurrent.Executors
 import org.json.JSONObject
 
 /**
- * Read-only bridge for RAVEN23 Player.
+ * Read-only companion bridge for RAVEN23 Player.
  *
- * Completed private downloads are exposed through temporary content URIs.
- * The MP4 remains in RAVEN23's private filesDir/offline_exports directory;
- * no public MediaStore copy is created. Every URI grant is restricted to the
- * companion package and every call checks the Binder caller again.
+ * The Media3 download index remains the source of truth. Completed downloads
+ * are exposed whether or not their validated MP4 export already exists. When
+ * Player opens the returned video URI, an existing export is opened directly;
+ * otherwise the existing RAVEN23 exporter prepares the MP4 from the private
+ * Media3 cache and streams that same private export through a pipe.
+ *
+ * No download queue, cache namespace, download request, or primary-app UI is
+ * changed by this provider. The only durable media remains RAVEN23's existing
+ * private download/export data.
  */
 @UnstableApi
 class Raven23PlayerMediaProvider : ContentProvider() {
     private val appContext get() = checkNotNull(context).applicationContext
     private val store by lazy { StreamDownloadStore.get(appContext) }
     private val exporter by lazy { StreamDownloadExporter(appContext, store) }
+    private val pipeExecutor by lazy {
+        Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "raven23-player-media-pipe").apply { isDaemon = true }
+        }
+    }
 
     override fun onCreate(): Boolean = context != null
 
@@ -58,34 +72,36 @@ class Raven23PlayerMediaProvider : ContentProvider() {
             .forEach { download ->
                 val metadata = StreamDownloadStore.requestMetadata(download.request)
                 val downloadMap = store.downloadToMap(download).toMutableMap()
-                val export = if (download.state == androidx.media3.exoplayer.offline.Download.STATE_COMPLETED) {
-                    exporter.existingExport(download.request.id)
-                } else {
-                    null
-                }
-                val subtitle = store.subtitleFileForExport(download.request.id, download.request)
                 val id = download.request.id
-                val videoUri = if (export != null) {
+                val completed = download.state == Download.STATE_COMPLETED
+
+                // An unexported completed Media3 item is still playable. The
+                // exporter is invoked lazily only when Player opens this URI.
+                val videoUri = if (completed) {
                     providerRoot.buildUpon().appendPath(id).appendPath("video").build()
-                        .also { grantPlayerRead(it) }
+                        .also(::grantPlayerRead)
                 } else {
                     null
                 }
-                val subtitleUri = subtitle?.takeIf { it.isFile && it.length() > 0L }?.let {
+
+                val subtitle = store.subtitleFileForExport(id, download.request)
+                    ?.takeIf { it.isFile && it.length() > 0L }
+                val subtitleUri = subtitle?.let {
                     providerRoot.buildUpon().appendPath(id).appendPath("subtitle").build()
-                        .also { grantPlayerRead(it) }
+                        .also(::grantPlayerRead)
                 }
 
                 val expectedDuration = metadata.optLong("expectedDurationMs", 0L)
                     .takeIf { it > 0L } ?: 0L
                 val title = metadata.optString("title", "RAVEN23 video")
                     .trim().ifBlank { "RAVEN23 video" }
-                downloadMap["isPlayable"] = export != null
+
+                downloadMap["isPlayable"] = videoUri != null
                 downloadMap["videoUri"] = videoUri?.toString().orEmpty()
                 downloadMap["subtitleUri"] = subtitleUri?.toString().orEmpty()
                 downloadMap["subtitleName"] = subtitle?.name.orEmpty()
                 downloadMap["durationMs"] = expectedDuration
-                downloadMap["sizeBytes"] = export?.length() ?: download.bytesDownloaded
+                downloadMap["sizeBytes"] = download.bytesDownloaded
 
                 result.addRow(
                     arrayOf<Any?>(
@@ -110,8 +126,8 @@ class Raven23PlayerMediaProvider : ContentProvider() {
                         subtitle?.name.orEmpty(),
                         videoUri?.toString().orEmpty(),
                         expectedDuration,
-                        export?.length() ?: download.bytesDownloaded,
-                        export != null,
+                        download.bytesDownloaded,
+                        videoUri != null,
                         JSONObject(downloadMap).toString(),
                     ),
                 )
@@ -127,18 +143,62 @@ class Raven23PlayerMediaProvider : ContentProvider() {
         if (segments.size != 3 || segments[0] != "downloads") {
             throw FileNotFoundException("Unknown RAVEN23 media URI.")
         }
+
         val id = segments[1]
-        val file = when (segments[2]) {
-            "video" -> exporter.existingExport(id)
+        return when (segments[2]) {
+            "video" -> openVideo(id)
             "subtitle" -> {
                 val download = store.getDownload(id)
                     ?: throw FileNotFoundException("RAVEN23 download no longer exists.")
-                store.subtitleFileForExport(id, download.request)
+                val file = store.subtitleFileForExport(id, download.request)
+                    ?.takeIf { it.isFile && it.length() > 0L }
+                    ?: throw FileNotFoundException("The downloaded subtitle is not available.")
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
             }
-            else -> null
-        }?.takeIf { it.isFile && it.length() > 0L }
-            ?: throw FileNotFoundException("The requested RAVEN23 offline file is not ready.")
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            else -> throw FileNotFoundException("Unknown RAVEN23 media resource.")
+        }
+    }
+
+    private fun openVideo(downloadId: String): ParcelFileDescriptor {
+        val download = store.getDownload(downloadId)
+            ?: throw FileNotFoundException("RAVEN23 download no longer exists.")
+        if (download.state != Download.STATE_COMPLETED) {
+            throw FileNotFoundException("The RAVEN23 download is not complete yet.")
+        }
+
+        exporter.existingExport(downloadId)?.let { export ->
+            return ParcelFileDescriptor.open(export, ParcelFileDescriptor.MODE_READ_ONLY)
+        }
+
+        // Exporting HLS/DASH (or a progressive stream that has not yet been
+        // materialized) can take time. Return a pipe immediately so the
+        // ContentResolver/ExoPlayer reader never blocks the UI thread.
+        val pipe = ParcelFileDescriptor.createPipe()
+        try {
+            exporter.export(downloadId) { outcome ->
+                pipeExecutor.execute {
+                    val output = ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])
+                    try {
+                        val file = outcome.getOrThrow()
+                        FileInputStream(file).use { input ->
+                            input.copyTo(output, DEFAULT_PIPE_BUFFER_BYTES)
+                            output.flush()
+                        }
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Could not prepare streamed offline download $downloadId", error)
+                    } finally {
+                        runCatching { output.close() }
+                    }
+                }
+            }
+        } catch (error: Exception) {
+            runCatching { pipe[1].close() }
+            runCatching { pipe[0].close() }
+            throw FileNotFoundException(
+                error.message ?: "Could not prepare this RAVEN23 download.",
+            )
+        }
+        return pipe[0]
     }
 
     override fun getType(uri: Uri): String? {
@@ -188,5 +248,7 @@ class Raven23PlayerMediaProvider : ContentProvider() {
     companion object {
         const val AUTHORITY = "com.m5ham3d.raven23.offline-library"
         private const val PLAYER_PACKAGE = "com.m5ham3ds.raven23.player"
+        private const val TAG = "Raven23PlayerMedia"
+        private const val DEFAULT_PIPE_BUFFER_BYTES = 256 * 1024
     }
 }
