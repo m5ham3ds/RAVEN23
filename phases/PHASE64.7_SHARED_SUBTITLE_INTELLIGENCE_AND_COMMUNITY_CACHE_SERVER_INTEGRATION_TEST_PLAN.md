@@ -17,6 +17,21 @@
 
 ---
 
+
+
+## Current prerequisite reconciliation — 2026-11-27
+
+**Repository snapshot:** `main` @ `9c78364e1d631cc26414b3b086a263cd4450e6b2`.  
+**Current status:** **BLOCKED — TEST PLAN ONLY.** No shared-subtitle Laravel endpoints, migrations, object-storage contract, or cross-user publication workflow are defined in this RAVEN23 Flutter repository. The Laravel backend is maintained separately; its deployment state was not changed or assumed during this documentation sync.
+
+- PHASE64.4 has not been accepted: confidence classes/thresholds and benchmark evidence remain open.
+- PHASE64.5 has not passed Arabic decoding, RTL, and synchronization acceptance on a physical Android device.
+- PHASE64.6 has no accepted movie/series/anime scorecard or frozen selector-version PASS report.
+- The staging prerequisites in Section 5 (Laravel deployment, schema, durable storage, queue/lock, frozen routes/OpenAPI, authorization/takedown, provider credentials and quotas, two Android clients, and fixed test corpus) remain prerequisites, not completed implementation claims.
+- The owner-confirmed shared-publication allowlist remains normalized Arabic (`ar`) and English (`en`) only. Enforce it server-side as well as client-side when this phase is eventually authorized.
+
+Do not implement endpoints, database tables, shared publication, or live shared-cache tests until PHASE64.6 is explicitly accepted and the owner confirms the intended Laravel staging environment.
+
 ## 0. Purpose and expected outcome
 
 This document defines how to test the owner's proposed cross-user subtitle workflow after the Laravel server is connected:

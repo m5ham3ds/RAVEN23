@@ -34,6 +34,42 @@ The known issue that copies a selected subtitle sidecar beside the video under D
 
 ## Implementation progress log
 
+## Current source-to-plan reconciliation — 2026-11-27
+
+**Verified repository snapshot:** `main` @ `9c78364e1d631cc26414b3b086a263cd4450e6b2`.  
+**Latest CI evidence:** [GitHub Actions #319](https://github.com/m5ham3ds/RAVEN23/actions/runs/46050802426) completed successfully. The configured workflow ran its 64-file focused Flutter gate, its 25 selected Android ABI/offline-download contract checks (3 Mihon + 22 Media3/download), the ARM64 Release APK build, and the APK/ABI audit. The uploaded APK artifact is 45,405,099 bytes. This is CI/build evidence only; it is not live-provider or real-device acceptance.
+
+### Current phase states
+
+| Subphase | Reconciled state | Evidence / outstanding gate |
+|---|---|---|
+| PHASE64.0 | **Partially complete; live validation open** | OpenSubtitles API v1, documented SubSource API v1, ArabicSubs proxy adapter, and RAVEN23 Scraper fallback are present in the app source. Actual authenticated provider/quota checks and the fixed provider corpus are not recorded as accepted. |
+| PHASE64.1 | **Development-only exception active; closure open** | The owner-approved temporary phone-testing configuration remains in force. Do not blank, rotate, replace, or migrate the existing TMDB/OpenSubtitles/SubSource test values until the owner explicitly closes phone testing. ArabicSubs Bearer credentials remain server-side only. This exception is not production approval. |
+| PHASE64.2 | **Partially implemented** | The existing documented adapters are present. SubF2M, Sub-Scene, and AnimeTosho remain conditional research candidates, not accepted production adapters. Provider terms, live coverage, and exact episode/release behavior remain to be validated. |
+| PHASE64.3 | **Partially implemented** | `SubtitleProviderOrchestrator.collectPartialResults` retains completed provider results when another provider stalls. The current service still uses a 48-second aggregate deadline; per-provider deadlines and true incremental menu updates are not implemented. |
+| PHASE64.4 | **IN PROGRESS — current execution focus** | `SubtitleSelectionEngine` filters by requested language and orders by available identity/release/uploader/rating/vote/download/date signals. It does not yet implement accepted confidence classes/thresholds or a benchmark-calibrated scorecard. The active video source supplies a quality label rather than a verified full release/timing fingerprint. |
+| PHASE64.5 | **Acceptance not complete** | The current normalizer decodes UTF-8 and falls back to Windows-1252. Explicit UTF-16 and verified Windows-1256 Arabic decoding, Arabic/Latin RTL rendering, and timing checks on the real Android player remain open. |
+| PHASE64.6 | **Blocked pending 64.4 and 64.5** | No accepted fixed corpus/scorecard covering movies, ordinary series, and anime, no frozen selector version/thresholds, and no real-device acceptance report were found in the audited phase records. |
+| PHASE64.7 | **BLOCKED — test plan only** | Requires PHASE64.6 PASS plus the separate Laravel staging deployment, deployed schema/storage/queue/locks, real API/OpenAPI contract, authorization policy, and two-client test setup. Do not start shared publication or live shared-cache tests before these gates pass. |
+
+### Direct source observations
+
+- `lib/services/external_subtitle_service.dart` contains the OpenSubtitles API v1, SubSource documented API v1, optional ArabicSubs protected-proxy path, and RAVEN23 Scraper fallback.
+- `lib/services/subtitle_provider_orchestrator.dart` contains the partial-result collector. The orchestration does not yet provide independently bounded provider deadlines or a true live incremental results stream.
+- `lib/services/subtitle_selection_engine.dart` implements a deterministic ordering/filtering helper, not the final confidence-calibrated selector required by PHASE64.4/64.6.
+- `lib/services/subtitle_file_normalizer.dart` normalizes ZIP/GZIP and supported subtitle formats, but its text decoder currently uses UTF-8 followed by Windows-1252 fallback; this is not the required Arabic encoding acceptance.
+- `lib/screens/common/player/player_external_subtitles.dart` wires the preferred Arabic language and external subtitle selection into the player. The presence of this UI/source path is not proof of correct timing or RTL rendering on a physical device.
+
+### Credential and historical-note reconciliation
+
+The earlier 2026-11-22 progress bullet stating that OpenSubtitles/SubSource credentials must be rotated before validation is superseded by the later owner-approved temporary phone-testing exception in PHASE64.1 (also recorded in `RAVEN23_TEMPORARY_PUBLIC_API_KEY_TESTING_EXCEPTION.md`). Preserve those values exactly as instructed during phone testing; do not expose them in logs/documents or use them for production. The actual live-provider validation result remains **not recorded**, so PHASE64.0 is still open.
+
+### Acceptance rule
+
+A successful CI run confirms the configured code-analysis, focused-test, Android contract, APK-build, and ABI-audit steps. It does not close PHASE64.0–64.6. PHASE64.5 and PHASE64.6 still require Arabic sample decoding, real playback/synchronization, fixed-corpus measurements, and an owner-visible PASS report. PHASE64.7 remains locked until then.
+
+---
+
 ### 2026-11-22 — Implementation authorized and first PHASE64.3 reliability fix
 
 - Owner approval received to begin implementation. This changes the document from proposal-only to active work; it does not mark PHASE64.0–64.6 as passed.
@@ -53,7 +89,7 @@ The known issue that copies a selected subtitle sidecar beside the video under D
 - The active stream exposes a quality label, not a verified full release filename or timing fingerprint. Matching those available quality tokens is ordering evidence only; it is not sufficient to claim high confidence or to close PHASE64.4–64.6.
 - Shared publication is still blocked. The owner has additionally specified that any future shared upload must accept only Arabic (ar) and English (en); all other languages remain searchable, visible, selectable, and device-local, but are not published to the server.
 - .env.example already declares OPENSUBTITLES_API_KEY, SUBSOURCE_API_KEY, and ARABICSUBS_PROXY_URL. No values were copied, inserted, or exposed by this implementation. ArabicSubs credentials remain server-only.
-- Validation is pending until the next CI run. This progress entry does not mark PHASE64.4 complete, does not claim live-provider or real-device acceptance, and does not unlock PHASE64.7.
+- At the time of this 2026-11-22 entry, validation was pending. The later CI #319 run on 2026-11-27 passed the configured focused CI/build gate on the restored baseline; this does not mark PHASE64.4 complete and does not claim live-provider or real-device acceptance or unlock PHASE64.7.
 
 **Protected-scope impact:** only subtitle language resolution, external subtitle candidate selection, its focused tests, the Phase64 CI test list, and Phase64 documentation are touched. No video URL/source selection, PRIMARY/BACKUP order, quality policy, offline player/download/export path, UI layout, backend contract, or deferred DCIM subtitle-sidecar behavior is changed.
 
@@ -64,7 +100,7 @@ The known issue that copies a selected subtitle sidecar beside the video under D
 - A deeper post-CI review found that `_mergeAndSort` still applied a fixed provider-name rank and removed same-language/same-release entries before `SubtitleSelectionEngine` could inspect them. This contradicted the new selector's provider-neutral contract and could discard better candidates. The current follow-up removes provider-name ranking and preserves distinct provider records; its regression run is pending.
 - The Android CI report template also contained an obsolete hard-coded 32-file inventory although the executed log showed 59 files. The current follow-up derives the reported test-file inventory from the actual Flutter log instead of keeping a duplicate stale list.
 - `PHASE64.4` remains IN PROGRESS: the selector still lacks accepted confidence classes/thresholds and benchmark evidence; the active stream currently supplies only a quality label rather than a verified full release fingerprint. Do not start PHASE64.5 or unlock PHASE64.7 until the required matching, Arabic decoding/RTL, and real-device gates are accepted.
-- `PHASE64.0` live credential validation remains blocked until the exposed OpenSubtitles and SubSource keys are rotated. SubF2M, Sub-Scene, and AnimeTosho remain research candidates, not integrated providers.
+- `PHASE64.0` live credential validation remains pending. The earlier rotation instruction is superseded by the later owner-approved temporary phone-testing exception in PHASE64.1: do not blank, rotate, replace, or migrate the existing test values until the owner explicitly closes phone testing. Do not use those exposed test values for production. SubF2M, Sub-Scene, and AnimeTosho remain research candidates, not integrated providers.
 - **Protected-scope impact:** the follow-up is restricted to provider-result merge/deduplication, its tests, accurate CI-report generation, environment descriptions, and this phase document. Provider-supplied video subtitle tracks, active video URLs, provider/server ordering, quality selection, offline playback, downloads/export, DCIM behavior, player layout, and backend contracts remain unchanged.
 - **Changed files in this follow-up:** `.github/workflows/android-ci.yml`, `lib/services/external_subtitle_service.dart`, `test/external_subtitle_service_test.dart`, and `phases/PHASE64_ARABIC_SUBTITLE_PROVIDER_QUALITY_AND_FALLBACK_PLAN.md`. The environment template correction is recorded separately in the preceding commits.
 

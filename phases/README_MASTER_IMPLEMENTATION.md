@@ -1,13 +1,28 @@
-# ACTIVE SCOPE — PHASE63.39 (2026-11-21)
+# CURRENT PROJECT STATUS — VERIFIED 2026-11-27
 
-The exact and exclusive authorization for the current RAVEN23 offline-download task is
-[`PHASE63.39_OFFLINE_SUBTITLES_EPISODES_SEASONS_AND_INCREMENTAL_PLAYBACK.md`](PHASE63.39_OFFLINE_SUBTITLES_EPISODES_SEASONS_AND_INCREMENTAL_PLAYBACK.md).
+**Repository:** `m5ham3ds/RAVEN23`  
+**Verified baseline:** `main` @ `9c78364e1d631cc26414b3b086a263cd4450e6b2`  
+**Latest verified CI:** [Run #319 — success](https://github.com/m5ham3ds/RAVEN23/actions/runs/46050802426)  
+**Current approved implementation track:** PHASE64 — current execution focus PHASE64.4.  
+**Open earlier acceptance item:** PHASE63.39 — offline download/playback scope is partially implemented, but partial playback and physical-device acceptance remain open.  
+**Branches observed during this audit:** `main` only.
 
-Only the four items in that phase are authorized: selected subtitle sidecars, restoring complete offline episode cards, locally switching among seasons with completed downloads, and concurrent export preparation / verified partial playback. No unrelated source, navigation, styling, backend, catalog, quality, priority or player-design changes are allowed.
+The detailed source-to-document comparison, phase matrix, CI evidence, and remaining acceptance gates are recorded in
+[PHASE_STATUS_RECONCILIATION_2026-11-27.md](PHASE_STATUS_RECONCILIATION_2026-11-27.md).
 
-PHASE63.39 is the active acceptance authority. Where an older phase or this historical log differs, PHASE63.39 wins. The complete supersession rules and safety conditions are in the linked phase document.
+## Current authority and scope boundaries
+
+- PHASE64 is the latest approved implementation plan. PHASE64.4 is in progress; PHASE64.0–64.3 still have open validation/adapters/credential tasks and must not be described as fully accepted.
+- PHASE63.39 remains an open acceptance item from the offline-download work. Its offline episode/season and subtitle-persistence source paths exist, but the current implementation exposes playback only for completed downloads. Verified partial playback while downloading is not implemented by the inspected code.
+- PHASE64 explicitly protects the offline player, episode cards, season switching, downloads, DCIM export, video-source ordering, quality behavior, and other accepted features. Do not modify those areas as part of PHASE64.
+- PHASE64.5 (Arabic decoding/RTL/synchronization) and PHASE64.6 (fixed movie/series/anime benchmark and real-device acceptance) must pass before PHASE64.7 can start.
+- PHASE64.7 remains blocked until both the selector acceptance gate and the separate Laravel staging/API prerequisites are met.
+- CI #319 proves the configured routine validation/build path passed on the verified baseline. It does not prove live provider authentication, all 312 test files, physical-device playback, Firebase-enabled production behavior, or the final product acceptance gates.
+
+Historical phase entries below retain their original dates and outcomes. They are an audit trail, not a live status dashboard; use the reconciliation report and linked phase plans for current status.
 
 ---
+
 
 # PHASE63.38 — Unified BetterPlayer offline playback, automatic export and DCIM library (2026-11-21)
 

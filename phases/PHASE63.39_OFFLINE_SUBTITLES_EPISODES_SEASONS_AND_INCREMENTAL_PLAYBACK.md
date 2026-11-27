@@ -61,3 +61,25 @@ Do not change online playback behavior, player design, source catalogue contents
 - Test progressive MP4, HLS and DASH while download is active; verify contiguous range, seek boundary, cache-only behaviour and concurrent download/playback. Specifically test non-contiguous segments and a byte progress such as 40% that does not equal 40% timeline coverage.
 - Run focused Flutter tests, Android JVM tests and the Release APK CI gate. A successful build alone does not prove device-level partial-playback correctness.
 - No unrelated files may appear in the diff. The final diff must list each changed file and map it to one of the four scope items above.
+
+
+---
+
+## Source-to-plan reconciliation — 2026-11-27
+
+**Verified baseline:** `main` @ `9c78364e1d631cc26414b3b086a263cd4450e6b2`.  
+**Latest CI:** [Run #319 — success](https://github.com/m5ham3ds/RAVEN23/actions/runs/46050802426). The run passed the configured focused Flutter/Android gates and ARM64 APK/ABI build. This does not constitute physical-device acceptance of the offline workflow.
+
+### Current implementation evidence
+
+- **Selected subtitle sidecar:** `StreamDownloadStore` contains the selected-subtitle preparation/persistence path and records subtitle status/path/name in the native download request metadata. The Flutter offline-download tests cover request serialization and subtitle status/data paths; the Android contract gate covers SRT extension/conversion and DCIM destination helpers.
+- **Offline episode metadata and season selection:** the native download metadata carries episode/season fields, and `OfflinePlayerScreen` reconstructs local episode/season information from completed downloads. Its season list is built from completed downloaded episodes and does not require an online season lookup for the local selection path.
+- **Completed offline playback:** `Raven23PlayerMediaProvider` exposes a video URI only when Media3 reports `Download.STATE_COMPLETED`; `openVideo` rejects any item that is not completed. `StreamDownloadExporter.export` independently rejects a download unless its state is `STATE_COMPLETED`. A pipe in the provider is used to stream an export after completion; it is not progressive playback of an active download.
+- **Concurrent preparation / verified partial playback:** not implemented in the inspected baseline. No cache-only contiguous playable-prefix bridge is exposed for an active download, and the exporter requires completion before starting. Do not describe byte progress or the post-completion pipe as partial playback.
+
+### Reconciled state
+
+**PARTIALLY IMPLEMENTED — NOT ACCEPTED.** Source and contract-test support exists for subtitle persistence, saved episode metadata, local season navigation, and completed-download playback. The fourth requirement (preparing during download and playing only a verified contiguous prefix) remains unimplemented. Physical-device checks for the listed offline MP4/HLS/DASH, season switching, subtitle, DCIM, and restart scenarios remain required.
+
+PHASE64 explicitly treats the offline player, episode cards, season switching, downloads, and DCIM export as protected scope. Do not change this phase's implementation while executing PHASE64 unless the owner separately reauthorizes it.
+
