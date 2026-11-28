@@ -7,6 +7,15 @@
 **Open earlier acceptance item:** PHASE63.39 — offline download/playback scope is partially implemented, but partial playback and physical-device acceptance remain open.  
 **Branches observed during this audit:** `main` only.
 
+## Critical release issue discovered — 2026-11-28
+
+- **Status: OPEN.** The Android APK update path is not fully compatible with previously installed builds.
+- The application ID changed from `com.m5ham3ds.raven23` to `com.m5ham3d.raven23` on 2026-11-18; this breaks in-place update identity for installations using the former ID.
+- CI #319 and #320 both produced `versionCode=12`; build numbers are not monotonically advanced.
+- The last two CI builds restored the same signing cache and reported the same certificate fingerprint; this rules out a signing change between those two runs but not all historical installations.
+- Dedicated investigation and remediation requirements: [ANDROID_APK_IN_PLACE_UPDATE_COMPATIBILITY_INVESTIGATION_2026-11-28.md](ANDROID_APK_IN_PLACE_UPDATE_COMPATIBILITY_INVESTIGATION_2026-11-28.md).
+- This is a documentation finding, not a claim that an Android device-side replacement test has already passed. Do not mark the issue resolved until a previous APK is upgraded in place and app data is preserved.
+
 The detailed source-to-document comparison, phase matrix, CI evidence, and remaining acceptance gates are recorded in
 [PHASE_STATUS_RECONCILIATION_2026-11-27.md](PHASE_STATUS_RECONCILIATION_2026-11-27.md).
 
